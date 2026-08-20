@@ -88,12 +88,19 @@ export function AppLayout({
         layoutViewportHeight = Math.max(layoutViewportHeight, currentLayoutHeight);
       }
 
+      const viewportTop = viewport?.offsetTop ?? 0;
+      const viewportLeft = viewport?.offsetLeft ?? 0;
+      const viewportWidth = viewport?.width ?? window.innerWidth;
+      const viewportHeight = viewport?.height ?? currentLayoutHeight;
       const bottomInset = viewport
-        ? Math.max(0, layoutViewportHeight - (viewport.offsetTop + viewport.height))
+        ? Math.max(0, layoutViewportHeight - (viewportTop + viewportHeight))
         : 0;
 
+      shell.style.setProperty('--visual-viewport-top', `${Math.ceil(viewportTop)}px`);
+      shell.style.setProperty('--visual-viewport-left', `${Math.ceil(viewportLeft)}px`);
+      shell.style.setProperty('--visual-viewport-width', `${Math.ceil(viewportWidth)}px`);
+      shell.style.setProperty('--visual-viewport-height', `${Math.ceil(viewportHeight)}px`);
       shell.style.setProperty('--visual-viewport-bottom-inset', `${Math.ceil(bottomInset)}px`);
-      shell.style.setProperty('--visual-viewport-height', `${Math.ceil(viewport?.height ?? currentLayoutHeight)}px`);
     };
 
     const scheduleVisualViewportSync = () => {
@@ -113,8 +120,11 @@ export function AppLayout({
       visualViewport?.removeEventListener('scroll', scheduleVisualViewportSync);
       window.removeEventListener('resize', scheduleVisualViewportSync);
       window.removeEventListener('orientationchange', scheduleVisualViewportSync);
-      shell.style.removeProperty('--visual-viewport-bottom-inset');
+      shell.style.removeProperty('--visual-viewport-top');
+      shell.style.removeProperty('--visual-viewport-left');
+      shell.style.removeProperty('--visual-viewport-width');
       shell.style.removeProperty('--visual-viewport-height');
+      shell.style.removeProperty('--visual-viewport-bottom-inset');
     };
   }, []);
 
