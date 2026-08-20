@@ -14,7 +14,7 @@ export function WelcomeScreen({ onDemo, onAuth }: { onDemo: () => void; onAuth: 
             <button className="button button--primary" type="button" onClick={onDemo}>Открыть рабочее пространство</button>
             <button className="button button--secondary" type="button" onClick={onAuth}>Посмотреть экран доступа</button>
           </div>
-          <p className="entry-note">Реальный AI-запрос не выполняется. При доступном localStorage demo-состояние хранится только в этом браузере.</p>
+          <p className="entry-note">Реальный AI-запрос не выполняется. При доступном localStorage preview-состояние хранится только в этом браузере.</p>
         </div>
       </section>
       <section className="principles-strip" aria-label="Принципы ARVELIS AI">
