@@ -1,140 +1,102 @@
-import { useRef } from 'react';
-import { ArrowIcon, SendIcon } from '../components/Icons';
+import { BrandMark } from '../components/Brand';
+import { ArrowIcon, ChatIcon } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
-import { starterPrompts } from '../data/demo';
-import { CHAT_MESSAGE_MAX_CHARS } from '../domain/chatPolicy';
 import {
   conversationMessageCount,
   conversationMessageCountLabel,
   conversationRelativeTime,
 } from '../domain/chatPresentation';
-import { useChatDraft } from '../hooks/useChatDraft';
-import { chatDraftKey } from '../lib/chatDraftStorage';
 import type { DemoThread } from '../types';
-
-const NEW_CHAT_DRAFT_KEY = chatDraftKey(null);
-
-function dialogCount(count: number): string {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return `${count} диалог`;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} диалога`;
-  return `${count} диалогов`;
-}
 
 function greetingFor(profileName: string): string {
   const hour = new Date().getHours();
   const greeting = hour < 6 ? 'Доброй ночи' : hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
   const normalized = profileName.trim();
-  if (!normalized || normalized === 'Пользователь ARVELIS') return `${greeting}. Можно начинать.`;
+  if (!normalized || normalized === 'Пользователь ARVELIS') return greeting;
   const firstName = normalized.split(/\s+/)[0] ?? normalized;
-  return `${greeting}, ${firstName}. Можно начинать.`;
+  return `${greeting}, ${firstName}`;
 }
 
 export function WorkspaceScreen({
   profileName,
   threads,
   threadLimitReached,
-  onSubmit,
+  onNewChat,
   onOpenThread,
 }: {
   profileName: string;
   threads: DemoThread[];
   threadLimitReached: boolean;
-  onSubmit: (prompt: string) => void;
+  onNewChat: () => void;
   onOpenThread: (threadId: string) => void;
 }) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const {
-    value: draft,
-    setValue: setDraft,
-    saveFailed: draftSaveFailed,
-    flush: flushDraft,
-    clear: clearDraft,
-  } = useChatDraft(NEW_CHAT_DRAFT_KEY);
-
-  const submit = () => {
-    const prompt = draft.trim();
-    if (!prompt || threadLimitReached) return;
-    clearDraft();
-    onSubmit(prompt);
-  };
-
-  const useScenario = (prompt: string) => {
-    if (threadLimitReached) return;
-    setDraft(prompt);
-    window.requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-      textareaRef.current?.setSelectionRange(prompt.length, prompt.length);
-      textareaRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    });
-  };
-
   return (
-    <div className="content-page">
-      <Topbar title="ARVELIS AI" subtitle={greetingFor(profileName)} />
+    <div className="content-page home-v2">
+      <Topbar title="Главная" subtitle={`${greetingFor(profileName)}. Здесь собрана основная информация об ARVELIS AI.`} />
 
-      <section className="workspace-hero">
-        <div className="workspace-hero__copy">
-          <p className="section-kicker workspace-welcome">ВАШ АССИСТЕНТ</p>
-          <h2>С чего начнём?</h2>
-          <p>Опишите задачу своими словами. Можно начать с цели, вопроса или просто контекста — ARVELIS AI создан, чтобы помогать двигаться от мысли к понятному результату.</p>
-        </div>
-        <div>
-          <div className="composer composer--hero">
-            <textarea
-              ref={textareaRef}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onBlur={flushDraft}
-              placeholder="Например: помоги сравнить варианты, разобраться в теме или составить план…"
-              aria-label="Описание задачи"
-              rows={5}
-              maxLength={CHAT_MESSAGE_MAX_CHARS}
-              disabled={threadLimitReached}
-            />
-            <div className="composer__footer">
-              <span>{draft.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')}</span>
-              <button className="send-button" type="button" disabled={!draft.trim() || threadLimitReached} onClick={submit} aria-label="Создать тестовый диалог"><SendIcon /></button>
-            </div>
-          </div>
-          {draftSaveFailed ? (
-            <p className="workspace-draft-note" role="status">Черновик не удалось сохранить на устройстве.</p>
-          ) : null}
-          {threadLimitReached ? (
-            <p className="workspace-limit-note" role="status">Локальная тестовая версия достигла лимита диалогов. Удалите ненужный диалог в «Истории», чтобы создать новый.</p>
-          ) : null}
+      <section className="home-v2__hero">
+        <div className="home-v2__hero-mark" aria-hidden="true"><BrandMark size="default" /></div>
+        <div className="home-v2__hero-copy">
+          <p className="section-kicker">ARVELIS AI</p>
+          <h2>Интеллект вокруг вашей задачи.</h2>
+          <p>
+            ARVELIS AI создаётся как профессиональный универсальный ассистент для работы, учёбы и сложных повседневных задач — с понятным интерфейсом, контролем данных и модульной архитектурой.
+          </p>
+          <button className="button button--primary home-v2__primary" type="button" onClick={onNewChat} disabled={threadLimitReached}>
+            <ChatIcon />Новый чат
+          </button>
+          {threadLimitReached ? <span className="home-v2__limit">Локальный preview достиг лимита диалогов. Удалите ненужный диалог в истории.</span> : null}
         </div>
       </section>
 
-      <section className="section-block">
-        <div className="section-heading"><p className="section-kicker">МОЖНО НАЧАТЬ ОТСЮДА</p><h2>Быстрые сценарии</h2></div>
-        <div className="scenario-list">
-          {starterPrompts.map((item) => (
-            <button className="scenario-row" type="button" key={item.id} onClick={() => useScenario(item.prompt)} disabled={threadLimitReached}>
-              <span className="scenario-row__index">{item.index}</span>
-              <div><strong>{item.title}</strong><p>{item.description}</p></div>
-              <ArrowIcon />
-            </button>
-          ))}
-        </div>
+      <section className="home-v2__grid" aria-label="О проекте ARVELIS AI">
+        <article className="home-v2__card home-v2__card--wide">
+          <span className="home-v2__card-index">01</span>
+          <p className="section-kicker">О ПРОЕКТЕ</p>
+          <h3>Профессиональный ассистент, а не очередной безликий чат.</h3>
+          <p>Продукт проектируется mobile-first: быстрый запуск, спокойный премиальный интерфейс, история диалогов, профиль и понятные системные состояния.</p>
+        </article>
+        <article className="home-v2__card">
+          <span className="home-v2__card-index">02</span>
+          <p className="section-kicker">КАК ПОЛЬЗОВАТЬСЯ</p>
+          <h3>Начните с обычной формулировки.</h3>
+          <p>Откройте «Чат», опишите цель или вопрос своими словами, затем уточняйте задачу в одном диалоге.</p>
+        </article>
+        <article className="home-v2__card">
+          <span className="home-v2__card-index">03</span>
+          <p className="section-kicker">КОНФИДЕНЦИАЛЬНОСТЬ</p>
+          <h3>Сейчас данные остаются локально.</h3>
+          <p>В этой версии нет серверного аккаунта, AI-провайдера или production-хранилища. Не вводите секреты и чувствительные данные.</p>
+        </article>
+        <article className="home-v2__card home-v2__card--status">
+          <div className="home-v2__status-line"><span className="home-v2__status-dot" /><strong>PRODUCT PREVIEW</strong></div>
+          <p className="section-kicker">СТАТУС</p>
+          <h3>Интерфейс строится до подключения модели.</h3>
+          <p>Авторизация, backend, production database и реальный AI пока не подключены. Это намеренный этап разработки.</p>
+        </article>
       </section>
 
-      <section className="section-block">
-        <div className="section-heading section-heading--inline"><div><p className="section-kicker">ПРОДОЛЖИТЬ</p><h2>Недавние диалоги</h2></div><span>{dialogCount(threads.length)}</span></div>
+      <section className="home-v2__recent">
+        <div className="section-heading section-heading--inline">
+          <div><p className="section-kicker">БЫСТРЫЙ ДОСТУП</p><h2>Недавние диалоги</h2></div>
+          <span>{threads.length}</span>
+        </div>
         {threads.length ? (
           <div className="history-list">
-            {threads.slice(0, 4).map((thread) => {
+            {threads.slice(0, 3).map((thread) => {
               const conversationCount = conversationMessageCount(thread);
               return (
                 <button className="history-row" type="button" key={thread.id} onClick={() => onOpenThread(thread.id)}>
-                  <div><strong>{thread.title}</strong><span>{conversationMessageCountLabel(conversationCount)} · {conversationRelativeTime(thread.updatedAt)}</span></div>
+                  <div>
+                    <strong>{thread.title}</strong>
+                    <span>{conversationMessageCountLabel(conversationCount)} · {conversationRelativeTime(thread.updatedAt)}</span>
+                  </div>
                   <ArrowIcon />
                 </button>
               );
             })}
           </div>
-        ) : <div className="empty-inline">Пока здесь пусто. Первый диалог появится после вашей первой задачи.</div>}
+        ) : <div className="empty-inline">Диалогов пока нет. Новый разговор можно начать во вкладке «Чат».</div>}
       </section>
     </div>
   );
