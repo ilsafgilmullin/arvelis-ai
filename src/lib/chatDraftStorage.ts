@@ -1,6 +1,7 @@
+import { CHAT_DRAFT_MAX_ENTRIES, CHAT_MESSAGE_MAX_CHARS } from '../domain/chatPolicy';
+
 const DRAFT_STORAGE_KEY = 'arvelis.preview.chatDrafts.v1';
-const MAX_DRAFTS = 64;
-const MAX_DRAFT_LENGTH = 6000;
+const MAX_DRAFT_KEY_LENGTH = 160;
 
 type DraftStore = Record<string, string>;
 
@@ -17,17 +18,17 @@ function readDraftStore(): DraftStore {
     const store: DraftStore = {};
     for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
       if (
-        key.length <= 160 &&
+        key.length <= MAX_DRAFT_KEY_LENGTH &&
         typeof value === 'string' &&
-        value.length <= MAX_DRAFT_LENGTH
+        value.length <= CHAT_MESSAGE_MAX_CHARS
       ) {
         store[key] = value;
       }
     }
 
     const keys = Object.keys(store);
-    if (keys.length > MAX_DRAFTS) {
-      for (const staleKey of keys.slice(0, keys.length - MAX_DRAFTS)) {
+    if (keys.length > CHAT_DRAFT_MAX_ENTRIES) {
+      for (const staleKey of keys.slice(0, keys.length - CHAT_DRAFT_MAX_ENTRIES)) {
         delete store[staleKey];
       }
     }
@@ -58,7 +59,7 @@ export function loadChatDraft(key: string): string {
 }
 
 export function saveChatDraft(key: string, content: string): boolean {
-  const normalized = content.slice(0, MAX_DRAFT_LENGTH);
+  const normalized = content.slice(0, CHAT_MESSAGE_MAX_CHARS);
   const store = readDraftStore();
 
   if (!normalized) {
@@ -71,8 +72,8 @@ export function saveChatDraft(key: string, content: string): boolean {
   store[key] = normalized;
 
   const keys = Object.keys(store);
-  if (keys.length > MAX_DRAFTS) {
-    for (const staleKey of keys.slice(0, keys.length - MAX_DRAFTS)) {
+  if (keys.length > CHAT_DRAFT_MAX_ENTRIES) {
+    for (const staleKey of keys.slice(0, keys.length - CHAT_DRAFT_MAX_ENTRIES)) {
       delete store[staleKey];
     }
   }
