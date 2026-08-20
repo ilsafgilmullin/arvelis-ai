@@ -241,12 +241,11 @@ export default function App() {
     const normalizedTitle = normalizeThreadTitle(title);
     if (!normalizedTitle) return;
 
-    const timestamp = Date.now();
     setWorkspace((current) => current ? {
       ...current,
       threads: current.threads.map((thread) => thread.id === threadId && thread.title !== normalizedTitle
-        ? { ...thread, title: normalizedTitle, updatedAt: timestamp }
-        : thread).sort((a, b) => b.updatedAt - a.updatedAt),
+        ? { ...thread, title: normalizedTitle }
+        : thread),
     } : current);
   };
 
