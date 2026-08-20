@@ -19,15 +19,9 @@ import {
   CHAT_SEARCH_MAX_CHARS,
   CHAT_THREAD_TITLE_MAX_CHARS,
 } from '../domain/chatPolicy';
-import {
-  chatDraftKey,
-  loadChatDraft,
-  removeChatDraft,
-  saveChatDraft,
-} from '../lib/chatDraftStorage';
+import { useChatDraft } from '../hooks/useChatDraft';
+import { chatDraftKey } from '../lib/chatDraftStorage';
 import type { DemoMessage, DemoThread } from '../types';
-
-const DRAFT_SAVE_DELAY = 180;
 
 const QUICK_STARTS = [
   { label: 'Разобрать задачу', prompt: 'Помоги разобраться в задаче: ' },
@@ -114,14 +108,12 @@ export function ChatScreen({
   onRenameThread: (threadId: string, title: string) => void;
   onDeleteThread: (threadId: string) => void;
 }) {
-  const [message, setMessage] = useState('');
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessage, setEditingMessage] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [copyFeedback, setCopyFeedback] = useState<CopyFeedback | null>(null);
   const [isAtEnd, setIsAtEnd] = useState(true);
-  const [draftSaveFailed, setDraftSaveFailed] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -134,13 +126,18 @@ export function ChatScreen({
   const composerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const messageNodesRef = useRef<Map<string, HTMLElement>>(new Map());
-  const messageRef = useRef('');
-  const draftSaveTimerRef = useRef<number | null>(null);
   const copyFeedbackTimerRef = useRef<number | null>(null);
   const pendingOwnSendRef = useRef(false);
 
   const title = useMemo(() => thread?.title ?? 'Новый диалог', [thread]);
   const draftKey = useMemo(() => chatDraftKey(thread?.id ?? null), [thread?.id]);
+  const {
+    value: message,
+    setValue: updateComposerMessage,
+    saveFailed: draftSaveFailed,
+    flush: flushDraft,
+    clear: clearDraft,
+  } = useChatDraft(draftKey);
   const sendLimitReached = thread ? messageLimitReached : threadLimitReached;
   const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase('ru-RU');
   const searchMatches = useMemo(() => {
@@ -152,33 +149,6 @@ export function ChatScreen({
   const activeSearchMessageId = searchMatches.length
     ? searchMatches[Math.min(searchIndex, searchMatches.length - 1)] ?? null
     : null;
-
-  const scheduleDraftSave = (nextMessage: string) => {
-    if (draftSaveTimerRef.current !== null) {
-      window.clearTimeout(draftSaveTimerRef.current);
-    }
-
-    draftSaveTimerRef.current = window.setTimeout(() => {
-      const saved = saveChatDraft(draftKey, nextMessage);
-      setDraftSaveFailed(!saved);
-      draftSaveTimerRef.current = null;
-    }, DRAFT_SAVE_DELAY);
-  };
-
-  const updateComposerMessage = (nextMessage: string) => {
-    const limited = nextMessage.slice(0, CHAT_MESSAGE_MAX_CHARS);
-    messageRef.current = limited;
-    setMessage(limited);
-    scheduleDraftSave(limited);
-  };
-
-  const flushDraft = () => {
-    if (draftSaveTimerRef.current !== null) {
-      window.clearTimeout(draftSaveTimerRef.current);
-      draftSaveTimerRef.current = null;
-    }
-    setDraftSaveFailed(!saveChatDraft(draftKey, messageRef.current));
-  };
 
   const scrollToLatest = (behavior: ScrollBehavior = 'smooth') => {
     window.requestAnimationFrame(() => {
@@ -197,15 +167,6 @@ export function ChatScreen({
   };
 
   useEffect(() => {
-    if (draftSaveTimerRef.current !== null) {
-      window.clearTimeout(draftSaveTimerRef.current);
-      draftSaveTimerRef.current = null;
-    }
-
-    const restoredDraft = loadChatDraft(draftKey);
-    messageRef.current = restoredDraft;
-    setMessage(restoredDraft);
-    setDraftSaveFailed(false);
     setEditingMessageId(null);
     setEditingMessage('');
     setRenaming(false);
@@ -214,14 +175,6 @@ export function ChatScreen({
     setSearchQuery('');
     setSearchIndex(0);
     messageNodesRef.current.clear();
-
-    return () => {
-      if (draftSaveTimerRef.current !== null) {
-        window.clearTimeout(draftSaveTimerRef.current);
-        draftSaveTimerRef.current = null;
-      }
-      saveChatDraft(draftKey, messageRef.current);
-    };
   }, [draftKey]);
 
   useEffect(() => {
@@ -335,15 +288,8 @@ export function ChatScreen({
     const content = message.trim();
     if (!content || sendLimitReached) return;
 
-    if (draftSaveTimerRef.current !== null) {
-      window.clearTimeout(draftSaveTimerRef.current);
-      draftSaveTimerRef.current = null;
-    }
-
     pendingOwnSendRef.current = true;
-    setDraftSaveFailed(!removeChatDraft(draftKey));
-    messageRef.current = '';
-    setMessage('');
+    clearDraft();
     onSend(content);
   };
 
