@@ -1,6 +1,10 @@
 /* Final mobile hardening for the chat refactor candidate.
    Loaded after the visual chat layers so route-specific viewport rules are deterministic. */
 
+.chat-page.chat-experience-v2 {
+  min-height: 100dvh;
+}
+
 .chat-v2-sheet,
 .chat-v2-composer textarea {
   overscroll-behavior: contain;
