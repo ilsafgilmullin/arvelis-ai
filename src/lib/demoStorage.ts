@@ -27,6 +27,7 @@ function isMessage(value: unknown): value is DemoMessage {
   const message = value as Partial<DemoMessage>;
   return (
     typeof message.id === 'string' &&
+    message.id.length <= 128 &&
     typeof message.role === 'string' &&
     VALID_ROLES.has(message.role as DemoMessage['role']) &&
     typeof message.content === 'string' &&
@@ -41,6 +42,7 @@ function isThread(value: unknown): value is DemoThread {
   const thread = value as Partial<DemoThread>;
   return (
     typeof thread.id === 'string' &&
+    thread.id.length <= 128 &&
     typeof thread.title === 'string' &&
     thread.title.length <= 160 &&
     isValidTimestamp(thread.createdAt) &&
@@ -61,6 +63,15 @@ function isWithinContentBudget(threads: DemoThread[]): boolean {
     }
   }
   return true;
+}
+
+function isWorkspacePersistable(state: DemoWorkspaceState): boolean {
+  return (
+    state.threads.length <= DEMO_MAX_THREADS &&
+    state.threads.every(isThread) &&
+    isWithinContentBudget(state.threads) &&
+    state.profileName.length <= 80
+  );
 }
 
 export function canUseDemoStorage(): boolean {
@@ -107,8 +118,7 @@ export function loadDemoWorkspace(): DemoWorkspaceState {
 }
 
 export function saveDemoWorkspace(state: DemoWorkspaceState): boolean {
-  if (typeof window === 'undefined') return false;
-  if (state.threads.length > DEMO_MAX_THREADS || !isWithinContentBudget(state.threads)) return false;
+  if (typeof window === 'undefined' || !isWorkspacePersistable(state)) return false;
 
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
