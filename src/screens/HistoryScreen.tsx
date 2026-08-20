@@ -7,7 +7,8 @@ import type { DemoThread } from '../types';
 
 function relativeTime(timestamp: number): string {
   const delta = Math.max(0, Date.now() - timestamp);
-  const minutes = Math.max(1, Math.floor(delta / 60_000));
+  if (delta < 60_000) return 'только что';
+  const minutes = Math.floor(delta / 60_000);
   if (minutes < 60) return `${minutes} мин назад`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours} ч назад`;
@@ -83,7 +84,7 @@ export function HistoryScreen({
     <div className="content-page history-v2">
       <Topbar title="История" subtitle="Ваши локальные диалоги на этом устройстве" />
       <section className="history-section history-v2__section">
-        <label className="search-field history-v2__search">
+        <div className="search-field history-v2__search" role="search" aria-label="Поиск по истории диалогов">
           <SearchIcon />
           <input
             value={query}
@@ -96,7 +97,7 @@ export function HistoryScreen({
           {hasQuery ? (
             <button className="history-v2__clear" type="button" onClick={() => setQuery('')} aria-label="Очистить поиск">×</button>
           ) : null}
-        </label>
+        </div>
 
         <div className="history-summary history-v2__summary">
           <span>Диалогов: {filtered.length}{hasQuery ? ` из ${threads.length}` : ''}</span>
