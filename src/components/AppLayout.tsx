@@ -3,6 +3,8 @@ import { BrandLockup } from './Brand';
 import { ChatIcon, HistoryIcon, HomeIcon, PlusIcon, ProfileIcon } from './Icons';
 import type { AppScreen } from '../types';
 
+const MOBILE_CHAT_MEDIA_QUERY = '(max-width: 780px), (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 520px)';
+
 const navigation = [
   { id: 'workspace' as const, label: 'Главная', desktopLabel: 'ARVELIS AI', icon: <HomeIcon /> },
   { id: 'chat' as const, label: 'Чат', desktopLabel: 'Чат', icon: <ChatIcon /> },
@@ -131,7 +133,7 @@ export function AppLayout({
   useLayoutEffect(() => {
     if (screen !== 'chat') return;
 
-    const media = window.matchMedia('(max-width: 780px)');
+    const media = window.matchMedia(MOBILE_CHAT_MEDIA_QUERY);
     const body = document.body;
     const root = document.documentElement;
     const previousBodyOverflow = body.style.overflow;
