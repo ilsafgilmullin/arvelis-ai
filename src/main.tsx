@@ -8,6 +8,7 @@ import './qa-hardening.css';
 import './runtime-polish.css';
 import './layout-hardening.css';
 import './product-polish.css';
+import './post-merge-mobile-qa.css';
 
 const root = document.getElementById('root');
 
