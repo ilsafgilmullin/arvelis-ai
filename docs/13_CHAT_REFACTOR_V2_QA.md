@@ -37,7 +37,8 @@
 - тот же media contract используется для body/root scroll lock;
 - landscape navigation становится compact/icon-only, сохраняя >=44 px touch targets;
 - при landscape keyboard header временно скрывается, чтобы composer гарантированно помещался в реально доступный viewport;
-- background message stream остаётся единственной scrollable областью.
+- background message stream остаётся единственной scrollable областью;
+- `К последнему` сокращён до 44px icon-only control, чтобы не перекрывать широкую часть нижнего сообщения.
 
 ## Проверки iPhone / mobile
 
@@ -59,7 +60,7 @@
 16. Отправка сообщения очищает только черновик текущего thread.
 17. Новый диалог показывает компактный empty state и быстрые заготовки без большого hero-экрана.
 18. Quick-start только заполняет composer и не отправляет текст автоматически.
-19. Кнопка `К последнему` появляется при уходе вверх по длинной переписке и возвращает к последнему сообщению.
+19. Компактная icon-only кнопка перехода к последнему сообщению появляется при уходе вверх, остаётся >=44 px и не перекрывает широкую часть нижнего bubble.
 20. Под нижней mobile navigation нет второго пустого вертикального резерва/лишнего хвоста прокрутки.
 21. Portrait → landscape → portrait не создаёт horizontal overflow и не теряет composer.
 22. В landscape Chat остаётся внутри mobile viewport-shell даже при CSS-width >780 px.
@@ -161,7 +162,7 @@
 ## Accessibility
 
 1. Header/search/composer/action-sheet controls имеют видимый focus state.
-2. Ключевые mobile chat action touch-targets — минимум 44 px: header, search navigation, message actions, send, history controls.
+2. Ключевые mobile chat action touch-targets — минимум 44 px: header, search navigation, message actions, send, history controls, jump-to-latest.
 3. Chat sheets имеют `role=dialog` и `aria-modal=true`.
 4. При открытии chat sheet фокус переводится внутрь; Tab/Shift+Tab не уходят за пределы sheet.
 5. Disabled control не может стать autofocus target.
