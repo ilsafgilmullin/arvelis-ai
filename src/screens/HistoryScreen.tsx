@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ArrowIcon, SearchIcon, TrashIcon } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
 import type { DemoThread } from '../types';
@@ -13,11 +14,19 @@ export function HistoryScreen({
   onDelete: (threadId: string) => void;
 }) {
   const [query, setQuery] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<DemoThread | null>(null);
+
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('ru-RU');
     if (!normalized) return threads;
     return threads.filter((thread) => thread.title.toLocaleLowerCase('ru-RU').includes(normalized) || thread.messages.some((message) => message.content.toLocaleLowerCase('ru-RU').includes(normalized)));
   }, [query, threads]);
+
+  const confirmDelete = () => {
+    if (!pendingDelete) return;
+    onDelete(pendingDelete.id);
+    setPendingDelete(null);
+  };
 
   return (
     <div className="content-page">
@@ -37,7 +46,7 @@ export function HistoryScreen({
                 <button className="history-row__open" type="button" onClick={() => onOpen(thread.id)}>
                   <div><strong>{thread.title}</strong><span>{thread.messages.length} сообщений</span></div><ArrowIcon />
                 </button>
-                <button className="icon-button icon-button--danger" type="button" onClick={() => onDelete(thread.id)} aria-label={`Удалить диалог «${thread.title}»`}><TrashIcon /></button>
+                <button className="icon-button icon-button--danger" type="button" onClick={() => setPendingDelete(thread)} aria-label={`Удалить диалог «${thread.title}»`}><TrashIcon /></button>
               </div>
             ))}
           </div>
@@ -45,6 +54,16 @@ export function HistoryScreen({
           <div className="empty-state"><p className="section-kicker">EMPTY</p><h2>Ничего не найдено</h2><p>Измените запрос или создайте новый локальный диалог.</p></div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Удалить локальный диалог?"
+        description={pendingDelete ? `«${pendingDelete.title}» будет удалён только из localStorage этого браузера. Отменить действие после подтверждения нельзя.` : ''}
+        confirmLabel="Удалить"
+        danger
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }
