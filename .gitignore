@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Build
+.next/
+dist/
+build/
+coverage/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Logs
+*.log
+logs/
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Tooling
+.cache/
+.tmp/
+temp/
+playwright-report/
+test-results/
