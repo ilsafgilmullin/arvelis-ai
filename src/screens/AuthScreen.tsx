@@ -39,11 +39,10 @@ export function AuthScreen({
           </p>
         </div>
 
-        <div className="auth-mode-switch" role="tablist" aria-label="Режим входа">
+        <div className="auth-mode-switch" role="group" aria-label="Режим доступа">
           <button
             type="button"
-            role="tab"
-            aria-selected={isSignIn}
+            aria-pressed={isSignIn}
             className={isSignIn ? 'auth-mode-switch__item auth-mode-switch__item--active' : 'auth-mode-switch__item'}
             onClick={() => setMode('signin')}
           >
@@ -51,8 +50,7 @@ export function AuthScreen({
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={!isSignIn}
+            aria-pressed={!isSignIn}
             className={!isSignIn ? 'auth-mode-switch__item auth-mode-switch__item--active' : 'auth-mode-switch__item'}
             onClick={() => setMode('signup')}
           >
