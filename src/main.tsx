@@ -5,6 +5,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles.css';
 import './mobile-polish.css';
 import './qa-hardening.css';
+import './runtime-polish.css';
 
 const root = document.getElementById('root');
 
