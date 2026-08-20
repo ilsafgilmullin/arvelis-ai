@@ -22,6 +22,8 @@ export function ConfirmDialog({
   const dialogRef = useRef<HTMLElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
 
   useEffect(() => {
     if (!open) return;
@@ -35,7 +37,7 @@ export function ConfirmDialog({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onCancel();
+        onCancelRef.current();
         return;
       }
 
@@ -63,9 +65,9 @@ export function ConfirmDialog({
       window.cancelAnimationFrame(frame);
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', handleKeyDown);
-      previousFocusRef.current?.focus();
+      if (previousFocusRef.current?.isConnected) previousFocusRef.current.focus();
     };
-  }, [open, onCancel]);
+  }, [open]);
 
   if (!open) return null;
 
