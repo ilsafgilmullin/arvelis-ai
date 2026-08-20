@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { BrandLockup } from './Brand';
 import { ChatIcon, HistoryIcon, HomeIcon, PlusIcon, ProfileIcon } from './Icons';
 import type { AppScreen } from '../types';
@@ -29,10 +29,37 @@ export function AppLayout({
   persistenceAvailable: boolean;
   children: ReactNode;
 }) {
+  const shellRef = useRef<HTMLDivElement>(null);
+  const statusBannersRef = useRef<HTMLDivElement>(null);
   const shellClassName = screen === 'chat' ? 'app-shell app-shell--chat' : 'app-shell';
 
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+
+    const syncStatusBannerHeight = () => {
+      const height = statusBannersRef.current?.getBoundingClientRect().height ?? 0;
+      shell.style.setProperty('--status-banners-height', `${Math.ceil(height)}px`);
+    };
+
+    syncStatusBannerHeight();
+
+    const banners = statusBannersRef.current;
+    const observer = banners && typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(syncStatusBannerHeight)
+      : null;
+    observer?.observe(banners as Element);
+    window.addEventListener('resize', syncStatusBannerHeight);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', syncStatusBannerHeight);
+      shell.style.removeProperty('--status-banners-height');
+    };
+  }, [online, persistenceAvailable]);
+
   return (
-    <div className={shellClassName}>
+    <div ref={shellRef} className={shellClassName}>
       <aside className="sidebar">
         <div className="sidebar__top">
           <BrandLockup compact />
@@ -62,7 +89,7 @@ export function AppLayout({
 
       <div className="app-main">
         {(!online || !persistenceAvailable) ? (
-          <div className="status-banners" aria-live="polite">
+          <div ref={statusBannersRef} className="status-banners" aria-live="polite">
             {!online ? <div className="offline-banner" role="status">Соединение отсутствует. Локальный интерфейс продолжает работать.</div> : null}
             {!persistenceAvailable ? <div className="storage-banner" role="status">Локальное сохранение недоступно. Текущие изменения могут исчезнуть после перезагрузки.</div> : null}
           </div>
