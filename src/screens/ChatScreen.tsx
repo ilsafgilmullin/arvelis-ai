@@ -19,6 +19,7 @@ export function ChatScreen({
 }) {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   const title = useMemo(() => thread?.title ?? 'Новый диалог', [thread]);
@@ -43,6 +44,35 @@ export function ChatScreen({
     return () => window.cancelAnimationFrame(frame);
   }, [thread?.id, thread?.messages.length]);
 
+  useEffect(() => {
+    const viewport = window.visualViewport;
+
+    const keepComposerVisible = () => {
+      if (document.activeElement !== textareaRef.current) return;
+      window.requestAnimationFrame(() => {
+        composerRef.current?.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'auto' });
+      });
+    };
+
+    viewport?.addEventListener('resize', keepComposerVisible);
+    viewport?.addEventListener('scroll', keepComposerVisible);
+    window.addEventListener('orientationchange', keepComposerVisible);
+
+    return () => {
+      viewport?.removeEventListener('resize', keepComposerVisible);
+      viewport?.removeEventListener('scroll', keepComposerVisible);
+      window.removeEventListener('orientationchange', keepComposerVisible);
+    };
+  }, []);
+
+  const focusComposer = () => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        composerRef.current?.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'auto' });
+      });
+    });
+  };
+
   const submit = () => {
     const content = message.trim();
     if (!content) return;
@@ -59,7 +89,7 @@ export function ChatScreen({
 
   return (
     <div className="chat-page">
-      <Topbar title={title} subtitle="Frontend preview · запрос к модели не выполняется" />
+      <Topbar title={title} subtitle="Preview · AI пока не подключён" />
 
       <div className="chat-thread" aria-live="polite">
         {thread?.messages.length ? thread.messages.map((item) => (
@@ -83,7 +113,7 @@ export function ChatScreen({
         <div ref={endRef} className="chat-thread__end" aria-hidden="true" />
       </div>
 
-      <div className="chat-composer-wrap">
+      <div ref={composerRef} className="chat-composer-wrap">
         <div className="chat-composer">
           <button
             className="icon-button icon-button--muted"
@@ -100,6 +130,7 @@ export function ChatScreen({
             value={message}
             onChange={(event) => setMessage(event.target.value)}
             onKeyDown={handleKeyDown}
+            onFocus={focusComposer}
             placeholder="Сообщение…"
             aria-label="Сообщение"
             rows={1}
