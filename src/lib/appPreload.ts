@@ -30,6 +30,20 @@ export type PreparedApp = {
 };
 
 const TOTAL_TASKS = APP_LOAD_TASKS.length;
+const CRITICAL_TASK_TIMEOUT_MS = 20_000;
+
+function withTimeout<T>(promise: Promise<T>, taskName: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${taskName} preload timed out`));
+    }, CRITICAL_TASK_TIMEOUT_MS);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId !== null) clearTimeout(timeoutId);
+  });
+}
 
 export async function prepareApp(onProgress: (progress: AppLoadProgress) => void): Promise<PreparedApp> {
   const completedTasks = new Set<AppLoadTaskId>();
@@ -45,10 +59,10 @@ export async function prepareApp(onProgress: (progress: AppLoadProgress) => void
     });
   };
 
-  const shellTask = Promise.all([
+  const shellTask = withTimeout(Promise.all([
     loadAppLayoutModule(),
     loadWorkspaceModule(),
-  ]).then(([layoutModule, workspaceModule]) => {
+  ]), 'Core interface').then(([layoutModule, workspaceModule]) => {
     complete('shell', 'Интерфейс готов');
     return {
       AppLayout: layoutModule.AppLayout,
@@ -56,7 +70,7 @@ export async function prepareApp(onProgress: (progress: AppLoadProgress) => void
     };
   });
 
-  const chatTask = loadChatModule().then((chatModule) => {
+  const chatTask = withTimeout(loadChatModule(), 'Chat').then((chatModule) => {
     complete('chat', 'Диалог готов');
     return chatModule.ChatScreen;
   });
