@@ -19,6 +19,7 @@ import {
   canUseDemoStorage,
   DEMO_MAX_MESSAGES_PER_THREAD,
   DEMO_MAX_THREADS,
+  DEMO_PREVIEW_NOTICE,
   loadDemoWorkspace,
   resetDemoWorkspace,
   saveDemoWorkspace,
@@ -67,7 +68,7 @@ function createSystemMessage(): DemoMessage {
     id: makeId('sys'),
     role: 'system',
     createdAt: Date.now() + 1,
-    content: 'Сохранено в локальном preview. AI пока не подключён.',
+    content: DEMO_PREVIEW_NOTICE,
   };
 }
 
