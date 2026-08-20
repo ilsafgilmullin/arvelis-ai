@@ -64,7 +64,7 @@ export async function prepareApp(onProgress: (progress: AppLoadProgress) => void
   const storageTask = Promise.resolve().then(() => {
     const workspace = loadDemoWorkspace();
     const persistenceAvailable = canUseDemoStorage();
-    complete('storage', 'Данные восстановлены');
+    complete('storage', 'Локальные данные готовы');
     return { workspace, persistenceAvailable };
   });
 
