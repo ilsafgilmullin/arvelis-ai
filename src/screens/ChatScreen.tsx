@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { BrandMark } from '../components/Brand';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -8,6 +8,7 @@ import {
   CopyIcon,
   EditIcon,
   PlusIcon,
+  SearchIcon,
   SendIcon,
   TrashIcon,
 } from '../components/Icons';
@@ -21,6 +22,7 @@ import {
 import type { DemoMessage, DemoThread } from '../types';
 
 const MAX_MESSAGE_LENGTH = 6000;
+const MAX_SEARCH_LENGTH = 160;
 const DRAFT_SAVE_DELAY = 180;
 
 const QUICK_STARTS = [
@@ -32,6 +34,28 @@ const QUICK_STARTS = [
 
 function timeLabel(timestamp: number): string {
   return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(timestamp);
+}
+
+function dayKey(timestamp: number): string {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function dateLabel(timestamp: number): string {
+  const date = new Date(timestamp);
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const dayDelta = Math.round((todayStart - dateStart) / 86_400_000);
+
+  if (dayDelta === 0) return 'Сегодня';
+  if (dayDelta === 1) return 'Вчера';
+
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    ...(date.getFullYear() !== today.getFullYear() ? { year: 'numeric' as const } : {}),
+  }).format(date);
 }
 
 function isCoarsePointer(): boolean {
@@ -98,12 +122,17 @@ export function ChatScreen({
   const [isAtEnd, setIsAtEnd] = useState(true);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchIndex, setSearchIndex] = useState(0);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const messageNodesRef = useRef<Map<string, HTMLElement>>(new Map());
   const messageRef = useRef('');
   const draftSaveTimerRef = useRef<number | null>(null);
   const copyFeedbackTimerRef = useRef<number | null>(null);
@@ -112,6 +141,16 @@ export function ChatScreen({
   const title = useMemo(() => thread?.title ?? 'Новый диалог', [thread]);
   const draftKey = useMemo(() => chatDraftKey(thread?.id ?? null), [thread?.id]);
   const sendLimitReached = thread ? messageLimitReached : threadLimitReached;
+  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase('ru-RU');
+  const searchMatches = useMemo(() => {
+    if (!thread || !normalizedSearchQuery) return [];
+    return thread.messages
+      .filter((item) => item.content.toLocaleLowerCase('ru-RU').includes(normalizedSearchQuery))
+      .map((item) => item.id);
+  }, [thread, normalizedSearchQuery]);
+  const activeSearchMessageId = searchMatches.length
+    ? searchMatches[Math.min(searchIndex, searchMatches.length - 1)] ?? null
+    : null;
 
   const scheduleDraftSave = (nextMessage: string) => {
     if (draftSaveTimerRef.current !== null) {
@@ -146,6 +185,16 @@ export function ChatScreen({
     });
   };
 
+  const scrollToMessage = (messageId: string) => {
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    window.requestAnimationFrame(() => {
+      messageNodesRef.current.get(messageId)?.scrollIntoView({
+        block: 'center',
+        behavior: reducedMotion ? 'auto' : 'smooth',
+      });
+    });
+  };
+
   useEffect(() => {
     if (draftSaveTimerRef.current !== null) {
       window.clearTimeout(draftSaveTimerRef.current);
@@ -160,6 +209,10 @@ export function ChatScreen({
     setEditingMessage('');
     setRenaming(false);
     setDeleteOpen(false);
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchIndex(0);
+    messageNodesRef.current.clear();
 
     return () => {
       if (draftSaveTimerRef.current !== null) {
@@ -227,6 +280,16 @@ export function ChatScreen({
       window.clearTimeout(copyFeedbackTimerRef.current);
     }
   }, []);
+
+  useEffect(() => {
+    if (!searchOpen || !activeSearchMessageId) return;
+    scrollToMessage(activeSearchMessageId);
+  }, [searchOpen, activeSearchMessageId]);
+
+  useEffect(() => {
+    if (searchIndex < searchMatches.length || searchIndex === 0) return;
+    setSearchIndex(0);
+  }, [searchIndex, searchMatches.length]);
 
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -365,33 +428,95 @@ export function ChatScreen({
     return copyFeedback.status === 'copied' ? 'Скопировано' : 'Не удалось';
   };
 
+  const openSearch = () => {
+    if (!thread) return;
+    setSearchOpen(true);
+    window.requestAnimationFrame(() => searchInputRef.current?.focus());
+  };
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchIndex(0);
+  };
+
+  const moveSearch = (direction: 1 | -1) => {
+    if (!searchMatches.length) return;
+    const nextIndex = (searchIndex + direction + searchMatches.length) % searchMatches.length;
+    setSearchIndex(nextIndex);
+  };
+
+  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeSearch();
+      return;
+    }
+    if (event.key === 'Enter' && searchMatches.length) {
+      event.preventDefault();
+      moveSearch(event.shiftKey ? -1 : 1);
+    }
+  };
+
   const confirmDelete = () => {
     if (!thread) return;
     onDeleteThread(thread.id);
     setDeleteOpen(false);
   };
 
-  const headerActions = (
+  const headerActions = thread ? (
     <div className="chat-header-actions">
-      {thread ? (
-        <>
-          <button className="chat-header-action" type="button" onClick={startRenaming} aria-label="Переименовать диалог" title="Переименовать диалог">
-            <EditIcon />
-          </button>
-          <button className="chat-header-action chat-header-action--danger" type="button" onClick={() => setDeleteOpen(true)} aria-label="Удалить диалог" title="Удалить диалог">
-            <TrashIcon />
-          </button>
-        </>
-      ) : null}
+      <button
+        className={searchOpen ? 'chat-header-action chat-header-action--active' : 'chat-header-action'}
+        type="button"
+        onClick={searchOpen ? closeSearch : openSearch}
+        aria-label={searchOpen ? 'Закрыть поиск по диалогу' : 'Поиск по диалогу'}
+        title={searchOpen ? 'Закрыть поиск' : 'Поиск по диалогу'}
+      >
+        <SearchIcon />
+      </button>
+      <button className="chat-header-action" type="button" onClick={startRenaming} aria-label="Переименовать диалог" title="Переименовать диалог">
+        <EditIcon />
+      </button>
+      <button className="chat-header-action chat-header-action--danger" type="button" onClick={() => setDeleteOpen(true)} aria-label="Удалить диалог" title="Удалить диалог">
+        <TrashIcon />
+      </button>
       <button className="chat-header-action" type="button" onClick={onNewChat} aria-label="Новый диалог" title="Новый диалог">
         <PlusIcon />
       </button>
     </div>
-  );
+  ) : null;
 
   return (
     <div className="chat-page chat-experience">
       <Topbar title={title} subtitle="Preview · AI пока не подключён" actions={headerActions} />
+
+      {searchOpen && thread ? (
+        <section className="chat-search" role="search" aria-label="Поиск по текущему диалогу">
+          <SearchIcon />
+          <input
+            ref={searchInputRef}
+            value={searchQuery}
+            onChange={(event) => {
+              setSearchQuery(event.target.value.slice(0, MAX_SEARCH_LENGTH));
+              setSearchIndex(0);
+            }}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="Найти в диалоге"
+            aria-label="Найти сообщение в диалоге"
+            maxLength={MAX_SEARCH_LENGTH}
+            autoComplete="off"
+          />
+          <span className="chat-search__count" aria-live="polite">
+            {normalizedSearchQuery ? (searchMatches.length ? `${Math.min(searchIndex + 1, searchMatches.length)} / ${searchMatches.length}` : '0 / 0') : '—'}
+          </span>
+          <div className="chat-search__actions">
+            <button type="button" disabled={!searchMatches.length} onClick={() => moveSearch(-1)}>Назад</button>
+            <button type="button" disabled={!searchMatches.length} onClick={() => moveSearch(1)}>Далее</button>
+            <button type="button" onClick={closeSearch}>Закрыть</button>
+          </div>
+        </section>
+      ) : null}
 
       {renaming && thread ? (
         <form className="chat-rename" onSubmit={(event) => { event.preventDefault(); saveRename(); }}>
@@ -413,20 +538,27 @@ export function ChatScreen({
       ) : null}
 
       <div className="chat-thread" role="log" aria-live="polite" aria-relevant="additions text">
-        {thread?.messages.length ? thread.messages.map((item) => {
+        {thread?.messages.length ? thread.messages.map((item, index) => {
+          const previous = index > 0 ? thread.messages[index - 1] : undefined;
+          const showDate = !previous || dayKey(previous.createdAt) !== dayKey(item.createdAt);
+          const searchHit = item.id === activeSearchMessageId;
+          const registerNode = (node: HTMLElement | null) => {
+            if (node) messageNodesRef.current.set(item.id, node);
+            else messageNodesRef.current.delete(item.id);
+          };
+
+          let content;
           if (item.role === 'system') {
-            return (
-              <article key={item.id} className="message message--system preview-notice">
+            content = (
+              <article ref={registerNode} className={searchHit ? 'message message--system preview-notice message--search-hit' : 'message message--system preview-notice'}>
                 <span className="preview-notice__dot" aria-hidden="true" />
                 <span>{item.content}</span>
               </article>
             );
-          }
-
-          if (item.role === 'user') {
+          } else if (item.role === 'user') {
             const editing = editingMessageId === item.id;
-            return (
-              <article key={item.id} className="message message--user">
+            content = (
+              <article ref={registerNode} className={searchHit ? 'message message--user message--search-hit' : 'message message--user'}>
                 <div className={editing ? 'message__bubble message__bubble--editing' : 'message__bubble'}>
                   {editing ? (
                     <textarea
@@ -459,23 +591,30 @@ export function ChatScreen({
                 </div>
               </article>
             );
+          } else {
+            content = (
+              <article ref={registerNode} className={searchHit ? 'message message--assistant message--search-hit' : 'message message--assistant'}>
+                <div className="assistant-label"><BrandMark size="compact" /><span>ARVELIS AI · {item.mock ? 'MOCK' : 'PREVIEW'}</span></div>
+                <p>{item.content}</p>
+                {item.mock ? <span className="mock-disclaimer">Предзаписанный демонстрационный текст — не ответ модели.</span> : null}
+                <div className="message__footer">
+                  <span className="message__time">{timeLabel(item.createdAt)}</span>
+                  <div className="message__actions">
+                    <button type="button" onClick={() => { void handleCopy(item); }} aria-label={`${copyLabel(item.id)} сообщение ARVELIS AI`}>
+                      {copyFeedback?.id === item.id && copyFeedback.status === 'copied' ? <CheckIcon /> : <CopyIcon />}
+                      <span>{copyLabel(item.id)}</span>
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
           }
 
           return (
-            <article key={item.id} className="message message--assistant">
-              <div className="assistant-label"><BrandMark size="compact" /><span>ARVELIS AI · {item.mock ? 'MOCK' : 'PREVIEW'}</span></div>
-              <p>{item.content}</p>
-              {item.mock ? <span className="mock-disclaimer">Предзаписанный демонстрационный текст — не ответ модели.</span> : null}
-              <div className="message__footer">
-                <span className="message__time">{timeLabel(item.createdAt)}</span>
-                <div className="message__actions">
-                  <button type="button" onClick={() => { void handleCopy(item); }} aria-label={`${copyLabel(item.id)} сообщение ARVELIS AI`}>
-                    {copyFeedback?.id === item.id && copyFeedback.status === 'copied' ? <CheckIcon /> : <CopyIcon />}
-                    <span>{copyLabel(item.id)}</span>
-                  </button>
-                </div>
-              </div>
-            </article>
+            <Fragment key={item.id}>
+              {showDate ? <div className="chat-date-separator"><span>{dateLabel(item.createdAt)}</span></div> : null}
+              {content}
+            </Fragment>
           );
         }) : (
           <section className="chat-empty">
