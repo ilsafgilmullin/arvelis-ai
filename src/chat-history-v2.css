@@ -60,8 +60,8 @@
 }
 
 .history-v2__clear {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
   border: 0;
@@ -225,14 +225,19 @@
   }
 
   .history-v2__search {
-    min-height: 52px;
+    min-height: 54px;
     border-radius: 15px;
     padding-left: 13px;
   }
 
   .history-v2__search input {
-    min-height: 50px;
+    min-height: 52px;
     font-size: 16px;
+  }
+
+  .history-v2__clear {
+    width: 44px;
+    height: 44px;
   }
 
   .history-v2__summary {
@@ -240,12 +245,12 @@
   }
 
   .history-v2__row {
-    min-height: 82px;
-    grid-template-columns: minmax(0, 1fr) 46px;
+    min-height: 84px;
+    grid-template-columns: minmax(0, 1fr) 48px;
   }
 
   .history-v2__open {
-    min-height: 81px;
+    min-height: 83px;
     padding: 10px 5px 10px 1px;
   }
 
@@ -259,8 +264,8 @@
   }
 
   .history-v2__delete {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
   }
 }
 
