@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CHAT_MESSAGE_MAX_CHARS } from '../domain/chatPolicy';
 import { loadChatDraft, removeChatDraft, saveChatDraft } from '../lib/chatDraftStorage';
 
@@ -8,6 +8,7 @@ export function useChatDraft(key: string) {
   const [value, setValueState] = useState('');
   const [saveFailed, setSaveFailed] = useState(false);
   const valueRef = useRef('');
+  const keyRef = useRef(key);
   const timerRef = useRef<number | null>(null);
 
   const cancelScheduledSave = () => {
@@ -29,7 +30,7 @@ export function useChatDraft(key: string) {
     setValueState(limited);
     cancelScheduledSave();
     timerRef.current = window.setTimeout(() => {
-      const saved = saveChatDraft(key, valueRef.current);
+      const saved = saveChatDraft(keyRef.current, valueRef.current);
       setSaveFailed(!saved);
       timerRef.current = null;
     }, DRAFT_SAVE_DELAY);
@@ -48,8 +49,9 @@ export function useChatDraft(key: string) {
     return removed;
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     cancelScheduledSave();
+    keyRef.current = key;
     const restored = loadChatDraft(key);
     valueRef.current = restored;
     setValueState(restored);
@@ -60,6 +62,25 @@ export function useChatDraft(key: string) {
       saveChatDraft(key, valueRef.current);
     };
   }, [key]);
+
+  useEffect(() => {
+    const persistCurrentDraft = () => {
+      cancelScheduledSave();
+      saveChatDraft(keyRef.current, valueRef.current);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') persistCurrentDraft();
+    };
+
+    window.addEventListener('pagehide', persistCurrentDraft);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('pagehide', persistCurrentDraft);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   return {
     value,
