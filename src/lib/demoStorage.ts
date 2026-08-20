@@ -22,6 +22,7 @@ const LEGACY_ASSISTANT_MOCK_COPY = new Set<string>([
 export const DEMO_MAX_THREADS = 40;
 export const DEMO_MAX_MESSAGES_PER_THREAD = 80;
 const DEMO_MAX_TOTAL_CONTENT_CHARS = 1_000_000;
+const DEMO_MAX_SERIALIZED_CHARS = 2_500_000;
 const DEMO_MAX_ID_LENGTH = 128;
 const DEMO_MAX_TITLE_LENGTH = 160;
 const DEMO_MAX_STORED_MESSAGE_CHARS = 12_000;
@@ -168,7 +169,7 @@ export function loadDemoWorkspace(): DemoWorkspaceState {
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultState();
+    if (!raw || raw.length > DEMO_MAX_SERIALIZED_CHARS) return defaultState();
 
     const parsed = JSON.parse(raw) as Partial<DemoWorkspaceState>;
     if (
@@ -202,7 +203,9 @@ export function saveDemoWorkspace(state: DemoWorkspaceState): boolean {
   if (typeof window === 'undefined' || !isWorkspacePersistable(state)) return false;
 
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const serialized = JSON.stringify(state);
+    if (serialized.length > DEMO_MAX_SERIALIZED_CHARS) return false;
+    window.localStorage.setItem(STORAGE_KEY, serialized);
     return true;
   } catch {
     return false;
