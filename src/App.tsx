@@ -13,6 +13,7 @@ import {
   type AppLoadProgress,
   type PreparedCoreModules,
 } from './lib/appPreload';
+import { chatDraftKey, clearChatDrafts, removeChatDraft } from './lib/chatDraftStorage';
 import {
   canUseDemoStorage,
   loadDemoWorkspace,
@@ -121,8 +122,6 @@ export default function App() {
         setPendingProfileName(nextWorkspace.profileName);
       }
 
-      // Let the browser paint the truthful 100% / ready state once before switching
-      // to the already prepared core UI. This is a frame boundary, not a timer delay.
       await waitForBootPaint();
       if (launchSequence !== launchSequenceRef.current) return;
 
@@ -193,7 +192,46 @@ export default function App() {
     } : current);
   };
 
+  const editMessage = (threadId: string, messageId: string, content: string) => {
+    const normalizedContent = content.trim();
+    if (!normalizedContent) return;
+
+    const timestamp = Date.now();
+    setWorkspace((current) => {
+      if (!current) return current;
+
+      const threads = current.threads.map((thread) => {
+        if (thread.id !== threadId) return thread;
+
+        let changed = false;
+        const messages = thread.messages.map((message) => {
+          if (message.id !== messageId || message.role !== 'user' || message.content === normalizedContent) return message;
+          changed = true;
+          return { ...message, content: normalizedContent, editedAt: timestamp };
+        });
+
+        return changed ? { ...thread, messages, updatedAt: timestamp } : thread;
+      }).sort((a, b) => b.updatedAt - a.updatedAt);
+
+      return { ...current, threads };
+    });
+  };
+
+  const renameThread = (threadId: string, title: string) => {
+    const normalizedTitle = title.replace(/\s+/g, ' ').trim().slice(0, 80);
+    if (!normalizedTitle) return;
+
+    const timestamp = Date.now();
+    setWorkspace((current) => current ? {
+      ...current,
+      threads: current.threads.map((thread) => thread.id === threadId && thread.title !== normalizedTitle
+        ? { ...thread, title: normalizedTitle, updatedAt: timestamp }
+        : thread).sort((a, b) => b.updatedAt - a.updatedAt),
+    } : current);
+  };
+
   const deleteThread = (threadId: string) => {
+    removeChatDraft(chatDraftKey(threadId));
     setWorkspace((current) => {
       if (!current) return current;
       const threads = current.threads.filter((thread) => thread.id !== threadId);
@@ -206,6 +244,7 @@ export default function App() {
   };
 
   const resetPreview = () => {
+    clearChatDrafts();
     const next = resetDemoWorkspace();
     setWorkspace(next);
     setPersistenceAvailable(canUseDemoStorage());
@@ -261,7 +300,15 @@ export default function App() {
       persistenceAvailable={persistenceAvailable}
     >
       {screen === 'workspace' ? <WorkspaceScreen profileName={workspace.profileName} threads={workspace.threads} onSubmit={createThreadFromPrompt} onOpenThread={openThread} /> : null}
-      {screen === 'chat' ? <ChatScreen thread={activeThread} onNewChat={newChat} onSend={sendMessage} /> : null}
+      {screen === 'chat' ? (
+        <ChatScreen
+          thread={activeThread}
+          onNewChat={newChat}
+          onSend={sendMessage}
+          onEditMessage={editMessage}
+          onRenameThread={renameThread}
+        />
+      ) : null}
       {screen === 'history' ? (
         <Suspense fallback={secondaryFallback}>
           <HistoryScreen threads={workspace.threads} onOpen={openThread} onDelete={deleteThread} />
