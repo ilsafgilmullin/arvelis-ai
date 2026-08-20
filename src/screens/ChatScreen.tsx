@@ -12,7 +12,6 @@ import {
   SendIcon,
   TrashIcon,
 } from '../components/Icons';
-import { Topbar } from '../components/Topbar';
 import {
   CHAT_COMPOSER_COUNTER_THRESHOLD,
   CHAT_MESSAGE_MAX_CHARS,
@@ -61,6 +60,14 @@ function motionSafeBehavior(behavior: ScrollBehavior): ScrollBehavior {
   if (behavior !== 'smooth') return behavior;
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   return reducedMotion ? 'auto' : 'smooth';
+}
+
+function displaySystemMessage(content: string): string {
+  const normalized = content.toLocaleLowerCase('ru-RU');
+  if (normalized.includes('сохран') && (normalized.includes('ai-ответ') || normalized.includes('ai пока'))) {
+    return 'Сохранено локально · AI пока не подключён';
+  }
+  return content;
 }
 
 async function copyText(content: string): Promise<boolean> {
@@ -122,6 +129,7 @@ export function ChatScreen({
   const [copyFeedback, setCopyFeedback] = useState<CopyFeedback | null>(null);
   const [isAtEnd, setIsAtEnd] = useState(true);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchIndex, setSearchIndex] = useState(0);
@@ -132,6 +140,7 @@ export function ChatScreen({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const menuFirstActionRef = useRef<HTMLButtonElement>(null);
   const messageNodesRef = useRef<Map<string, HTMLElement>>(new Map());
   const copyFeedbackTimerRef = useRef<number | null>(null);
   const copyRequestSequenceRef = useRef(0);
@@ -183,11 +192,23 @@ export function ChatScreen({
     });
   };
 
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchIndex(0);
+  };
+
+  const cancelEditing = () => {
+    setEditingMessageId(null);
+    setEditingMessage('');
+  };
+
   useEffect(() => {
     setEditingMessageId(null);
     setEditingMessage('');
     setRenaming(false);
     setDeleteOpen(false);
+    setMenuOpen(false);
     setSearchOpen(false);
     setSearchQuery('');
     setSearchIndex(0);
@@ -206,7 +227,7 @@ export function ChatScreen({
     const textarea = textareaRef.current;
     if (!textarea) return;
     textarea.style.height = 'auto';
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 148)}px`;
   }, [message]);
 
   useEffect(() => {
@@ -214,14 +235,12 @@ export function ChatScreen({
       setEndState(true);
       return;
     }
-
-    scrollToLatest('smooth');
+    scrollToLatest('auto');
   }, [thread?.id]);
 
   useEffect(() => {
     if (!thread?.messages.length) return;
     if (!pendingOwnSendRef.current && !isAtEndRef.current) return;
-
     scrollToLatest('smooth');
     pendingOwnSendRef.current = false;
   }, [thread?.id, thread?.messages.length]);
@@ -236,7 +255,7 @@ export function ChatScreen({
       setEndState(entry.isIntersecting);
     }, {
       root: null,
-      rootMargin: '0px 0px 160px 0px',
+      rootMargin: '0px 0px 140px 0px',
       threshold: 0.01,
     });
 
@@ -250,7 +269,12 @@ export function ChatScreen({
       editTextareaRef.current?.focus();
       editTextareaRef.current?.setSelectionRange(editingMessage.length, editingMessage.length);
     });
-  }, [editingMessageId]);
+  }, [editingMessageId, editingMessage.length]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    window.requestAnimationFrame(() => menuFirstActionRef.current?.focus());
+  }, [menuOpen]);
 
   useEffect(() => () => {
     copyRequestSequenceRef.current += 1;
@@ -265,8 +289,11 @@ export function ChatScreen({
   }, [searchOpen, activeSearchMessageId]);
 
   useEffect(() => {
-    if (searchIndex < searchMatches.length || searchIndex === 0) return;
-    setSearchIndex(0);
+    if (!searchMatches.length) {
+      if (searchIndex !== 0) setSearchIndex(0);
+      return;
+    }
+    if (searchIndex >= searchMatches.length) setSearchIndex(0);
   }, [searchIndex, searchMatches.length]);
 
   useEffect(() => {
@@ -289,6 +316,25 @@ export function ChatScreen({
       window.removeEventListener('orientationchange', keepComposerVisible);
     };
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen && !renaming && !editingMessageId) return;
+
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (editingMessageId) {
+        setEditingMessageId(null);
+        setEditingMessage('');
+      } else if (renaming) {
+        setRenaming(false);
+      } else {
+        setMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [editingMessageId, menuOpen, renaming]);
 
   const focusComposer = () => {
     window.requestAnimationFrame(() => {
@@ -326,14 +372,10 @@ export function ChatScreen({
   const startEditing = (item: DemoMessage) => {
     if (item.role !== 'user') return;
     closeSearch();
+    setMenuOpen(false);
     setRenaming(false);
     setEditingMessageId(item.id);
     setEditingMessage(item.content.slice(0, CHAT_MESSAGE_MAX_CHARS));
-  };
-
-  const cancelEditing = () => {
-    setEditingMessageId(null);
-    setEditingMessage('');
   };
 
   const saveEditing = () => {
@@ -357,16 +399,11 @@ export function ChatScreen({
     }
   };
 
-  const closeSearch = () => {
-    setSearchOpen(false);
-    setSearchQuery('');
-    setSearchIndex(0);
-  };
-
   const startRenaming = () => {
     if (!thread) return;
     closeSearch();
     cancelEditing();
+    setMenuOpen(false);
     setRenameValue(thread.title);
     setRenaming(true);
     window.requestAnimationFrame(() => {
@@ -414,6 +451,7 @@ export function ChatScreen({
 
   const openSearch = () => {
     if (!thread) return;
+    setMenuOpen(false);
     setRenaming(false);
     cancelEditing();
     setSearchOpen(true);
@@ -439,6 +477,7 @@ export function ChatScreen({
 
   const openDelete = () => {
     closeSearch();
+    setMenuOpen(false);
     setRenaming(false);
     cancelEditing();
     setDeleteOpen(true);
@@ -451,82 +490,85 @@ export function ChatScreen({
     setDeleteOpen(false);
   };
 
-  const headerActions = thread ? (
-    <div className="chat-header-actions">
-      <button
-        className={searchOpen ? 'chat-header-action chat-header-action--active' : 'chat-header-action'}
-        type="button"
-        onClick={searchOpen ? closeSearch : openSearch}
-        aria-label={searchOpen ? 'Закрыть поиск по диалогу' : 'Поиск по диалогу'}
-        aria-expanded={searchOpen}
-        aria-controls="chat-search-panel"
-        title={searchOpen ? 'Закрыть поиск' : 'Поиск по диалогу'}
-      >
-        <SearchIcon />
-      </button>
-      <button className="chat-header-action" type="button" onClick={startRenaming} aria-label="Переименовать диалог" title="Переименовать диалог">
-        <EditIcon />
-      </button>
-      <button className="chat-header-action chat-header-action--danger" type="button" onClick={openDelete} aria-label="Удалить диалог" title="Удалить диалог">
-        <TrashIcon />
-      </button>
-      <button className="chat-header-action" type="button" onClick={onNewChat} aria-label="Новый диалог" title="Новый диалог">
-        <PlusIcon />
-      </button>
-    </div>
-  ) : null;
+  const handleNewChat = () => {
+    setMenuOpen(false);
+    closeSearch();
+    cancelEditing();
+    setRenaming(false);
+    onNewChat();
+  };
+
+  const pageClassName = thread?.messages.length
+    ? 'chat-page chat-experience chat-experience-v2'
+    : 'chat-page chat-experience chat-experience-v2 chat-experience-v2--empty';
 
   return (
-    <div className="chat-page chat-experience">
-      <Topbar title={title} subtitle="AI-ответы пока недоступны в этой версии" actions={headerActions} />
+    <div className={pageClassName}>
+      <header className="chat-v2-header">
+        <div className="chat-v2-header__identity">
+          <BrandMark size="compact" />
+          <div className="chat-v2-header__copy">
+            <span className="chat-v2-header__product">ARVELIS AI</span>
+            <h1 title={title}>{title}</h1>
+            <span className="chat-v2-header__status">Локальный preview · AI пока не подключён</span>
+          </div>
+        </div>
+
+        {thread ? (
+          <div className="chat-v2-header__actions">
+            <button
+              className={searchOpen ? 'chat-v2-icon-button chat-v2-icon-button--active' : 'chat-v2-icon-button'}
+              type="button"
+              onClick={searchOpen ? closeSearch : openSearch}
+              aria-label={searchOpen ? 'Закрыть поиск по диалогу' : 'Поиск по диалогу'}
+              aria-expanded={searchOpen}
+              aria-controls="chat-search-panel"
+            >
+              <SearchIcon />
+            </button>
+            <button
+              className={menuOpen ? 'chat-v2-icon-button chat-v2-icon-button--active' : 'chat-v2-icon-button'}
+              type="button"
+              onClick={() => setMenuOpen((current) => !current)}
+              aria-label="Действия с диалогом"
+              aria-expanded={menuOpen}
+            >
+              <span className="chat-v2-more" aria-hidden="true">•••</span>
+            </button>
+          </div>
+        ) : null}
+      </header>
 
       {searchOpen && thread ? (
-        <section id="chat-search-panel" className="chat-search" role="search" aria-label="Поиск по текущему диалогу">
-          <SearchIcon />
-          <input
-            ref={searchInputRef}
-            value={searchQuery}
-            onChange={(event) => {
-              setSearchQuery(event.target.value.slice(0, CHAT_SEARCH_MAX_CHARS));
-              setSearchIndex(0);
-            }}
-            onKeyDown={handleSearchKeyDown}
-            placeholder="Найти в диалоге"
-            aria-label="Найти сообщение в диалоге"
-            maxLength={CHAT_SEARCH_MAX_CHARS}
-            autoComplete="off"
-          />
-          <span className="chat-search__count" aria-live="polite">
-            {normalizedSearchQuery ? (searchMatches.length ? `${Math.min(searchIndex + 1, searchMatches.length)} / ${searchMatches.length}` : '0 / 0') : '—'}
-          </span>
-          <div className="chat-search__actions">
-            <button type="button" disabled={!searchMatches.length} onClick={() => moveSearch(-1)}>Назад</button>
-            <button type="button" disabled={!searchMatches.length} onClick={() => moveSearch(1)}>Далее</button>
-            <button type="button" onClick={closeSearch}>Закрыть</button>
+        <section id="chat-search-panel" className="chat-v2-search" role="search" aria-label="Поиск по текущему диалогу">
+          <div className="chat-v2-search__field">
+            <SearchIcon />
+            <input
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={(event) => {
+                setSearchQuery(event.target.value.slice(0, CHAT_SEARCH_MAX_CHARS));
+                setSearchIndex(0);
+              }}
+              onKeyDown={handleSearchKeyDown}
+              placeholder="Найти в диалоге"
+              aria-label="Найти сообщение в диалоге"
+              maxLength={CHAT_SEARCH_MAX_CHARS}
+              autoComplete="off"
+            />
+            <span className="chat-v2-search__count" aria-live="polite">
+              {normalizedSearchQuery ? (searchMatches.length ? `${Math.min(searchIndex + 1, searchMatches.length)} / ${searchMatches.length}` : '0 / 0') : '—'}
+            </span>
+          </div>
+          <div className="chat-v2-search__actions">
+            <button type="button" disabled={!searchMatches.length} onClick={() => moveSearch(-1)} aria-label="Предыдущее совпадение">↑</button>
+            <button type="button" disabled={!searchMatches.length} onClick={() => moveSearch(1)} aria-label="Следующее совпадение">↓</button>
+            <button className="chat-v2-search__done" type="button" onClick={closeSearch}>Готово</button>
           </div>
         </section>
       ) : null}
 
-      {renaming && thread ? (
-        <form className="chat-rename" onSubmit={(event) => { event.preventDefault(); saveRename(); }}>
-          <label htmlFor="chat-title-input">Название диалога</label>
-          <div className="chat-rename__controls">
-            <input
-              ref={renameInputRef}
-              id="chat-title-input"
-              value={renameValue}
-              onChange={(event) => setRenameValue(event.target.value.slice(0, CHAT_THREAD_TITLE_MAX_CHARS))}
-              onKeyDown={handleRenameKeyDown}
-              maxLength={CHAT_THREAD_TITLE_MAX_CHARS}
-              autoComplete="off"
-            />
-            <button className="button button--primary" type="submit" disabled={!renameValue.trim()}>Сохранить</button>
-            <button className="button button--secondary" type="button" onClick={() => setRenaming(false)}>Отмена</button>
-          </div>
-        </form>
-      ) : null}
-
-      <div className="chat-thread" role="log" aria-live="polite" aria-relevant="additions text">
+      <div className="chat-thread chat-v2-thread" role="log" aria-live="polite" aria-relevant="additions text">
         {thread?.messages.length ? thread.messages.map((item, index) => {
           const previous = index > 0 ? thread.messages[index - 1] : undefined;
           const showDate = !previous || dayKey(previous.createdAt) !== dayKey(item.createdAt);
@@ -539,57 +581,41 @@ export function ChatScreen({
           let content: ReactNode;
           if (item.role === 'system') {
             content = (
-              <article ref={registerNode} className={searchHit ? 'message message--system preview-notice message--search-hit' : 'message message--system preview-notice'}>
+              <article ref={registerNode} className={searchHit ? 'message message--system preview-notice chat-v2-preview-notice message--search-hit' : 'message message--system preview-notice chat-v2-preview-notice'}>
                 <span className="preview-notice__dot" aria-hidden="true" />
-                <span>{item.content}</span>
+                <span>{displaySystemMessage(item.content)}</span>
               </article>
             );
           } else if (item.role === 'user') {
-            const editing = editingMessageId === item.id;
             content = (
-              <article ref={registerNode} className={searchHit ? 'message message--user message--search-hit' : 'message message--user'}>
-                <div className={editing ? 'message__bubble message__bubble--editing' : 'message__bubble'}>
-                  {editing ? (
-                    <textarea
-                      ref={editTextareaRef}
-                      value={editingMessage}
-                      onChange={(event) => setEditingMessage(event.target.value.slice(0, CHAT_MESSAGE_MAX_CHARS))}
-                      onKeyDown={handleEditKeyDown}
-                      maxLength={CHAT_MESSAGE_MAX_CHARS}
-                      rows={2}
-                      aria-label="Редактировать сообщение"
-                    />
-                  ) : <p>{item.content}</p>}
-                </div>
-                <div className="message__footer message__footer--user">
+              <article ref={registerNode} className={searchHit ? 'message message--user chat-v2-message chat-v2-message--user message--search-hit' : 'message message--user chat-v2-message chat-v2-message--user'}>
+                <div className="message__bubble chat-v2-user-bubble"><p>{item.content}</p></div>
+                <div className="message__footer message__footer--user chat-v2-message-footer">
                   <span className="message__time">{timeLabel(item.createdAt)}{item.editedAt ? ' · изменено' : ''}</span>
-                  {editing ? (
-                    <div className="message__edit-actions">
-                      <button type="button" onClick={cancelEditing}>Отмена</button>
-                      <button type="button" onClick={saveEditing} disabled={!editingMessage.trim()}>Сохранить</button>
-                    </div>
-                  ) : (
-                    <div className="message__actions">
-                      <button type="button" onClick={() => { void handleCopy(item); }} aria-label={`${copyLabel(item.id)} сообщение`}>
-                        {copyFeedback?.id === item.id && copyFeedback.status === 'copied' ? <CheckIcon /> : <CopyIcon />}
-                        <span>{copyLabel(item.id)}</span>
-                      </button>
-                      <button type="button" onClick={() => startEditing(item)} aria-label="Изменить сообщение"><EditIcon /><span>Изменить</span></button>
-                    </div>
-                  )}
+                  <div className="message__actions chat-v2-message-actions">
+                    <button type="button" onClick={() => { void handleCopy(item); }} aria-label={`${copyLabel(item.id)} сообщение`} title={copyLabel(item.id)}>
+                      {copyFeedback?.id === item.id && copyFeedback.status === 'copied' ? <CheckIcon /> : <CopyIcon />}
+                      <span>{copyLabel(item.id)}</span>
+                    </button>
+                    <button type="button" onClick={() => startEditing(item)} aria-label="Изменить сообщение" title="Изменить сообщение"><EditIcon /><span>Изменить</span></button>
+                  </div>
                 </div>
               </article>
             );
           } else {
             content = (
-              <article ref={registerNode} className={searchHit ? 'message message--assistant message--search-hit' : 'message message--assistant'}>
-                <div className="assistant-label"><BrandMark size="compact" /><span>ARVELIS AI · {item.mock ? 'MOCK' : 'PREVIEW'}</span></div>
+              <article ref={registerNode} className={searchHit ? 'message message--assistant chat-v2-message chat-v2-message--assistant message--search-hit' : 'message message--assistant chat-v2-message chat-v2-message--assistant'}>
+                <div className="assistant-label chat-v2-assistant-label">
+                  <BrandMark size="compact" />
+                  <span>ARVELIS AI</span>
+                  <span className="chat-v2-preview-tag">{item.mock ? 'MOCK' : 'PREVIEW'}</span>
+                </div>
                 <p>{item.content}</p>
-                {item.mock ? <span className="mock-disclaimer">Предзаписанный демонстрационный текст — не ответ модели.</span> : null}
-                <div className="message__footer">
+                {item.mock ? <span className="mock-disclaimer">Демонстрационный текст — не ответ модели.</span> : null}
+                <div className="message__footer chat-v2-message-footer">
                   <span className="message__time">{timeLabel(item.createdAt)}</span>
-                  <div className="message__actions">
-                    <button type="button" onClick={() => { void handleCopy(item); }} aria-label={`${copyLabel(item.id)} сообщение ARVELIS AI`}>
+                  <div className="message__actions chat-v2-message-actions">
+                    <button type="button" onClick={() => { void handleCopy(item); }} aria-label={`${copyLabel(item.id)} сообщение ARVELIS AI`} title={copyLabel(item.id)}>
                       {copyFeedback?.id === item.id && copyFeedback.status === 'copied' ? <CheckIcon /> : <CopyIcon />}
                       <span>{copyLabel(item.id)}</span>
                     </button>
@@ -601,42 +627,43 @@ export function ChatScreen({
 
           return (
             <Fragment key={item.id}>
-              {showDate ? <div className="chat-date-separator"><span>{dateLabel(item.createdAt)}</span></div> : null}
+              {showDate ? <div className="chat-date-separator chat-v2-date-separator"><span>{dateLabel(item.createdAt)}</span></div> : null}
               {content}
             </Fragment>
           );
         }) : (
-          <section className="chat-empty">
-            <BrandMark size="default" />
-            <p className="section-kicker">НОВЫЙ ДИАЛОГ</p>
-            <h2>{threadLimitReached ? 'Освободите место для нового диалога' : 'Что хотите решить?'}</h2>
-            <p>{threadLimitReached ? 'Локальная тестовая версия достигла лимита диалогов. Удалите ненужный диалог в «Истории», затем вернитесь сюда.' : 'Начните своими словами или выберите заготовку. Сообщение сохранится на устройстве; AI-ответы в этой тестовой версии пока не формируются.'}</p>
+          <section className="chat-empty chat-v2-empty">
+            <BrandMark size="compact" />
+            <h2>{threadLimitReached ? 'Освободите место для нового диалога' : 'Чем помочь?'}</h2>
+            <p>{threadLimitReached
+              ? 'Локальный preview достиг лимита диалогов. Удалите ненужный диалог в истории и вернитесь сюда.'
+              : 'Опишите задачу своими словами или начните с одной из заготовок.'}</p>
             {!threadLimitReached ? (
-              <div className="chat-quick-starts" aria-label="Быстрые заготовки">
+              <div className="chat-quick-starts chat-v2-quick-starts" aria-label="Быстрые заготовки">
                 {QUICK_STARTS.map((item) => (
                   <button key={item.label} type="button" onClick={() => focusComposerWith(item.prompt)}>{item.label}</button>
                 ))}
               </div>
             ) : null}
+            <span className="chat-v2-empty__note">Сообщения сохраняются локально · AI пока не подключён</span>
           </section>
         )}
         <div ref={endRef} className="chat-thread__end" aria-hidden="true" />
       </div>
 
-      <div ref={composerRef} className="chat-composer-wrap">
+      <div ref={composerRef} className="chat-composer-wrap chat-v2-composer-wrap">
         {!isAtEnd && thread?.messages.length ? (
-          <button className="chat-jump-latest" type="button" onClick={() => scrollToLatest('smooth')} aria-label="Перейти к последнему сообщению">
+          <button className="chat-jump-latest chat-v2-jump-latest" type="button" onClick={() => scrollToLatest('smooth')} aria-label="Перейти к последнему сообщению">
             <ChevronDownIcon /><span>К последнему</span>
           </button>
         ) : null}
         {messageLimitReached && thread ? (
-          <div className="chat-limit-notice" role="status">
-            <strong>Локальный лимит тестовой версии достигнут.</strong>
-            <span>Начните новый диалог, чтобы продолжить.</span>
-            <button type="button" onClick={onNewChat}>Новый диалог</button>
+          <div className="chat-limit-notice chat-v2-limit-notice" role="status">
+            <strong>Локальный лимит сообщений достигнут.</strong>
+            <button type="button" onClick={handleNewChat} disabled={threadLimitReached}>Новый диалог</button>
           </div>
         ) : null}
-        <div className="chat-composer">
+        <div className="chat-composer chat-v2-composer">
           <textarea
             ref={textareaRef}
             value={message}
@@ -644,25 +671,95 @@ export function ChatScreen({
             onKeyDown={handleKeyDown}
             onFocus={focusComposer}
             onBlur={flushDraft}
-            placeholder={sendLimitReached ? 'Отправка временно недоступна' : 'Сообщение ARVELIS AI…'}
+            placeholder={sendLimitReached ? 'Отправка недоступна' : 'Сообщение'}
             aria-label="Сообщение"
             rows={1}
             maxLength={CHAT_MESSAGE_MAX_CHARS}
             disabled={sendLimitReached}
           />
-          {message.length >= CHAT_COMPOSER_COUNTER_THRESHOLD ? <span className="chat-char-count">{message.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')}</span> : null}
-          <button className="send-button" type="button" disabled={!message.trim() || sendLimitReached} onClick={submit} aria-label="Добавить сообщение в тестовый диалог"><SendIcon /></button>
+          <button className="send-button chat-v2-send-button" type="button" disabled={!message.trim() || sendLimitReached} onClick={submit} aria-label="Отправить сообщение"><SendIcon /></button>
         </div>
-        {draftSaveFailed ? (
-          <p className="chat-draft-warning" role="status">Черновик не удалось сохранить на устройстве.</p>
-        ) : (
-          <p className="chat-composer-helper">Enter — отправить · Shift+Enter — новая строка</p>
-        )}
+        <div className="chat-v2-composer-meta">
+          {draftSaveFailed ? <span className="chat-draft-warning" role="status">Черновик не удалось сохранить.</span> : <span className="chat-v2-composer-hint">Enter — отправить · Shift+Enter — новая строка</span>}
+          {message.length >= CHAT_COMPOSER_COUNTER_THRESHOLD ? <span className="chat-char-count chat-v2-char-count">{message.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')}</span> : null}
+        </div>
       </div>
 
       <span className="chat-a11y-status" aria-live="polite">
         {copyFeedback ? (copyFeedback.status === 'copied' ? 'Сообщение скопировано' : 'Не удалось скопировать сообщение') : ''}
       </span>
+
+      {menuOpen && thread ? (
+        <div className="chat-v2-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setMenuOpen(false); }}>
+          <section className="chat-v2-sheet chat-v2-sheet--actions" role="dialog" aria-modal="true" aria-label="Действия с диалогом">
+            <span className="chat-v2-sheet__handle" aria-hidden="true" />
+            <div className="chat-v2-sheet__heading">
+              <strong>Диалог</strong>
+              <span>{thread.title}</span>
+            </div>
+            <div className="chat-v2-action-list">
+              <button ref={menuFirstActionRef} type="button" onClick={handleNewChat} disabled={threadLimitReached}>
+                <PlusIcon /><span><strong>Новый диалог</strong><small>{threadLimitReached ? 'Локальный лимит диалогов достигнут' : 'Начать чистый разговор'}</small></span>
+              </button>
+              <button type="button" onClick={startRenaming}><EditIcon /><span><strong>Переименовать</strong><small>Изменить название текущего диалога</small></span></button>
+              <button className="chat-v2-action-list__danger" type="button" onClick={openDelete}><TrashIcon /><span><strong>Удалить</strong><small>Удалить диалог и его локальный черновик</small></span></button>
+            </div>
+            <button className="chat-v2-sheet__close" type="button" onClick={() => setMenuOpen(false)}>Закрыть</button>
+          </section>
+        </div>
+      ) : null}
+
+      {renaming && thread ? (
+        <div className="chat-v2-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setRenaming(false); }}>
+          <form className="chat-v2-sheet chat-v2-form-sheet" role="dialog" aria-modal="true" aria-labelledby="chat-rename-title" onSubmit={(event) => { event.preventDefault(); saveRename(); }}>
+            <span className="chat-v2-sheet__handle" aria-hidden="true" />
+            <div className="chat-v2-sheet__heading">
+              <strong id="chat-rename-title">Переименовать диалог</strong>
+              <span>Название помогает быстрее находить разговор в истории.</span>
+            </div>
+            <label htmlFor="chat-title-input">Название</label>
+            <input
+              ref={renameInputRef}
+              id="chat-title-input"
+              value={renameValue}
+              onChange={(event) => setRenameValue(event.target.value.slice(0, CHAT_THREAD_TITLE_MAX_CHARS))}
+              onKeyDown={handleRenameKeyDown}
+              maxLength={CHAT_THREAD_TITLE_MAX_CHARS}
+              autoComplete="off"
+            />
+            <div className="chat-v2-form-sheet__actions">
+              <button type="button" onClick={() => setRenaming(false)}>Отмена</button>
+              <button className="chat-v2-primary-action" type="submit" disabled={!renameValue.trim()}>Сохранить</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {editingMessageId && thread ? (
+        <div className="chat-v2-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) cancelEditing(); }}>
+          <section className="chat-v2-sheet chat-v2-form-sheet" role="dialog" aria-modal="true" aria-labelledby="chat-edit-title">
+            <span className="chat-v2-sheet__handle" aria-hidden="true" />
+            <div className="chat-v2-sheet__heading">
+              <strong id="chat-edit-title">Изменить сообщение</strong>
+              <span>Редактируется только ваше локальное сообщение.</span>
+            </div>
+            <textarea
+              ref={editTextareaRef}
+              value={editingMessage}
+              onChange={(event) => setEditingMessage(event.target.value.slice(0, CHAT_MESSAGE_MAX_CHARS))}
+              onKeyDown={handleEditKeyDown}
+              maxLength={CHAT_MESSAGE_MAX_CHARS}
+              rows={5}
+              aria-label="Редактировать сообщение"
+            />
+            <span className="chat-v2-form-sheet__counter">{editingMessage.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')}</span>
+            <div className="chat-v2-form-sheet__actions">
+              <button type="button" onClick={cancelEditing}>Отмена</button>
+              <button className="chat-v2-primary-action" type="button" onClick={saveEditing} disabled={!editingMessage.trim()}>Сохранить</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       <ConfirmDialog
         open={deleteOpen}
