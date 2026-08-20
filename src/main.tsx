@@ -13,6 +13,7 @@ import './smart-entry.css';
 import './smart-entry-responsive.css';
 import './chat-experience.css';
 import './chat-features.css';
+import './chat-refactor-v2.css';
 
 const root = document.getElementById('root');
 
