@@ -1,8 +1,13 @@
-import { useState } from 'react';
+import { useRef } from 'react';
 import { ArrowIcon, SendIcon } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
 import { starterPrompts } from '../data/demo';
+import { CHAT_MESSAGE_MAX_CHARS } from '../domain/chatPolicy';
+import { useChatDraft } from '../hooks/useChatDraft';
+import { chatDraftKey } from '../lib/chatDraftStorage';
 import type { DemoThread } from '../types';
+
+const NEW_CHAT_DRAFT_KEY = chatDraftKey(null);
 
 function relativeTime(timestamp: number): string {
   const delta = Math.max(0, Date.now() - timestamp);
@@ -44,13 +49,30 @@ export function WorkspaceScreen({
   onSubmit: (prompt: string) => void;
   onOpenThread: (threadId: string) => void;
 }) {
-  const [draft, setDraft] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const {
+    value: draft,
+    setValue: setDraft,
+    saveFailed: draftSaveFailed,
+    flush: flushDraft,
+    clear: clearDraft,
+  } = useChatDraft(NEW_CHAT_DRAFT_KEY);
 
   const submit = () => {
     const prompt = draft.trim();
     if (!prompt || threadLimitReached) return;
+    clearDraft();
     onSubmit(prompt);
-    setDraft('');
+  };
+
+  const useScenario = (prompt: string) => {
+    if (threadLimitReached) return;
+    setDraft(prompt);
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(prompt.length, prompt.length);
+      textareaRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
   };
 
   return (
@@ -66,19 +88,24 @@ export function WorkspaceScreen({
         <div>
           <div className="composer composer--hero">
             <textarea
+              ref={textareaRef}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onBlur={flushDraft}
               placeholder="Например: помоги сравнить варианты, разобраться в теме или составить план…"
               aria-label="Описание задачи"
               rows={5}
-              maxLength={6000}
+              maxLength={CHAT_MESSAGE_MAX_CHARS}
               disabled={threadLimitReached}
             />
             <div className="composer__footer">
-              <span>{draft.length.toLocaleString('ru-RU')} / 6 000 · LOCAL PREVIEW</span>
+              <span>{draft.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')} · LOCAL PREVIEW</span>
               <button className="send-button" type="button" disabled={!draft.trim() || threadLimitReached} onClick={submit} aria-label="Создать локальный preview-диалог"><SendIcon /></button>
             </div>
           </div>
+          {draftSaveFailed ? (
+            <p className="workspace-draft-note" role="status">Черновик не удалось сохранить на устройстве.</p>
+          ) : null}
           {threadLimitReached ? (
             <p className="workspace-limit-note" role="status">Локальный preview достиг лимита диалогов. Удалите ненужный диалог в «Истории», чтобы создать новый.</p>
           ) : null}
@@ -89,7 +116,7 @@ export function WorkspaceScreen({
         <div className="section-heading"><p className="section-kicker">МОЖНО НАЧАТЬ ОТСЮДА</p><h2>Быстрые сценарии</h2></div>
         <div className="scenario-list">
           {starterPrompts.map((item) => (
-            <button className="scenario-row" type="button" key={item.id} onClick={() => onSubmit(item.prompt)} disabled={threadLimitReached}>
+            <button className="scenario-row" type="button" key={item.id} onClick={() => useScenario(item.prompt)} disabled={threadLimitReached}>
               <span className="scenario-row__index">{item.index}</span>
               <div><strong>{item.title}</strong><p>{item.description}</p></div>
               <ArrowIcon />
