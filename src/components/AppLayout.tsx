@@ -4,7 +4,7 @@ import { ChatIcon, HistoryIcon, HomeIcon, PlusIcon, ProfileIcon } from './Icons'
 import type { AppScreen } from '../types';
 
 const navigation = [
-  { id: 'workspace' as const, label: 'Главная', desktopLabel: 'Рабочее пространство', icon: <HomeIcon /> },
+  { id: 'workspace' as const, label: 'Главная', desktopLabel: 'ARVELIS AI', icon: <HomeIcon /> },
   { id: 'chat' as const, label: 'Чат', desktopLabel: 'Чат', icon: <ChatIcon /> },
   { id: 'history' as const, label: 'История', desktopLabel: 'История', icon: <HistoryIcon /> },
   { id: 'profile' as const, label: 'Профиль', desktopLabel: 'Профиль', icon: <ProfileIcon /> },
@@ -54,7 +54,7 @@ export function AppLayout({
         </div>
         <div className="sidebar__status">
           <span className={online ? 'status-dot status-dot--online' : 'status-dot status-dot--offline'} />
-          <div><strong>{online ? 'Сеть доступна' : 'Нет соединения'}</strong><span>Frontend preview · локальный режим</span></div>
+          <div><strong>{online ? 'Сеть доступна' : 'Нет соединения'}</strong><span>Тестовая версия · локальный режим</span></div>
         </div>
       </aside>
 

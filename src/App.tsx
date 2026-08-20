@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { AppBootScreen } from './components/AppBootScreen';
+import { normalizeChatMessage, normalizeThreadTitle } from './domain/chatPolicy';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import {
   loadHistoryModule,
@@ -13,8 +14,12 @@ import {
   type AppLoadProgress,
   type PreparedCoreModules,
 } from './lib/appPreload';
+import { chatDraftKey, clearChatDrafts, removeChatDraft } from './lib/chatDraftStorage';
 import {
   canUseDemoStorage,
+  DEMO_MAX_MESSAGES_PER_THREAD,
+  DEMO_MAX_THREADS,
+  DEMO_PREVIEW_NOTICE,
   loadDemoWorkspace,
   resetDemoWorkspace,
   saveDemoWorkspace,
@@ -63,7 +68,7 @@ function createSystemMessage(): DemoMessage {
     id: makeId('sys'),
     role: 'system',
     createdAt: Date.now() + 1,
-    content: 'Сохранено в локальном preview. AI пока не подключён.',
+    content: DEMO_PREVIEW_NOTICE,
   };
 }
 
@@ -93,6 +98,9 @@ export default function App() {
     [workspace],
   );
 
+  const threadLimitReached = (workspace?.threads.length ?? 0) >= DEMO_MAX_THREADS;
+  const messageLimitReached = Boolean(activeThread && activeThread.messages.length >= DEMO_MAX_MESSAGES_PER_THREAD);
+
   const launchApp = async (profileName?: string) => {
     const launchSequence = ++launchSequenceRef.current;
     const normalizedName = profileName?.trim() || undefined;
@@ -121,8 +129,6 @@ export default function App() {
         setPendingProfileName(nextWorkspace.profileName);
       }
 
-      // Let the browser paint the truthful 100% / ready state once before switching
-      // to the already prepared core UI. This is a frame boundary, not a timer delay.
       await waitForBootPaint();
       if (launchSequence !== launchSequenceRef.current) return;
 
@@ -156,48 +162,104 @@ export default function App() {
   };
 
   const createThreadFromPrompt = (prompt: string) => {
+    const normalizedPrompt = normalizeChatMessage(prompt);
+    if (!normalizedPrompt || threadLimitReached) return;
+
     const timestamp = Date.now();
     const thread: DemoThread = {
       id: makeId('thread'),
-      title: titleFromPrompt(prompt),
+      title: titleFromPrompt(normalizedPrompt),
       createdAt: timestamp,
       updatedAt: timestamp,
-      messages: [createUserMessage(prompt), createSystemMessage()],
+      messages: [createUserMessage(normalizedPrompt), createSystemMessage()],
     };
 
-    setWorkspace((current) => current ? {
-      ...current,
-      activeThreadId: thread.id,
-      threads: [thread, ...current.threads],
-    } : current);
+    setWorkspace((current) => {
+      if (!current || current.threads.length >= DEMO_MAX_THREADS) return current;
+      return {
+        ...current,
+        activeThreadId: thread.id,
+        threads: [thread, ...current.threads],
+      };
+    });
     setScreen('chat');
   };
 
   const sendMessage = (content: string) => {
     if (!workspace) return;
+    const normalizedContent = normalizeChatMessage(content);
+    if (!normalizedContent) return;
+
     if (!activeThread) {
-      createThreadFromPrompt(content);
+      createThreadFromPrompt(normalizedContent);
       return;
     }
+    if (activeThread.messages.length >= DEMO_MAX_MESSAGES_PER_THREAD) return;
 
-    const userMessage = createUserMessage(content);
+    const userMessage = createUserMessage(normalizedContent);
     const timestamp = Date.now();
 
     setWorkspace((current) => current ? {
       ...current,
-      threads: current.threads.map((thread) => thread.id === activeThread.id ? {
-        ...thread,
-        updatedAt: timestamp,
-        messages: [...thread.messages, userMessage],
-      } : thread).sort((a, b) => b.updatedAt - a.updatedAt),
+      threads: current.threads.map((thread) => {
+        if (thread.id !== activeThread.id || thread.messages.length >= DEMO_MAX_MESSAGES_PER_THREAD) return thread;
+        return {
+          ...thread,
+          updatedAt: timestamp,
+          messages: [...thread.messages, userMessage],
+        };
+      }).sort((a, b) => b.updatedAt - a.updatedAt),
+    } : current);
+  };
+
+  const editMessage = (threadId: string, messageId: string, content: string) => {
+    const normalizedContent = normalizeChatMessage(content);
+    if (!normalizedContent) return;
+
+    const timestamp = Date.now();
+    setWorkspace((current) => {
+      if (!current) return current;
+
+      const threads = current.threads.map((thread) => {
+        if (thread.id !== threadId) return thread;
+
+        let changed = false;
+        const messages = thread.messages.map((message) => {
+          if (message.id !== messageId || message.role !== 'user' || message.content === normalizedContent) return message;
+          changed = true;
+          return { ...message, content: normalizedContent, editedAt: timestamp };
+        });
+
+        return changed ? { ...thread, messages, updatedAt: timestamp } : thread;
+      }).sort((a, b) => b.updatedAt - a.updatedAt);
+
+      return { ...current, threads };
+    });
+  };
+
+  const renameThread = (threadId: string, title: string) => {
+    const normalizedTitle = normalizeThreadTitle(title);
+    if (!normalizedTitle) return;
+
+    const timestamp = Date.now();
+    setWorkspace((current) => current ? {
+      ...current,
+      threads: current.threads.map((thread) => thread.id === threadId && thread.title !== normalizedTitle
+        ? { ...thread, title: normalizedTitle, updatedAt: timestamp }
+        : thread).sort((a, b) => b.updatedAt - a.updatedAt),
     } : current);
   };
 
   const deleteThread = (threadId: string) => {
+    removeChatDraft(chatDraftKey(threadId));
     setWorkspace((current) => {
       if (!current) return current;
       const threads = current.threads.filter((thread) => thread.id !== threadId);
-      return { ...current, threads, activeThreadId: current.activeThreadId === threadId ? threads[0]?.id ?? null : current.activeThreadId };
+      return {
+        ...current,
+        threads,
+        activeThreadId: current.activeThreadId === threadId ? null : current.activeThreadId,
+      };
     });
   };
 
@@ -206,6 +268,7 @@ export default function App() {
   };
 
   const resetPreview = () => {
+    clearChatDrafts();
     const next = resetDemoWorkspace();
     setWorkspace(next);
     setPersistenceAvailable(canUseDemoStorage());
@@ -260,8 +323,27 @@ export default function App() {
       online={online}
       persistenceAvailable={persistenceAvailable}
     >
-      {screen === 'workspace' ? <WorkspaceScreen profileName={workspace.profileName} threads={workspace.threads} onSubmit={createThreadFromPrompt} onOpenThread={openThread} /> : null}
-      {screen === 'chat' ? <ChatScreen thread={activeThread} onNewChat={newChat} onSend={sendMessage} /> : null}
+      {screen === 'workspace' ? (
+        <WorkspaceScreen
+          profileName={workspace.profileName}
+          threads={workspace.threads}
+          threadLimitReached={threadLimitReached}
+          onSubmit={createThreadFromPrompt}
+          onOpenThread={openThread}
+        />
+      ) : null}
+      {screen === 'chat' ? (
+        <ChatScreen
+          thread={activeThread}
+          threadLimitReached={threadLimitReached}
+          messageLimitReached={messageLimitReached}
+          onNewChat={newChat}
+          onSend={sendMessage}
+          onEditMessage={editMessage}
+          onRenameThread={renameThread}
+          onDeleteThread={deleteThread}
+        />
+      ) : null}
       {screen === 'history' ? (
         <Suspense fallback={secondaryFallback}>
           <HistoryScreen threads={workspace.threads} onOpen={openThread} onDelete={deleteThread} />

@@ -12,6 +12,10 @@ export const StateIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="M3.5
 export const PlusIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg></IconFrame>;
 export const SendIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="m4 4 16 8-16 8 3-8Z" /><path d="M7 12h13" /></svg></IconFrame>;
 export const ArrowIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></svg></IconFrame>;
+export const ChevronDownIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="m5 9 7 7 7-7" /></svg></IconFrame>;
 export const SearchIcon = () => <IconFrame><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.2" /><path d="m15.2 15.2 4.3 4.3" /></svg></IconFrame>;
+export const CopyIcon = () => <IconFrame><svg viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="1.8" /><path d="M16 8V5.8A1.8 1.8 0 0 0 14.2 4H5.8A1.8 1.8 0 0 0 4 5.8v8.4A1.8 1.8 0 0 0 5.8 16H8" /></svg></IconFrame>;
+export const EditIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="m5 16.8-.8 3 3-.8L18 8.2 15.8 6Z" /><path d="m14.8 7 2.2 2.2" /></svg></IconFrame>;
+export const CheckIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="m5 12.5 4.3 4.3L19 7" /></svg></IconFrame>;
 export const TrashIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="M5.5 7.2h13M9 7.2V4.8h6v2.4M7.4 7.2l.7 12h7.8l.7-12M10 10.2v6M14 10.2v6" /></svg></IconFrame>;
 export const ResetIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="M4.5 8.2V4.5h3.7M4.6 4.7a8.8 8.8 0 1 1-1.4 10.1" /></svg></IconFrame>;
