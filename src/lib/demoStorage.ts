@@ -4,15 +4,20 @@ import type { DemoMessage, DemoThread, DemoWorkspaceState } from '../types';
 const STORAGE_KEY = 'arvelis.demo.workspace.v1';
 const STORAGE_PROBE_KEY = 'arvelis.demo.storage.probe';
 const VALID_ROLES = new Set<DemoMessage['role']>(['user', 'assistant', 'system']);
+const COMPACT_PREVIEW_STATUS = 'Сохранено в локальном preview. AI пока не подключён.';
 
 const LEGACY_PREVIEW_COPY = new Map<string, string>([
   [
     'Запрос сохранён локально для тестирования интерфейса. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
-    'Запрос добавлен в локальный preview-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
+    COMPACT_PREVIEW_STATUS,
   ],
   [
     'Запрос добавлен в локальный demo-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
+    COMPACT_PREVIEW_STATUS,
+  ],
+  [
     'Запрос добавлен в локальный preview-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
+    COMPACT_PREVIEW_STATUS,
   ],
   [
     'Это демонстрационный пример структуры ответа. Реальный AI не подключён. В production здесь появится проверяемый разбор цели, ограничений, рисков и последовательности действий.',
