@@ -2,10 +2,42 @@ import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandMark } from '../components/Brand';
 import { PlusIcon, SendIcon } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
-import type { DemoThread } from '../types';
+import type { DemoMessage, DemoThread } from '../types';
 
 function timeLabel(timestamp: number): string {
   return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(timestamp);
+}
+
+function ChatMessage({ item }: { item: DemoMessage }) {
+  if (item.role === 'system') {
+    return (
+      <aside className="preview-notice" role="status">
+        <span className="preview-notice__dot" aria-hidden="true" />
+        <span>{item.content}</span>
+      </aside>
+    );
+  }
+
+  if (item.role === 'assistant') {
+    return (
+      <article className="message message--assistant">
+        <div className="assistant-label">
+          <BrandMark size="compact" />
+          <span>ARVELIS AI · {item.mock ? 'MOCK' : 'PREVIEW'}</span>
+        </div>
+        <p>{item.content}</p>
+        <time className="message__time" dateTime={new Date(item.createdAt).toISOString()}>{timeLabel(item.createdAt)}</time>
+        {item.mock ? <span className="mock-disclaimer">Предзаписанный пример — не ответ модели.</span> : null}
+      </article>
+    );
+  }
+
+  return (
+    <article className="message message--user">
+      <div className="message__bubble"><p>{item.content}</p></div>
+      <time className="message__time" dateTime={new Date(item.createdAt).toISOString()}>{timeLabel(item.createdAt)}</time>
+    </article>
+  );
 }
 
 export function ChatScreen({
@@ -88,26 +120,18 @@ export function ChatScreen({
   };
 
   return (
-    <div className="chat-page">
-      <Topbar title={title} subtitle="Preview · AI пока не подключён" />
+    <div className="chat-page chat-experience">
+      <Topbar title={title} subtitle="ARVELIS AI · локальный preview" />
 
       <div className="chat-thread" aria-live="polite">
         {thread?.messages.length ? thread.messages.map((item) => (
-          <article key={item.id} className={`message message--${item.role}`}>
-            {item.role === 'assistant' ? (
-              <div className="assistant-label"><BrandMark size="compact" /><span>ARVELIS AI · {item.mock ? 'MOCK' : 'PREVIEW'}</span></div>
-            ) : (
-              <div className="message__meta"><span>{item.role === 'user' ? 'ВЫ' : 'СИСТЕМА'}</span><time>{timeLabel(item.createdAt)}</time></div>
-            )}
-            <p>{item.content}</p>
-            {item.mock ? <span className="mock-disclaimer">Предзаписанный демонстрационный текст — не ответ модели.</span> : null}
-          </article>
+          <ChatMessage key={item.id} item={item} />
         )) : (
           <section className="chat-empty">
             <BrandMark size="default" />
             <p className="section-kicker">НОВЫЙ ДИАЛОГ</p>
-            <h2>Опишите задачу.</h2>
-            <p>Сообщение создаст локальный preview-диалог. AI-запрос не выполняется; сохранение зависит от возможностей браузера.</p>
+            <h2>О чём хотите поговорить?</h2>
+            <p>Начните с вопроса, задачи или контекста. В preview сообщение сохранится локально; AI пока не подключён.</p>
           </section>
         )}
         <div ref={endRef} className="chat-thread__end" aria-hidden="true" />
@@ -116,7 +140,7 @@ export function ChatScreen({
       <div ref={composerRef} className="chat-composer-wrap">
         <div className="chat-composer">
           <button
-            className="icon-button icon-button--muted"
+            className="icon-button icon-button--muted chat-composer__new"
             type="button"
             onClick={onNewChat}
             disabled={!thread}
@@ -136,9 +160,17 @@ export function ChatScreen({
             rows={1}
             maxLength={6000}
           />
-          <button className="send-button" type="button" disabled={!message.trim()} onClick={submit} aria-label="Добавить сообщение в локальный preview-диалог"><SendIcon /></button>
+          <button
+            className="send-button"
+            type="button"
+            disabled={!message.trim()}
+            onClick={submit}
+            aria-label="Добавить сообщение в локальный preview-диалог"
+          >
+            <SendIcon />
+          </button>
         </div>
-        <p>LOCAL PREVIEW · Enter — отправить · Shift+Enter — новая строка</p>
+        <p>PREVIEW · AI пока не подключён · Shift+Enter — новая строка</p>
       </div>
     </div>
   );
