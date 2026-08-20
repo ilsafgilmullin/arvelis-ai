@@ -93,6 +93,18 @@ Chat разделён по ответственности:
 
 Будущий AI integration layer должен добавлять streaming/pending/error/cancel semantics через отдельный domain/provider слой. `Regenerate`, `Stop generation`, attachments, voice, web-search, citations и model selector не должны встраиваться в `ChatScreen` как локальные фальшивые действия.
 
+## Chat data integrity
+
+Локальная preview-миграция имеет отдельные правила целостности:
+
+- пользовательский `user` content является данными пользователя и не переписывается по совпадению текста с legacy/system copy;
+- автоматическая legacy-нормализация разрешена только для известных `system`/`assistant` preview-фраз;
+- мигрируемый предзаписанный assistant-текст обязан сохранять `mock: true`, чтобы после обновления он не мог визуально выглядеть как реальный ответ AI;
+- повторные известные system preview-notices могут безопасно схлопываться до одного, поскольку это инфраструктурная preview-метка, а не пользовательский контент;
+- неизвестный текст не исправляется и не «улучшается» автоматически.
+
+Тот же принцип должен использоваться для будущих server/database migrations: данные пользователя не меняются эвристической copy-нормализацией.
+
 ## CSS layers
 
 Чтобы не переписывать работающую дизайн-систему целиком, стили разделены по ответственности:
@@ -159,6 +171,7 @@ QA candidate включает:
 - short-screen/landscape hardening Smart Entry;
 - smart Chat auto-scroll без принудительного ухода вниз во время чтения старых сообщений;
 - безопасный local search без `innerHTML`/HTML injection;
+- mobile Search/Rename/Edit modes без конкуренции основного composer/mobile navigation с клавиатурой;
 - Clipboard failure feedback + `aria-live` feedback;
 - draft persistence failure feedback;
 - отказ от постоянного filled `transform` после screen entrance animation, чтобы не создавать лишний containing block для fixed/mobile UI.
