@@ -26,9 +26,9 @@ function greetingFor(profileName: string): string {
   const hour = new Date().getHours();
   const greeting = hour < 6 ? 'Доброй ночи' : hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
   const normalized = profileName.trim();
-  if (!normalized || normalized === 'Пользователь ARVELIS') return `${greeting}. Всё готово.`;
+  if (!normalized || normalized === 'Пользователь ARVELIS') return `${greeting}. Можно начинать.`;
   const firstName = normalized.split(/\s+/)[0];
-  return `${greeting}, ${firstName}. Всё готово.`;
+  return `${greeting}, ${firstName}. Можно начинать.`;
 }
 
 export function WorkspaceScreen({
