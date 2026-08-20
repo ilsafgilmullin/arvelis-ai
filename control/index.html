@@ -9,8 +9,22 @@
     <meta name="description" content="ARVELIS CONTROL — внутренний центр управления ARVELIS AI." />
     <link rel="icon" type="image/svg+xml" href="/brand/favicon.svg" />
     <title>ARVELIS CONTROL</title>
+    <style>
+      #control-preboot{position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;min-width:320px;min-height:100vh;min-height:100dvh;padding:max(24px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom));box-sizing:border-box;background:radial-gradient(circle at 50% 38%,rgba(214,170,70,.06),transparent 30%),#08090b;color:#f4f2ec;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif}
+      #control-preboot .control-preboot-lockup{display:flex;align-items:center;gap:14px}
+      #control-preboot img{width:58px;height:58px;display:block}
+      #control-preboot .control-preboot-copy{display:grid;gap:3px}
+      #control-preboot span{color:#f0d27d;font-size:18px;font-weight:650;letter-spacing:.16em}
+      #control-preboot strong{color:#8b9098;font-size:10px;font-weight:700;letter-spacing:.28em}
+    </style>
   </head>
   <body>
+    <div id="control-preboot" aria-label="ARVELIS CONTROL">
+      <div class="control-preboot-lockup">
+        <img src="/brand/logo-mark.svg" alt="" />
+        <div class="control-preboot-copy"><span>ARVELIS</span><strong>CONTROL</strong></div>
+      </div>
+    </div>
     <div id="control-root"></div>
     <script type="module" src="/src/control/main.tsx"></script>
   </body>
