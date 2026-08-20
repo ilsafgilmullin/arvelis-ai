@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ControlApp } from './ControlApp';
+import { ControlErrorBoundary } from './ControlErrorBoundary';
 import './control.css';
 
 const root = document.getElementById('control-root');
@@ -11,7 +12,9 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <ControlApp />
+    <ControlErrorBoundary>
+      <ControlApp />
+    </ControlErrorBoundary>
   </StrictMode>,
 );
 
