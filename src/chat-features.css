@@ -1,5 +1,16 @@
 /* Functional chat-layer loaded after the visual conversation layer. */
 
+.chat-experience .topbar__identity,
+.chat-experience .topbar__identity > div:last-child {
+  min-width: 0;
+}
+
+.chat-experience .topbar h1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chat-composer textarea {
   padding-left: 12px;
 }
@@ -22,8 +33,35 @@
   color: #666c75;
 }
 
-.chat-draft-warning {
+.chat-draft-warning,
+.workspace-draft-note {
   color: #d6a978;
+}
+
+.workspace-draft-note,
+.workspace-limit-note {
+  max-width: 520px;
+  margin: 10px 4px 0;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.workspace-draft-note {
+  color: #c49c68;
+}
+
+.workspace-limit-note {
+  color: #b19a72;
+}
+
+.chat-a11y-status {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .chat-header-action--active {
@@ -195,14 +233,6 @@
   cursor: pointer;
 }
 
-.workspace-limit-note {
-  max-width: 520px;
-  margin: 10px 4px 0;
-  color: #b19a72;
-  font-size: 10px;
-  line-height: 1.55;
-}
-
 .scenario-row:disabled {
   cursor: not-allowed;
   opacity: .42;
@@ -221,6 +251,18 @@
 
   .chat-composer textarea {
     padding-left: 12px;
+  }
+
+  .chat-experience .topbar {
+    align-items: flex-start;
+  }
+
+  .chat-experience .topbar__identity {
+    flex: 1 1 auto;
+  }
+
+  .chat-experience .topbar h1 {
+    max-width: 100%;
   }
 
   .chat-search {
@@ -267,6 +309,7 @@
     font-size: 9px;
   }
 
+  .workspace-draft-note,
   .workspace-limit-note {
     margin-left: 0;
     margin-right: 0;
