@@ -1,0 +1,36 @@
+/* Post-merge fixes verified against real iPhone Safari screenshots. */
+
+@media (max-width: 780px) {
+  /*
+   * A sticky composer can remain at its document position when iOS Safari opens
+   * the software keyboard. While the textarea is focused, promote the composer
+   * to a fixed visual-viewport control so it stays close to the keyboard/browser
+   * chrome instead of leaving a large dead zone below it.
+   */
+  .chat-composer-wrap:focus-within {
+    position: fixed;
+    z-index: 90;
+    left: 20px;
+    right: 20px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: auto;
+    margin: 0;
+    padding: 10px 0 0;
+    background: linear-gradient(180deg, transparent, var(--bg) 22%);
+  }
+
+  .chat-composer-wrap:focus-within .chat-composer {
+    box-shadow: 0 18px 52px rgba(0, 0, 0, .42);
+  }
+
+  .chat-composer-wrap:focus-within > p {
+    display: none;
+  }
+}
+
+@media (max-width: 360px) {
+  .chat-composer-wrap:focus-within {
+    left: 16px;
+    right: 16px;
+  }
+}
