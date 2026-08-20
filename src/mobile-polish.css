@@ -1,0 +1,249 @@
+@media (max-width: 780px) {
+  .app-main {
+    padding-bottom: calc(118px + env(safe-area-inset-bottom));
+  }
+
+  .content-page,
+  .chat-page {
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-bottom: calc(118px + env(safe-area-inset-bottom));
+  }
+
+  .topbar {
+    gap: 14px;
+  }
+
+  .topbar h1 {
+    font-size: 23px;
+    line-height: 1.12;
+  }
+
+  .topbar p {
+    max-width: 100%;
+    font-size: 11px;
+    line-height: 1.55;
+  }
+
+  .demo-chip {
+    flex: 0 0 auto;
+  }
+
+  .welcome-layout {
+    gap: 34px;
+    padding: 38px 0 44px;
+  }
+
+  .welcome-brand {
+    padding: 26px 0 34px;
+  }
+
+  .welcome-copy h1 {
+    margin: 14px 0 16px;
+    font-size: clamp(40px, 10.6vw, 48px);
+    line-height: 1.02;
+    letter-spacing: -.045em;
+  }
+
+  .welcome-copy > p:not(.section-kicker):not(.entry-note) {
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .welcome-actions {
+    margin-top: 28px;
+  }
+
+  .principles-strip > div,
+  .principles-strip > div:nth-child(2),
+  .principles-strip > div:last-child {
+    min-height: 72px;
+    padding: 14px 0;
+  }
+
+  .workspace-hero {
+    margin-top: 30px;
+    gap: 24px;
+  }
+
+  .workspace-hero__copy h2 {
+    margin: 10px 0 12px;
+    font-size: clamp(36px, 9.8vw, 44px);
+    line-height: 1.04;
+    letter-spacing: -.045em;
+  }
+
+  .workspace-hero__copy > p:not(.section-kicker) {
+    font-size: 12px;
+    line-height: 1.65;
+  }
+
+  .composer--hero textarea {
+    min-height: 124px;
+  }
+
+  .section-block {
+    margin-top: 40px;
+  }
+
+  .section-heading h2 {
+    font-size: 18px;
+  }
+
+  .mobile-nav {
+    left: 12px;
+    right: 12px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    padding: 6px;
+  }
+
+  .mobile-nav__item {
+    min-height: 54px;
+    font-size: 9px;
+  }
+
+  .chat-thread {
+    padding: 22px 0 20px;
+  }
+
+  .chat-composer-wrap {
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    padding-bottom: 4px;
+  }
+
+  .message--user {
+    max-width: 86%;
+  }
+
+  .profile-overview {
+    gap: 14px;
+    padding-bottom: 24px;
+  }
+
+  .profile-overview h2 {
+    font-size: 18px;
+    line-height: 1.25;
+  }
+
+  .settings-panel {
+    margin-top: 30px;
+  }
+
+  .settings-group {
+    padding: 20px 0;
+  }
+
+  .settings-group__heading p,
+  .security-note > p:not(.section-kicker) {
+    max-width: 100%;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  .inline-form {
+    gap: 10px;
+  }
+
+  .setting-action {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    gap: 7px;
+    padding: 20px 4px;
+  }
+
+  .setting-action > .icon,
+  .setting-action > span {
+    display: none;
+  }
+
+  .setting-action div {
+    display: grid;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .setting-action strong {
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .setting-action div span {
+    max-width: 34rem;
+    font-size: 11px;
+    line-height: 1.55;
+  }
+
+  .security-note {
+    margin-top: 34px;
+    padding: 20px 18px;
+  }
+
+  .security-note h3 {
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .history-row--managed {
+    grid-template-columns: minmax(0, 1fr) 46px;
+    gap: 8px;
+  }
+
+  .history-row__open {
+    padding-right: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .entry-shell {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .entry-status {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .entry-status i {
+    width: 22px;
+  }
+
+  .brand-mark--hero {
+    width: 96px;
+    height: 96px;
+  }
+
+  .brand-lockup__wordmark {
+    font-size: 22px;
+  }
+
+  .brand-lockup__tagline {
+    font-size: 7px;
+    letter-spacing: .16em;
+  }
+
+  .welcome-copy h1 {
+    font-size: clamp(38px, 10.4vw, 46px);
+  }
+
+  .workspace-hero__copy h2 {
+    font-size: clamp(34px, 9.4vw, 42px);
+  }
+
+  .profile-avatar {
+    width: 50px;
+    height: 50px;
+  }
+
+  .profile-overview {
+    align-items: center;
+  }
+
+  .inline-form input,
+  .search-field input,
+  .chat-composer textarea,
+  .composer textarea {
+    font-size: 16px;
+  }
+}
