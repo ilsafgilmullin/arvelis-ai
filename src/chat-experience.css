@@ -1,0 +1,303 @@
+/* ARVELIS AI conversation experience.
+   Keeps the product's graphite-gold identity while moving the chat away from a technical preview layout. */
+
+/* Smart Entry remains scrollable on short screens but should not expose a browser scrollbar in normal use. */
+.app-boot {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.app-boot::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.chat-experience .topbar {
+  min-height: 96px;
+}
+
+.chat-experience .topbar h1 {
+  max-width: min(30ch, 100%);
+}
+
+.chat-thread {
+  width: min(780px, 100%);
+  max-width: 780px;
+  gap: 18px;
+  padding: 26px 0 30px;
+}
+
+.message {
+  max-width: 100%;
+  font-size: 14px;
+  line-height: 1.68;
+}
+
+.message--user {
+  justify-self: end;
+  display: grid;
+  justify-items: end;
+  width: auto;
+  max-width: min(78%, 620px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.message__bubble {
+  max-width: 100%;
+  padding: 12px 15px;
+  border: 1px solid rgba(214, 170, 70, .12);
+  border-radius: 19px 19px 5px 19px;
+  background: linear-gradient(180deg, rgba(27, 28, 31, .96), rgba(19, 20, 23, .96));
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .16);
+}
+
+.message__bubble p {
+  margin: 0;
+}
+
+.message__time {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted-2);
+  font-size: 8px;
+  line-height: 1;
+  letter-spacing: .08em;
+}
+
+.message--assistant {
+  justify-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  padding: 5px 2px 10px;
+  border: 0;
+  background: transparent;
+}
+
+.message--assistant .assistant-label {
+  margin-bottom: 10px;
+}
+
+.message--assistant > p {
+  max-width: 72ch;
+  color: #e7e3da;
+  font-size: 14px;
+  line-height: 1.72;
+}
+
+.message--assistant .message__time {
+  margin-top: 9px;
+}
+
+.preview-notice {
+  justify-self: center;
+  width: fit-content;
+  max-width: min(560px, 100%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid rgba(214, 170, 70, .12);
+  border-radius: 999px;
+  background: rgba(214, 170, 70, .028);
+  color: #aaa69e;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.preview-notice__dot {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 10px rgba(214, 170, 70, .26);
+}
+
+.chat-empty {
+  width: min(520px, 100%);
+  margin-top: clamp(54px, 10vh, 110px);
+}
+
+.chat-empty h2 {
+  margin-top: 14px;
+  font-size: clamp(30px, 5vw, 38px);
+}
+
+.chat-composer-wrap {
+  width: min(780px, 100%);
+  max-width: 780px;
+  padding-top: 20px;
+  padding-bottom: 4px;
+  background: linear-gradient(180deg, transparent 0%, rgba(9, 10, 12, .94) 24%, var(--bg) 48%);
+}
+
+.chat-composer {
+  min-height: 58px;
+  align-items: flex-end;
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, .11);
+  border-radius: 24px;
+  background: rgba(18, 20, 24, .96);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .32), inset 0 1px 0 rgba(255, 255, 255, .025);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.chat-composer textarea {
+  min-height: 44px;
+  max-height: 160px;
+  padding: 11px 7px 9px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.chat-composer .icon-button,
+.chat-composer .send-button {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+
+.chat-composer .icon-button {
+  border-color: transparent;
+  background: transparent;
+}
+
+.chat-composer .icon-button:not(:disabled):hover {
+  background: rgba(255, 255, 255, .04);
+  color: var(--text);
+}
+
+.chat-composer .send-button {
+  border-color: rgba(240, 210, 125, .24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .15);
+}
+
+.chat-composer-wrap > p {
+  margin-top: 8px;
+  color: #666c75;
+  font-size: 8px;
+  letter-spacing: .035em;
+}
+
+@media (max-width: 780px) {
+  .chat-page.chat-experience {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .chat-experience .topbar {
+    min-height: 92px;
+    padding-bottom: 16px;
+  }
+
+  .chat-experience .topbar h1 {
+    font-size: 22px;
+  }
+
+  .chat-experience .topbar p {
+    margin-top: 5px;
+    font-size: 10px;
+  }
+
+  .chat-thread {
+    gap: 16px;
+    padding: 18px 0 28px;
+  }
+
+  .message {
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .message--user {
+    max-width: 84%;
+  }
+
+  .message__bubble {
+    padding: 11px 13px;
+    border-radius: 18px 18px 4px 18px;
+  }
+
+  .message--assistant > p {
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  .preview-notice {
+    justify-self: stretch;
+    width: 100%;
+    max-width: 100%;
+    justify-content: center;
+    padding: 8px 10px;
+    border-radius: 12px;
+    font-size: 10px;
+    text-align: center;
+  }
+
+  .chat-composer-wrap {
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    padding-top: 14px;
+    padding-bottom: 4px;
+  }
+
+  .chat-composer {
+    min-height: 56px;
+    border-radius: 23px;
+    padding: 5px;
+  }
+
+  .chat-composer textarea {
+    min-height: 44px;
+    padding-left: 6px;
+    padding-right: 6px;
+    font-size: 16px;
+  }
+
+  .chat-composer-wrap > p {
+    display: none;
+  }
+
+  .chat-empty {
+    margin-top: 9vh;
+  }
+
+  .chat-empty h2 {
+    font-size: 30px;
+  }
+
+  .app-shell:has(.chat-composer textarea:focus) .chat-composer-wrap {
+    bottom: max(4px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 420px) {
+  .message--user {
+    max-width: 88%;
+  }
+
+  .chat-composer .icon-button,
+  .chat-composer .send-button {
+    width: 42px;
+    height: 42px;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .chat-composer .icon-button:hover {
+    background: transparent;
+    color: var(--muted);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message__bubble,
+  .chat-composer,
+  .preview-notice {
+    transition: none;
+  }
+}
