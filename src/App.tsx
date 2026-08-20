@@ -16,6 +16,8 @@ import {
 import { chatDraftKey, clearChatDrafts, removeChatDraft } from './lib/chatDraftStorage';
 import {
   canUseDemoStorage,
+  DEMO_MAX_MESSAGES_PER_THREAD,
+  DEMO_MAX_THREADS,
   loadDemoWorkspace,
   resetDemoWorkspace,
   saveDemoWorkspace,
@@ -95,6 +97,9 @@ export default function App() {
     [workspace],
   );
 
+  const threadLimitReached = (workspace?.threads.length ?? 0) >= DEMO_MAX_THREADS;
+  const messageLimitReached = Boolean(activeThread && activeThread.messages.length >= DEMO_MAX_MESSAGES_PER_THREAD);
+
   const launchApp = async (profileName?: string) => {
     const launchSequence = ++launchSequenceRef.current;
     const normalizedName = profileName?.trim() || undefined;
@@ -156,20 +161,26 @@ export default function App() {
   };
 
   const createThreadFromPrompt = (prompt: string) => {
+    const normalizedPrompt = prompt.trim().slice(0, MAX_CHAT_MESSAGE_LENGTH);
+    if (!normalizedPrompt || threadLimitReached) return;
+
     const timestamp = Date.now();
     const thread: DemoThread = {
       id: makeId('thread'),
-      title: titleFromPrompt(prompt),
+      title: titleFromPrompt(normalizedPrompt),
       createdAt: timestamp,
       updatedAt: timestamp,
-      messages: [createUserMessage(prompt), createSystemMessage()],
+      messages: [createUserMessage(normalizedPrompt), createSystemMessage()],
     };
 
-    setWorkspace((current) => current ? {
-      ...current,
-      activeThreadId: thread.id,
-      threads: [thread, ...current.threads],
-    } : current);
+    setWorkspace((current) => {
+      if (!current || current.threads.length >= DEMO_MAX_THREADS) return current;
+      return {
+        ...current,
+        activeThreadId: thread.id,
+        threads: [thread, ...current.threads],
+      };
+    });
     setScreen('chat');
   };
 
@@ -179,17 +190,21 @@ export default function App() {
       createThreadFromPrompt(content);
       return;
     }
+    if (activeThread.messages.length >= DEMO_MAX_MESSAGES_PER_THREAD) return;
 
     const userMessage = createUserMessage(content.slice(0, MAX_CHAT_MESSAGE_LENGTH));
     const timestamp = Date.now();
 
     setWorkspace((current) => current ? {
       ...current,
-      threads: current.threads.map((thread) => thread.id === activeThread.id ? {
-        ...thread,
-        updatedAt: timestamp,
-        messages: [...thread.messages, userMessage],
-      } : thread).sort((a, b) => b.updatedAt - a.updatedAt),
+      threads: current.threads.map((thread) => {
+        if (thread.id !== activeThread.id || thread.messages.length >= DEMO_MAX_MESSAGES_PER_THREAD) return thread;
+        return {
+          ...thread,
+          updatedAt: timestamp,
+          messages: [...thread.messages, userMessage],
+        };
+      }).sort((a, b) => b.updatedAt - a.updatedAt),
     } : current);
   };
 
@@ -236,7 +251,11 @@ export default function App() {
     setWorkspace((current) => {
       if (!current) return current;
       const threads = current.threads.filter((thread) => thread.id !== threadId);
-      return { ...current, threads, activeThreadId: current.activeThreadId === threadId ? threads[0]?.id ?? null : current.activeThreadId };
+      return {
+        ...current,
+        threads,
+        activeThreadId: current.activeThreadId === threadId ? null : current.activeThreadId,
+      };
     });
   };
 
@@ -300,14 +319,25 @@ export default function App() {
       online={online}
       persistenceAvailable={persistenceAvailable}
     >
-      {screen === 'workspace' ? <WorkspaceScreen profileName={workspace.profileName} threads={workspace.threads} onSubmit={createThreadFromPrompt} onOpenThread={openThread} /> : null}
+      {screen === 'workspace' ? (
+        <WorkspaceScreen
+          profileName={workspace.profileName}
+          threads={workspace.threads}
+          threadLimitReached={threadLimitReached}
+          onSubmit={createThreadFromPrompt}
+          onOpenThread={openThread}
+        />
+      ) : null}
       {screen === 'chat' ? (
         <ChatScreen
           thread={activeThread}
+          threadLimitReached={threadLimitReached}
+          messageLimitReached={messageLimitReached}
           onNewChat={newChat}
           onSend={sendMessage}
           onEditMessage={editMessage}
           onRenameThread={renameThread}
+          onDeleteThread={deleteThread}
         />
       ) : null}
       {screen === 'history' ? (
