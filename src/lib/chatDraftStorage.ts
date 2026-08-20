@@ -14,15 +14,25 @@ function readDraftStore(): DraftStore {
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
 
-    const entries = Object.entries(parsed as Record<string, unknown>)
-      .filter(([key, value]) => (
+    const store: DraftStore = {};
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (
         key.length <= 160 &&
         typeof value === 'string' &&
         value.length <= MAX_DRAFT_LENGTH
-      ))
-      .slice(-MAX_DRAFTS);
+      ) {
+        store[key] = value;
+      }
+    }
 
-    return Object.fromEntries(entries);
+    const keys = Object.keys(store);
+    if (keys.length > MAX_DRAFTS) {
+      for (const staleKey of keys.slice(0, keys.length - MAX_DRAFTS)) {
+        delete store[staleKey];
+      }
+    }
+
+    return store;
   } catch {
     return {};
   }
@@ -57,7 +67,6 @@ export function saveChatDraft(key: string, content: string): boolean {
     return writeDraftStore(store);
   }
 
-  // Reinsert the key so object order also represents recency for bounded cleanup.
   delete store[key];
   store[key] = normalized;
 
