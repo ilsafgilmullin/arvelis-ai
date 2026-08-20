@@ -56,6 +56,17 @@
     top: 64px;
   }
 
+  .chat-v2-icon-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .chat-v2-search__actions button,
+  .chat-v2-message-actions button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   /* ChatSheet syncs its fixed overlay to window.visualViewport. Bound the sheet
      to that already-synchronized box too, so a tall keyboard can never leave
      rename/edit/actions taller than the actually visible Safari viewport. */
@@ -68,18 +79,6 @@
   .app-shell--chat:has(.chat-v2-search) .chat-v2-composer-wrap {
     visibility: hidden;
     pointer-events: none;
-  }
-}
-
-@media (max-width: 370px) {
-  .chat-v2-icon-button {
-    width: 44px;
-    height: 44px;
-  }
-
-  .chat-v2-search__actions button {
-    min-width: 44px;
-    min-height: 44px;
   }
 }
 
