@@ -8,6 +8,7 @@ import {
   preloadSecondaryAppModules,
 } from './lib/appModules';
 import {
+  APP_LOAD_TASKS,
   prepareApp,
   type AppLoadProgress,
   type PreparedCoreModules,
@@ -30,7 +31,7 @@ const DEFAULT_PROFILE_NAME = 'Пользователь ARVELIS';
 
 const INITIAL_LOAD_PROGRESS: AppLoadProgress = {
   completed: 0,
-  total: 3,
+  total: APP_LOAD_TASKS.length,
   label: 'Подготавливаем ARVELIS AI',
   completedTasks: [],
 };
