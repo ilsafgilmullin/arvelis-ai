@@ -41,6 +41,7 @@ export function ChatSheet({
   ariaLabelledBy?: string;
   className?: string;
 }) {
+  const overlayRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
@@ -51,7 +52,31 @@ export function ChatSheet({
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    const frame = window.requestAnimationFrame(() => focusPreferredControl(sheetRef.current));
+    const focusFrame = window.requestAnimationFrame(() => focusPreferredControl(sheetRef.current));
+    const viewport = window.visualViewport;
+    let viewportFrame: number | null = null;
+
+    const syncVisualViewport = () => {
+      if (!viewport) return;
+      if (viewportFrame !== null) window.cancelAnimationFrame(viewportFrame);
+
+      viewportFrame = window.requestAnimationFrame(() => {
+        viewportFrame = null;
+        const overlay = overlayRef.current;
+        if (!overlay) return;
+
+        overlay.style.top = `${viewport.offsetTop}px`;
+        overlay.style.left = `${viewport.offsetLeft}px`;
+        overlay.style.right = 'auto';
+        overlay.style.bottom = 'auto';
+        overlay.style.width = `${viewport.width}px`;
+        overlay.style.height = `${viewport.height}px`;
+      });
+    };
+
+    syncVisualViewport();
+    viewport?.addEventListener('resize', syncVisualViewport);
+    viewport?.addEventListener('scroll', syncVisualViewport);
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -83,7 +108,10 @@ export function ChatSheet({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
-      window.cancelAnimationFrame(frame);
+      window.cancelAnimationFrame(focusFrame);
+      if (viewportFrame !== null) window.cancelAnimationFrame(viewportFrame);
+      viewport?.removeEventListener('resize', syncVisualViewport);
+      viewport?.removeEventListener('scroll', syncVisualViewport);
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', handleKeyDown);
       if (previousFocusRef.current?.isConnected) previousFocusRef.current.focus();
@@ -94,6 +122,7 @@ export function ChatSheet({
 
   return (
     <div
+      ref={overlayRef}
       className="chat-v2-overlay"
       role="presentation"
       onClick={(event) => {
