@@ -8,9 +8,16 @@ export type AppLoadProgress = {
   label: string;
 };
 
+export type PreparedCoreModules = {
+  AppLayout: Awaited<ReturnType<typeof loadAppLayoutModule>>['AppLayout'];
+  WorkspaceScreen: Awaited<ReturnType<typeof loadWorkspaceModule>>['WorkspaceScreen'];
+  ChatScreen: Awaited<ReturnType<typeof loadChatModule>>['ChatScreen'];
+};
+
 export type PreparedApp = {
   workspace: DemoWorkspaceState;
   persistenceAvailable: boolean;
+  core: PreparedCoreModules;
 };
 
 const TOTAL_TASKS = 3;
@@ -26,12 +33,17 @@ export async function prepareApp(onProgress: (progress: AppLoadProgress) => void
   const shellTask = Promise.all([
     loadAppLayoutModule(),
     loadWorkspaceModule(),
-  ]).then(() => {
+  ]).then(([layoutModule, workspaceModule]) => {
     complete('Интерфейс готов');
+    return {
+      AppLayout: layoutModule.AppLayout,
+      WorkspaceScreen: workspaceModule.WorkspaceScreen,
+    };
   });
 
-  const chatTask = loadChatModule().then(() => {
+  const chatTask = loadChatModule().then((chatModule) => {
     complete('Диалог готов');
+    return chatModule.ChatScreen;
   });
 
   const storageTask = Promise.resolve().then(() => {
@@ -41,6 +53,13 @@ export async function prepareApp(onProgress: (progress: AppLoadProgress) => void
     return { workspace, persistenceAvailable };
   });
 
-  const [, , prepared] = await Promise.all([shellTask, chatTask, storageTask]);
-  return prepared;
+  const [shell, ChatScreen, prepared] = await Promise.all([shellTask, chatTask, storageTask]);
+
+  return {
+    ...prepared,
+    core: {
+      ...shell,
+      ChatScreen,
+    },
+  };
 }
