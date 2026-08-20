@@ -1,27 +1,25 @@
+import { useEffect, useRef } from 'react';
 import { BrandLockup } from '../components/Brand';
 
-export function WelcomeScreen({ onDemo, onAuth }: { onDemo: () => void; onAuth: () => void }) {
+export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
+  useEffect(() => {
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const timeout = window.setTimeout(() => onCompleteRef.current(), reducedMotion ? 220 : 1050);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
   return (
-    <main className="entry-shell">
-      <div className="entry-status"><span>PRODUCT PREVIEW</span><i />Модель пока не подключена</div>
-      <section className="welcome-layout">
-        <div className="welcome-brand"><BrandLockup /></div>
-        <div className="welcome-copy">
-          <p className="section-kicker">ПРОФЕССИОНАЛЬНЫЙ ИИ-АССИСТЕНТ</p>
-          <h1>Добро пожаловать<br />в ARVELIS AI.</h1>
-          <p>Спокойное и понятное пространство для сложных задач, учёбы, анализа и решений. Мы сохраняем профессиональную точность, но делаем работу с интеллектом естественной и удобной.</p>
-          <div className="welcome-actions">
-            <button className="button button--primary" type="button" onClick={onDemo}>Открыть ARVELIS AI</button>
-            <button className="button button--secondary" type="button" onClick={onAuth}>Продолжить с именем</button>
-          </div>
-          <p className="entry-note">Сейчас мы проверяем интерфейс: AI-ответы ещё не включены, а локальные данные остаются только в этом браузере.</p>
-        </div>
+    <main className="app-splash" aria-label="ARVELIS AI">
+      <section className="app-splash__brand" aria-hidden="true">
+        <BrandLockup />
       </section>
-      <section className="principles-strip" aria-label="Принципы ARVELIS AI">
-        <div><span>01</span><strong>Понимание</strong><p>Начинаем с цели и контекста, а не с лишней сложности.</p></div>
-        <div><span>02</span><strong>Структура</strong><p>Превращаем сложную задачу в понятную систему действий.</p></div>
-        <div><span>03</span><strong>Контроль</strong><p>Важные действия остаются прозрачными и управляемыми.</p></div>
-      </section>
+      <div className="app-splash__footer">
+        <span>ARVELIS AI</span>
+        <p>Профессиональный интеллектуальный ассистент</p>
+      </div>
     </main>
   );
 }
