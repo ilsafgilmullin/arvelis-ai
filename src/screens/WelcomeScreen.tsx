@@ -17,8 +17,8 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
         <BrandLockup />
       </section>
       <div className="app-splash__footer">
-        <span>ARVELIS AI</span>
-        <p>Профессиональный интеллектуальный ассистент</p>
+        <span>PRODUCT PREVIEW</span>
+        <p>Интерфейсная версия · AI пока не подключён</p>
       </div>
     </main>
   );
