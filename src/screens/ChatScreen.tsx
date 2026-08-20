@@ -57,6 +57,12 @@ function isCoarsePointer(): boolean {
   return typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches ?? false);
 }
 
+function motionSafeBehavior(behavior: ScrollBehavior): ScrollBehavior {
+  if (behavior !== 'smooth') return behavior;
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  return reducedMotion ? 'auto' : 'smooth';
+}
+
 async function copyText(content: string): Promise<boolean> {
   try {
     if (navigator.clipboard?.writeText) {
@@ -67,8 +73,9 @@ async function copyText(content: string): Promise<boolean> {
     // Fall through to the DOM copy fallback below.
   }
 
+  let textarea: HTMLTextAreaElement | null = null;
   try {
-    const textarea = document.createElement('textarea');
+    textarea = document.createElement('textarea');
     textarea.value = content;
     textarea.setAttribute('readonly', '');
     textarea.style.position = 'fixed';
@@ -76,11 +83,11 @@ async function copyText(content: string): Promise<boolean> {
     textarea.style.pointerEvents = 'none';
     document.body.appendChild(textarea);
     textarea.select();
-    const copied = document.execCommand('copy');
-    textarea.remove();
-    return copied;
+    return document.execCommand('copy');
   } catch {
     return false;
+  } finally {
+    textarea?.remove();
   }
 }
 
@@ -127,6 +134,7 @@ export function ChatScreen({
   const endRef = useRef<HTMLDivElement>(null);
   const messageNodesRef = useRef<Map<string, HTMLElement>>(new Map());
   const copyFeedbackTimerRef = useRef<number | null>(null);
+  const copyRequestSequenceRef = useRef(0);
   const pendingOwnSendRef = useRef(false);
   const isAtEndRef = useRef(true);
 
@@ -141,12 +149,16 @@ export function ChatScreen({
   } = useChatDraft(draftKey);
   const sendLimitReached = thread ? messageLimitReached : threadLimitReached;
   const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase('ru-RU');
+  const searchableMessages = useMemo(() => thread?.messages.map((item) => ({
+    id: item.id,
+    content: item.content.toLocaleLowerCase('ru-RU'),
+  })) ?? [], [thread?.messages]);
   const searchMatches = useMemo(() => {
-    if (!thread || !normalizedSearchQuery) return [];
-    return thread.messages
-      .filter((item) => item.content.toLocaleLowerCase('ru-RU').includes(normalizedSearchQuery))
+    if (!normalizedSearchQuery) return [];
+    return searchableMessages
+      .filter((item) => item.content.includes(normalizedSearchQuery))
       .map((item) => item.id);
-  }, [thread, normalizedSearchQuery]);
+  }, [normalizedSearchQuery, searchableMessages]);
   const activeSearchMessageId = searchMatches.length
     ? searchMatches[Math.min(searchIndex, searchMatches.length - 1)] ?? null
     : null;
@@ -158,16 +170,15 @@ export function ChatScreen({
 
   const scrollToLatest = (behavior: ScrollBehavior = 'smooth') => {
     window.requestAnimationFrame(() => {
-      endRef.current?.scrollIntoView({ block: 'end', behavior });
+      endRef.current?.scrollIntoView({ block: 'end', behavior: motionSafeBehavior(behavior) });
     });
   };
 
   const scrollToMessage = (messageId: string) => {
-    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     window.requestAnimationFrame(() => {
       messageNodesRef.current.get(messageId)?.scrollIntoView({
         block: 'center',
-        behavior: reducedMotion ? 'auto' : 'smooth',
+        behavior: motionSafeBehavior('smooth'),
       });
     });
   };
@@ -180,6 +191,12 @@ export function ChatScreen({
     setSearchOpen(false);
     setSearchQuery('');
     setSearchIndex(0);
+    setCopyFeedback(null);
+    copyRequestSequenceRef.current += 1;
+    if (copyFeedbackTimerRef.current !== null) {
+      window.clearTimeout(copyFeedbackTimerRef.current);
+      copyFeedbackTimerRef.current = null;
+    }
     messageNodesRef.current.clear();
     pendingOwnSendRef.current = false;
     setEndState(true);
@@ -198,16 +215,14 @@ export function ChatScreen({
       return;
     }
 
-    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    scrollToLatest(reducedMotion ? 'auto' : 'smooth');
+    scrollToLatest('smooth');
   }, [thread?.id]);
 
   useEffect(() => {
     if (!thread?.messages.length) return;
     if (!pendingOwnSendRef.current && !isAtEndRef.current) return;
 
-    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    scrollToLatest(reducedMotion ? 'auto' : 'smooth');
+    scrollToLatest('smooth');
     pendingOwnSendRef.current = false;
   }, [thread?.id, thread?.messages.length]);
 
@@ -238,6 +253,7 @@ export function ChatScreen({
   }, [editingMessageId]);
 
   useEffect(() => () => {
+    copyRequestSequenceRef.current += 1;
     if (copyFeedbackTimerRef.current !== null) {
       window.clearTimeout(copyFeedbackTimerRef.current);
     }
@@ -375,7 +391,10 @@ export function ChatScreen({
   };
 
   const handleCopy = async (item: DemoMessage) => {
+    const requestSequence = ++copyRequestSequenceRef.current;
     const copied = await copyText(item.content);
+    if (requestSequence !== copyRequestSequenceRef.current) return;
+
     setCopyFeedback({ id: item.id, status: copied ? 'copied' : 'error' });
 
     if (copyFeedbackTimerRef.current !== null) {
@@ -403,8 +422,7 @@ export function ChatScreen({
 
   const moveSearch = (direction: 1 | -1) => {
     if (!searchMatches.length) return;
-    const nextIndex = (searchIndex + direction + searchMatches.length) % searchMatches.length;
-    setSearchIndex(nextIndex);
+    setSearchIndex((current) => (current + direction + searchMatches.length) % searchMatches.length);
   };
 
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -440,6 +458,8 @@ export function ChatScreen({
         type="button"
         onClick={searchOpen ? closeSearch : openSearch}
         aria-label={searchOpen ? 'Закрыть поиск по диалогу' : 'Поиск по диалогу'}
+        aria-expanded={searchOpen}
+        aria-controls="chat-search-panel"
         title={searchOpen ? 'Закрыть поиск' : 'Поиск по диалогу'}
       >
         <SearchIcon />
@@ -461,7 +481,7 @@ export function ChatScreen({
       <Topbar title={title} subtitle="AI-ответы пока недоступны в этой версии" actions={headerActions} />
 
       {searchOpen && thread ? (
-        <section className="chat-search" role="search" aria-label="Поиск по текущему диалогу">
+        <section id="chat-search-panel" className="chat-search" role="search" aria-label="Поиск по текущему диалогу">
           <SearchIcon />
           <input
             ref={searchInputRef}
