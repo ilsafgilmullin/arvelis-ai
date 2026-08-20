@@ -28,6 +28,25 @@
   }
 }
 
+@media (hover: none) and (pointer: coarse) {
+  /* Mobile Safari can keep :hover after a tap and make an inactive row look selected. */
+  .scenario-row:hover,
+  .history-row:hover,
+  .history-row__open:hover,
+  .setting-action:hover {
+    background: transparent;
+    color: inherit;
+  }
+
+  .scenario-row:hover p {
+    color: var(--muted);
+  }
+
+  .setting-action--danger:hover {
+    color: inherit;
+  }
+}
+
 @media (max-width: 360px) {
   .chat-composer-wrap:focus-within {
     left: 16px;
