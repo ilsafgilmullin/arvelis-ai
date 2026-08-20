@@ -20,7 +20,7 @@ function readDraftStore(): DraftStore {
         typeof value === 'string' &&
         value.length <= MAX_DRAFT_LENGTH
       ))
-      .slice(0, MAX_DRAFTS);
+      .slice(-MAX_DRAFTS);
 
     return Object.fromEntries(entries);
   } catch {
@@ -57,6 +57,8 @@ export function saveChatDraft(key: string, content: string): boolean {
     return writeDraftStore(store);
   }
 
+  // Reinsert the key so object order also represents recency for bounded cleanup.
+  delete store[key];
   store[key] = normalized;
 
   const keys = Object.keys(store);
