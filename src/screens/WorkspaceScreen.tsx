@@ -3,21 +3,16 @@ import { ArrowIcon, SendIcon } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
 import { starterPrompts } from '../data/demo';
 import { CHAT_MESSAGE_MAX_CHARS } from '../domain/chatPolicy';
+import {
+  conversationMessageCount,
+  conversationMessageCountLabel,
+  conversationRelativeTime,
+} from '../domain/chatPresentation';
 import { useChatDraft } from '../hooks/useChatDraft';
 import { chatDraftKey } from '../lib/chatDraftStorage';
 import type { DemoThread } from '../types';
 
 const NEW_CHAT_DRAFT_KEY = chatDraftKey(null);
-
-function relativeTime(timestamp: number): string {
-  const delta = Math.max(0, Date.now() - timestamp);
-  const minutes = Math.max(1, Math.round(delta / 60_000));
-  if (minutes < 60) return `${minutes} мин назад`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} ч назад`;
-  const days = Math.round(hours / 24);
-  return `${days} дн назад`;
-}
 
 function dialogCount(count: number): string {
   const mod10 = count % 10;
@@ -129,12 +124,15 @@ export function WorkspaceScreen({
         <div className="section-heading section-heading--inline"><div><p className="section-kicker">ПРОДОЛЖИТЬ</p><h2>Недавние диалоги</h2></div><span>{dialogCount(threads.length)}</span></div>
         {threads.length ? (
           <div className="history-list">
-            {threads.slice(0, 4).map((thread) => (
-              <button className="history-row" type="button" key={thread.id} onClick={() => onOpenThread(thread.id)}>
-                <div><strong>{thread.title}</strong><span>{thread.messages.length} сообщ. · {relativeTime(thread.updatedAt)}</span></div>
-                <ArrowIcon />
-              </button>
-            ))}
+            {threads.slice(0, 4).map((thread) => {
+              const conversationCount = conversationMessageCount(thread);
+              return (
+                <button className="history-row" type="button" key={thread.id} onClick={() => onOpenThread(thread.id)}>
+                  <div><strong>{thread.title}</strong><span>{conversationMessageCountLabel(conversationCount)} · {conversationRelativeTime(thread.updatedAt)}</span></div>
+                  <ArrowIcon />
+                </button>
+              );
+            })}
           </div>
         ) : <div className="empty-inline">Пока здесь пусто. Первый диалог появится после вашей первой задачи.</div>}
       </section>
