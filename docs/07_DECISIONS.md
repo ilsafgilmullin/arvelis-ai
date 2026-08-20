@@ -43,14 +43,18 @@
 - Новый диалог использует общий draft между Home и пустым Chat: переход между этими экранами не должен терять введённый текст.
 - Быстрые сценарии/заготовки только заполняют composer и не отправляют сообщение автоматически.
 - На touch/iPhone Return остаётся новой строкой; отправка выполняется кнопкой. На desktop Enter отправляет, Shift+Enter добавляет строку.
-- Автоскролл не должен принудительно уводить пользователя вниз, если он читает старую часть истории; в таком случае показывается `К последнему`.
+- Автоскролл не должен принудительно уводить пользователя вниз, если он читает старую часть истории; в таком случае показывается компактная кнопка перехода к последнему сообщению.
 - Поиск по текущему диалогу работает локально по тексту сообщений, без HTML injection; переход между совпадениями прокручивает к целому сообщению.
-- В длинной переписке используются датированные разделители (`Сегодня`, `Вчера`, дата).
+- Датированные разделители `Сегодня/Вчера` и per-message clock timestamps скрыты в Chat v2 как лишний messenger-like шум; относительное время остаётся в History.
 - Пользовательские Chat-ограничения централизованы в `src/domain/chatPolicy.ts`, а не размножаются по UI-компонентам.
 - Preview-лимиты threads/messages показываются явно и не являются тарифными или production-ограничениями.
 - PREVIEW-маркировка должна оставаться честной и заметной, но не дублироваться в каждой служебной строке. Предпочтение: один стабильный `PREVIEW` indicator и контекстные объяснения только там, где пользователь принимает решение или ожидает AI-ответ.
 - Реалистичный демонстрационный ответ допустим только как явно помеченный `MOCK` с прямым пояснением, что это предзаписанный текст, а не результат модели.
 - На mobile Search, Rename и Edit считаются отдельными interaction modes: нижняя навигация и основной composer не должны конкурировать с клавиатурой и активной формой.
+- На mobile Chat использует отдельный bounded viewport-shell: document/root scroll блокируется, прокручивается только message stream, а shell синхронизируется с полным `window.visualViewport` (`top/left/width/height`).
+- Touch-landscape с малой высотой остаётся в mobile Chat contract независимо от CSS-width устройства; breakpoint не должен отключать mobile shell после поворота iPhone.
+- В очень низком landscape viewport при software keyboard header может временно скрываться, чтобы composer и send-control гарантированно оставались доступными.
+- При выходе из Chat обычный document scroll Home/History/Profile полностью восстанавливается.
 - На узком iPhone header сохраняет знак ARVELIS, но может скрывать повторяющий compact wordmark, чтобы не создавать collision с действиями Chat.
 - `+` внутри composer не показывается до появления реального attachment/action menu. Кнопка не должна обещать несуществующую функцию.
 - `Regenerate`, `Stop generation`, upload, voice, web-search, citations и model selector не показываются как доступные до реальной provider/backend реализации и отдельного продуктового решения.
@@ -88,7 +92,9 @@
 
 - `main` фактически запускался в Replit на iPhone после PR №6, №7 и №8.
 - PR №9 (`feat: build ARVELIS AI conversational chat experience`) слит в `main`; после фактического iPhone запуска подтверждена работоспособность local chat/history flow, одновременно выявлены существенные UX-проблемы Chat на mobile: вертикальный ритм, тяжёлый header, keyboard interactions, rename/search/edit modes, composer/navigation composition и presentation локальной истории.
-- Текущий исправляющий candidate развивается отдельно в `feat/chat-refactor-v2` / Draft PR №10. Он не считается runtime-подтверждённым и не должен сливаться в `main` до фактических `typecheck/build`, ручного `Pull → Run` без Replit Agent и iPhone smoke-test по `docs/13_CHAT_REFACTOR_V2_QA.md`.
+- Исправляющий candidate развивается отдельно в `feat/chat-refactor-v2` / Draft PR №10. Для него уже выполнены несколько фактических iPhone video-smoke проходов: подтверждены portrait message-scroll containment, отправка, drafts, History/thread transitions, action/rename sheets и rotation без падения приложения.
+- Четвёртый iPhone video-smoke выявил два блокирующих edge-case: Safari `visualViewport.offsetTop` при keyboard и выпадение landscape из mobile contract из-за `max-width: 780px`. Исправления внесены, но именно последний visualViewport/breakpoint head ещё требует повторного real-device smoke.
+- PR №10 не должен сливаться в `main` до фактических `typecheck/build` и финального iPhone smoke последнего head.
 - `main` остаётся источником стабильного состояния до отдельного подтверждения merge PR №10.
 
 ## Не утверждено для production
