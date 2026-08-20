@@ -265,11 +265,12 @@ export function ChatScreen({
 
   useEffect(() => {
     if (!editingMessageId) return;
+    const contentLength = editingMessage.length;
     window.requestAnimationFrame(() => {
       editTextareaRef.current?.focus();
-      editTextareaRef.current?.setSelectionRange(editingMessage.length, editingMessage.length);
+      editTextareaRef.current?.setSelectionRange(contentLength, contentLength);
     });
-  }, [editingMessageId, editingMessage.length]);
+  }, [editingMessageId]);
 
   useEffect(() => {
     if (!menuOpen) return;
