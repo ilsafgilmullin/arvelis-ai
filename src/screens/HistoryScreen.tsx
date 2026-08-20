@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ArrowIcon, SearchIcon, TrashIcon } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
+import { CHAT_SEARCH_MAX_CHARS } from '../domain/chatPolicy';
 import type { DemoThread } from '../types';
 
 function relativeTime(timestamp: number): string {
@@ -26,11 +27,20 @@ export function HistoryScreen({
   const [query, setQuery] = useState('');
   const [pendingDelete, setPendingDelete] = useState<DemoThread | null>(null);
 
+  const searchIndex = useMemo(() => threads.map((thread) => ({
+    thread,
+    content: [thread.title, ...thread.messages.map((message) => message.content)]
+      .join('\n')
+      .toLocaleLowerCase('ru-RU'),
+  })), [threads]);
+
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('ru-RU');
     if (!normalized) return threads;
-    return threads.filter((thread) => thread.title.toLocaleLowerCase('ru-RU').includes(normalized) || thread.messages.some((message) => message.content.toLocaleLowerCase('ru-RU').includes(normalized)));
-  }, [query, threads]);
+    return searchIndex
+      .filter((entry) => entry.content.includes(normalized))
+      .map((entry) => entry.thread);
+  }, [query, searchIndex, threads]);
 
   const confirmDelete = () => {
     if (!pendingDelete) return;
@@ -46,7 +56,14 @@ export function HistoryScreen({
       <section className="history-section">
         <label className="search-field">
           <SearchIcon />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск по локальной истории" aria-label="Поиск по истории" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value.slice(0, CHAT_SEARCH_MAX_CHARS))}
+            placeholder="Поиск по локальной истории"
+            aria-label="Поиск по истории"
+            maxLength={CHAT_SEARCH_MAX_CHARS}
+            autoComplete="off"
+          />
         </label>
 
         <div className="history-summary"><span>{filtered.length} из {threads.length}</span><small>LOCAL PREVIEW</small></div>
