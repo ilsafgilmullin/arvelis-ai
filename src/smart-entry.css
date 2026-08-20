@@ -111,6 +111,15 @@
   min-width: 180px;
 }
 
+.app-shell {
+  animation: arvelisAppIn .24s ease-out both;
+}
+
+.content-page,
+.chat-page {
+  animation: arvelisScreenIn .18s ease-out both;
+}
+
 .workspace-welcome {
   display: inline-flex;
   align-items: center;
@@ -140,6 +149,16 @@
   0% { transform: translateX(-110%); opacity: .55; }
   50% { opacity: 1; }
   100% { transform: translateX(285%); opacity: .55; }
+}
+
+@keyframes arvelisAppIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes arvelisScreenIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 520px) {
@@ -177,7 +196,10 @@
 @media (prefers-reduced-motion: reduce) {
   .app-boot__brand::before,
   .app-boot__brand .brand-mark--hero,
-  .app-boot__progress--indeterminate .app-boot__track span {
+  .app-boot__progress--indeterminate .app-boot__track span,
+  .app-shell,
+  .content-page,
+  .chat-page {
     animation: none;
   }
 
