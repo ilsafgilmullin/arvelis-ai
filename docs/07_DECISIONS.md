@@ -92,8 +92,9 @@
 
 - `main` фактически запускался в Replit на iPhone после PR №6, №7 и №8.
 - PR №9 (`feat: build ARVELIS AI conversational chat experience`) слит в `main`; после фактического iPhone запуска подтверждена работоспособность local chat/history flow, одновременно выявлены существенные UX-проблемы Chat на mobile: вертикальный ритм, тяжёлый header, keyboard interactions, rename/search/edit modes, composer/navigation composition и presentation локальной истории.
-- Исправляющий candidate развивается отдельно в `feat/chat-refactor-v2` / Draft PR №10. Для него уже выполнены несколько фактических iPhone video-smoke проходов: подтверждены portrait message-scroll containment, отправка, drafts, History/thread transitions, action/rename sheets и rotation без падения приложения.
+- Исправляющий candidate развивается отдельно в `feat/chat-refactor-v2` / Draft PR №10. Для него уже выполнены четыре фактических iPhone video-smoke прохода: подтверждены portrait message-scroll containment, отправка, drafts, History/thread transitions, action/rename sheets и rotation без падения приложения.
 - Четвёртый iPhone video-smoke выявил два блокирующих edge-case: Safari `visualViewport.offsetTop` при keyboard и выпадение landscape из mobile contract из-за `max-width: 780px`. Исправления внесены, но именно последний visualViewport/breakpoint head ещё требует повторного real-device smoke.
+- Последний `AppLayout.tsx` отдельно прошёл изолированный strict TypeScript smoke-check без ошибок; это не заменяет project TypeScript 6.0.3 `npm run typecheck`.
 - PR №10 не должен сливаться в `main` до фактических `typecheck/build` и финального iPhone smoke последнего head.
 - `main` остаётся источником стабильного состояния до отдельного подтверждения merge PR №10.
 
