@@ -15,8 +15,9 @@
 Для первого интерфейсного прототипа используется минимальный стек:
 
 - React 19.2.x;
-- TypeScript 7;
+- TypeScript 6.x;
 - Vite 8.1;
+- Node.js 22.12+; рекомендуемая LTS-линия для CI/production-подготовки — Node 24;
 - без router-зависимости;
 - без UI framework;
 - без backend;
