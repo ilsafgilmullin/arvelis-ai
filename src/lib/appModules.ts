@@ -5,22 +5,26 @@ export const loadHistoryModule = () => import('../screens/HistoryScreen');
 export const loadProfileModule = () => import('../screens/ProfileScreen');
 export const loadStatesModule = () => import('../screens/StatesScreen');
 
-export async function preloadCoreAppModules(): Promise<void> {
-  await Promise.all([
-    loadAppLayoutModule(),
-    loadWorkspaceModule(),
-    loadChatModule(),
+type IdleCapableWindow = Window & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+};
+
+function warmSecondaryModules(): void {
+  void Promise.allSettled([
+    loadHistoryModule(),
+    loadProfileModule(),
+    loadStatesModule(),
   ]);
 }
 
 export function preloadSecondaryAppModules(): void {
   if (typeof window === 'undefined') return;
 
-  window.setTimeout(() => {
-    void Promise.allSettled([
-      loadHistoryModule(),
-      loadProfileModule(),
-      loadStatesModule(),
-    ]);
-  }, 0);
+  const idleWindow = window as IdleCapableWindow;
+  if (idleWindow.requestIdleCallback) {
+    idleWindow.requestIdleCallback(warmSecondaryModules, { timeout: 1200 });
+    return;
+  }
+
+  window.setTimeout(warmSecondaryModules, 120);
 }
