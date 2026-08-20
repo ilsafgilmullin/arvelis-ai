@@ -9,6 +9,25 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(', ');
 
+function focusPreferredControl(sheet: HTMLElement | null) {
+  const preferred = sheet?.querySelector<HTMLElement>('[data-chat-sheet-autofocus]');
+  const firstFocusable = sheet?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+  const target = preferred ?? firstFocusable ?? sheet;
+  target?.focus();
+
+  if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
+
+  if (target.dataset.chatSheetSelect === 'all') {
+    target.select();
+    return;
+  }
+
+  if (target.dataset.chatSheetSelect === 'end') {
+    const end = target.value.length;
+    target.setSelectionRange(end, end);
+  }
+}
+
 export function ChatSheet({
   children,
   onClose,
@@ -32,11 +51,7 @@ export function ChatSheet({
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    const frame = window.requestAnimationFrame(() => {
-      const preferred = sheetRef.current?.querySelector<HTMLElement>('[data-chat-sheet-autofocus]');
-      const firstFocusable = sheetRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-      (preferred ?? firstFocusable ?? sheetRef.current)?.focus();
-    });
+    const frame = window.requestAnimationFrame(() => focusPreferredControl(sheetRef.current));
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
