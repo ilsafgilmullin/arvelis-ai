@@ -58,6 +58,66 @@ export function AppLayout({
     };
   }, [online, persistenceAvailable]);
 
+  useLayoutEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+
+    const visualViewport = window.visualViewport;
+    let frame: number | null = null;
+    let orientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+    let layoutViewportHeight = Math.max(
+      window.innerHeight,
+      document.documentElement.clientHeight,
+      visualViewport ? visualViewport.offsetTop + visualViewport.height : 0,
+    );
+
+    const syncVisualViewport = () => {
+      frame = null;
+      const viewport = window.visualViewport;
+      const nextOrientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+      const currentLayoutHeight = Math.max(
+        window.innerHeight,
+        document.documentElement.clientHeight,
+        viewport ? viewport.offsetTop + viewport.height : 0,
+      );
+
+      if (nextOrientation !== orientation) {
+        orientation = nextOrientation;
+        layoutViewportHeight = currentLayoutHeight;
+      } else {
+        layoutViewportHeight = Math.max(layoutViewportHeight, currentLayoutHeight);
+      }
+
+      const bottomInset = viewport
+        ? Math.max(0, layoutViewportHeight - (viewport.offsetTop + viewport.height))
+        : 0;
+
+      shell.style.setProperty('--visual-viewport-bottom-inset', `${Math.ceil(bottomInset)}px`);
+      shell.style.setProperty('--visual-viewport-height', `${Math.ceil(viewport?.height ?? currentLayoutHeight)}px`);
+    };
+
+    const scheduleVisualViewportSync = () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(syncVisualViewport);
+    };
+
+    syncVisualViewport();
+    visualViewport?.addEventListener('resize', scheduleVisualViewportSync);
+    visualViewport?.addEventListener('scroll', scheduleVisualViewportSync);
+    window.addEventListener('resize', scheduleVisualViewportSync);
+    window.addEventListener('orientationchange', scheduleVisualViewportSync);
+
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      visualViewport?.removeEventListener('resize', scheduleVisualViewportSync);
+      visualViewport?.removeEventListener('scroll', scheduleVisualViewportSync);
+      window.removeEventListener('resize', scheduleVisualViewportSync);
+      window.removeEventListener('orientationchange', scheduleVisualViewportSync);
+      shell.style.removeProperty('--visual-viewport-bottom-inset');
+      shell.style.removeProperty('--visual-viewport-height');
+    };
+  }, []);
+
   return (
     <div ref={shellRef} className={shellClassName}>
       <aside className="sidebar">
