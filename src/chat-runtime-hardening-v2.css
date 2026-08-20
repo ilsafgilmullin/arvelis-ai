@@ -14,6 +14,20 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Keep the conversation closer to a professional AI workspace than a messenger:
+   per-message clock stamps and day dividers are unnecessary visual noise here.
+   History remains the place for relative-time metadata. */
+.chat-v2-date-separator,
+.chat-v2-message-footer .message__time {
+  display: none;
+}
+
+.chat-v2-message-footer {
+  min-height: 0;
+  justify-content: flex-end;
+  margin-top: 3px;
+}
+
 /* Prefer one disclosure location. Most threads already have a system notice,
    a MOCK/PREVIEW assistant tag, or the empty-state note. Legacy/demo threads
    that contain only user content still need an explicit explanation in header. */
@@ -48,6 +62,7 @@
 
   .chat-page.chat-experience-v2 {
     overscroll-behavior-y: contain;
+    scroll-padding-bottom: calc(170px + var(--visual-viewport-bottom-inset, 0px));
   }
 
   .chat-v2-header {
@@ -69,6 +84,22 @@
   .chat-v2-message-actions button {
     min-width: 44px;
     min-height: 44px;
+  }
+
+  /* Mobile Safari may keep part of its bottom browser chrome inside the layout
+     viewport, and software-keyboard resize behaviour changes across iOS releases.
+     AppLayout publishes the measured visualViewport bottom inset so both fixed
+     navigation and the sticky composer stay above what the user can actually see. */
+  .app-shell--chat .mobile-nav {
+    bottom: calc(max(7px, env(safe-area-inset-bottom)) + var(--visual-viewport-bottom-inset, 0px));
+  }
+
+  .chat-v2-composer-wrap {
+    bottom: calc(70px + env(safe-area-inset-bottom) + var(--visual-viewport-bottom-inset, 0px));
+  }
+
+  .app-shell--chat:has(.chat-v2-composer textarea:focus) .chat-v2-composer-wrap {
+    bottom: calc(max(5px, env(safe-area-inset-bottom)) + var(--visual-viewport-bottom-inset, 0px));
   }
 
   /* ChatSheet syncs its fixed overlay to window.visualViewport. Bound the sheet
@@ -165,5 +196,13 @@
 
   .chat-v2-search {
     top: 0;
+  }
+
+  .chat-v2-composer-wrap {
+    bottom: calc(64px + env(safe-area-inset-bottom) + var(--visual-viewport-bottom-inset, 0px));
+  }
+
+  .app-shell--chat:has(.chat-v2-composer textarea:focus) .chat-v2-composer-wrap {
+    bottom: calc(max(4px, env(safe-area-inset-bottom)) + var(--visual-viewport-bottom-inset, 0px));
   }
 }
