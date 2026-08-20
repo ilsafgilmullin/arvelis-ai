@@ -87,6 +87,7 @@ export function ChatScreen({
   const [renameValue, setRenameValue] = useState('');
   const [copyFeedback, setCopyFeedback] = useState<CopyFeedback | null>(null);
   const [isAtEnd, setIsAtEnd] = useState(true);
+  const [draftSaveFailed, setDraftSaveFailed] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -107,7 +108,8 @@ export function ChatScreen({
     }
 
     draftSaveTimerRef.current = window.setTimeout(() => {
-      saveChatDraft(draftKey, nextMessage);
+      const saved = saveChatDraft(draftKey, nextMessage);
+      setDraftSaveFailed(!saved);
       draftSaveTimerRef.current = null;
     }, DRAFT_SAVE_DELAY);
   };
@@ -124,7 +126,7 @@ export function ChatScreen({
       window.clearTimeout(draftSaveTimerRef.current);
       draftSaveTimerRef.current = null;
     }
-    saveChatDraft(draftKey, messageRef.current);
+    setDraftSaveFailed(!saveChatDraft(draftKey, messageRef.current));
   };
 
   const scrollToLatest = (behavior: ScrollBehavior = 'smooth') => {
@@ -142,6 +144,7 @@ export function ChatScreen({
     const restoredDraft = loadChatDraft(draftKey);
     messageRef.current = restoredDraft;
     setMessage(restoredDraft);
+    setDraftSaveFailed(false);
     setEditingMessageId(null);
     setEditingMessage('');
     setRenaming(false);
@@ -259,7 +262,7 @@ export function ChatScreen({
     }
 
     pendingOwnSendRef.current = true;
-    removeChatDraft(draftKey);
+    setDraftSaveFailed(!removeChatDraft(draftKey));
     messageRef.current = '';
     setMessage('');
     onSend(content);
@@ -471,16 +474,6 @@ export function ChatScreen({
           </button>
         ) : null}
         <div className="chat-composer">
-          <button
-            className="icon-button icon-button--muted"
-            type="button"
-            onClick={onNewChat}
-            disabled={!thread}
-            aria-label="Начать новый диалог"
-            title={thread ? 'Начать новый диалог' : 'Новый диалог уже открыт'}
-          >
-            <PlusIcon />
-          </button>
           <textarea
             ref={textareaRef}
             value={message}
@@ -496,7 +489,11 @@ export function ChatScreen({
           {message.length >= 4800 ? <span className="chat-char-count">{message.length.toLocaleString('ru-RU')} / 6 000</span> : null}
           <button className="send-button" type="button" disabled={!message.trim()} onClick={submit} aria-label="Добавить сообщение в локальный preview-диалог"><SendIcon /></button>
         </div>
-        <p>PREVIEW · Enter — отправить на компьютере · Shift+Enter — новая строка</p>
+        {draftSaveFailed ? (
+          <p className="chat-draft-warning" role="status">Черновик не удалось сохранить на устройстве.</p>
+        ) : (
+          <p className="chat-composer-helper">PREVIEW · Enter — отправить на компьютере · Shift+Enter — новая строка</p>
+        )}
       </div>
     </div>
   );
