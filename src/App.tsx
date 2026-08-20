@@ -1,22 +1,49 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AppLayout } from './components/AppLayout';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { AppBootScreen } from './components/AppBootScreen';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import {
+  loadAppLayoutModule,
+  loadChatModule,
+  loadHistoryModule,
+  loadProfileModule,
+  loadStatesModule,
+  loadWorkspaceModule,
+  preloadSecondaryAppModules,
+} from './lib/appModules';
+import { prepareApp, type AppLoadProgress } from './lib/appPreload';
+import {
   canUseDemoStorage,
-  loadDemoWorkspace,
   resetDemoWorkspace,
   saveDemoWorkspace,
 } from './lib/demoStorage';
 import { AuthScreen } from './screens/AuthScreen';
-import { ChatScreen } from './screens/ChatScreen';
-import { HistoryScreen } from './screens/HistoryScreen';
-import { ProfileScreen } from './screens/ProfileScreen';
-import { StatesScreen } from './screens/StatesScreen';
 import { WelcomeScreen } from './screens/WelcomeScreen';
-import { WorkspaceScreen } from './screens/WorkspaceScreen';
 import type { AppScreen, DemoMessage, DemoThread, DemoWorkspaceState, EntryScreen } from './types';
 
+const AppLayout = lazy(() => loadAppLayoutModule().then((module) => ({ default: module.AppLayout })));
+const WorkspaceScreen = lazy(() => loadWorkspaceModule().then((module) => ({ default: module.WorkspaceScreen })));
+const ChatScreen = lazy(() => loadChatModule().then((module) => ({ default: module.ChatScreen })));
+const HistoryScreen = lazy(() => loadHistoryModule().then((module) => ({ default: module.HistoryScreen })));
+const ProfileScreen = lazy(() => loadProfileModule().then((module) => ({ default: module.ProfileScreen })));
+const StatesScreen = lazy(() => loadStatesModule().then((module) => ({ default: module.StatesScreen })));
+
+const INITIAL_LOAD_PROGRESS: AppLoadProgress = {
+  completed: 0,
+  total: 3,
+  label: 'Подготавливаем ARVELIS AI',
+};
+
 const makeId = (prefix: string): string => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+function waitForBootPaint(): Promise<void> {
+  if (typeof window === 'undefined' || typeof document === 'undefined' || document.visibilityState !== 'visible') {
+    return Promise.resolve();
+  }
+
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
 
 function titleFromPrompt(prompt: string): string {
   const normalized = prompt.replace(/\s+/g, ' ').trim();
@@ -33,18 +60,22 @@ function createSystemMessage(): DemoMessage {
     id: makeId('sys'),
     role: 'system',
     createdAt: Date.now() + 1,
-    content: 'Запрос добавлен в локальный demo-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
+    content: 'Запрос добавлен в локальный preview-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
   };
 }
 
 export default function App() {
   const [entry, setEntry] = useState<EntryScreen>('welcome');
   const [screen, setScreen] = useState<AppScreen>('workspace');
-  const [workspace, setWorkspace] = useState<DemoWorkspaceState>(() => loadDemoWorkspace());
-  const [persistenceAvailable, setPersistenceAvailable] = useState(() => canUseDemoStorage());
+  const [workspace, setWorkspace] = useState<DemoWorkspaceState | null>(null);
+  const [persistenceAvailable, setPersistenceAvailable] = useState(true);
+  const [loadProgress, setLoadProgress] = useState<AppLoadProgress>(INITIAL_LOAD_PROGRESS);
+  const [loadError, setLoadError] = useState(false);
+  const [pendingProfileName, setPendingProfileName] = useState<string | undefined>();
   const online = useOnlineStatus();
 
   useEffect(() => {
+    if (!workspace) return;
     setPersistenceAvailable(saveDemoWorkspace(workspace));
   }, [workspace]);
 
@@ -53,17 +84,42 @@ export default function App() {
   }, [entry, screen]);
 
   const activeThread = useMemo(
-    () => workspace.threads.find((thread) => thread.id === workspace.activeThreadId) ?? null,
-    [workspace.activeThreadId, workspace.threads],
+    () => workspace?.threads.find((thread) => thread.id === workspace.activeThreadId) ?? null,
+    [workspace],
   );
 
+  const launchApp = async (profileName?: string) => {
+    const normalizedName = profileName?.trim() || undefined;
+    setPendingProfileName(normalizedName);
+    setLoadProgress(INITIAL_LOAD_PROGRESS);
+    setLoadError(false);
+    setEntry('boot');
+
+    await waitForBootPaint();
+
+    try {
+      const prepared = await prepareApp(setLoadProgress);
+      const nextWorkspace = normalizedName
+        ? { ...prepared.workspace, profileName: normalizedName }
+        : prepared.workspace;
+
+      setWorkspace(nextWorkspace);
+      setPersistenceAvailable(prepared.persistenceAvailable);
+      setScreen('workspace');
+      setEntry('app');
+      preloadSecondaryAppModules();
+    } catch {
+      setLoadError(true);
+    }
+  };
+
   const openThread = (threadId: string) => {
-    setWorkspace((current) => ({ ...current, activeThreadId: threadId }));
+    setWorkspace((current) => current ? { ...current, activeThreadId: threadId } : current);
     setScreen('chat');
   };
 
   const newChat = () => {
-    setWorkspace((current) => ({ ...current, activeThreadId: null }));
+    setWorkspace((current) => current ? { ...current, activeThreadId: null } : current);
     setScreen('chat');
   };
 
@@ -77,15 +133,16 @@ export default function App() {
       messages: [createUserMessage(prompt), createSystemMessage()],
     };
 
-    setWorkspace((current) => ({
+    setWorkspace((current) => current ? {
       ...current,
       activeThreadId: thread.id,
       threads: [thread, ...current.threads],
-    }));
+    } : current);
     setScreen('chat');
   };
 
   const sendMessage = (content: string) => {
+    if (!workspace) return;
     if (!activeThread) {
       createThreadFromPrompt(content);
       return;
@@ -95,26 +152,29 @@ export default function App() {
     const systemMessage = createSystemMessage();
     const timestamp = Date.now();
 
-    setWorkspace((current) => ({
+    setWorkspace((current) => current ? {
       ...current,
       threads: current.threads.map((thread) => thread.id === activeThread.id ? {
         ...thread,
         updatedAt: timestamp,
         messages: [...thread.messages, userMessage, systemMessage],
       } : thread).sort((a, b) => b.updatedAt - a.updatedAt),
-    }));
+    } : current);
   };
 
   const deleteThread = (threadId: string) => {
     setWorkspace((current) => {
+      if (!current) return current;
       const threads = current.threads.filter((thread) => thread.id !== threadId);
       return { ...current, threads, activeThreadId: current.activeThreadId === threadId ? threads[0]?.id ?? null : current.activeThreadId };
     });
   };
 
-  const saveProfileName = (profileName: string) => setWorkspace((current) => ({ ...current, profileName }));
+  const saveProfileName = (profileName: string) => {
+    setWorkspace((current) => current ? { ...current, profileName } : current);
+  };
 
-  const resetDemo = () => {
+  const resetPreview = () => {
     const next = resetDemoWorkspace();
     setWorkspace(next);
     setPersistenceAvailable(canUseDemoStorage());
@@ -122,26 +182,56 @@ export default function App() {
   };
 
   if (entry === 'welcome') {
-    return <WelcomeScreen onDemo={() => setEntry('app')} onAuth={() => setEntry('auth')} />;
+    return <WelcomeScreen onDemo={() => { void launchApp(); }} onAuth={() => setEntry('auth')} />;
   }
 
   if (entry === 'auth') {
-    return <AuthScreen initialName={workspace.profileName} onBack={() => setEntry('welcome')} onContinue={(name) => { saveProfileName(name); setEntry('app'); }} />;
+    return (
+      <AuthScreen
+        initialName={workspace?.profileName ?? 'Пользователь ARVELIS'}
+        onBack={() => setEntry('welcome')}
+        onContinue={(name) => { void launchApp(name); }}
+      />
+    );
   }
 
+  if (entry === 'boot') {
+    return (
+      <AppBootScreen
+        progress={loadProgress}
+        profileName={pendingProfileName}
+        error={loadError}
+        onRetry={() => { void launchApp(pendingProfileName); }}
+      />
+    );
+  }
+
+  if (!workspace) {
+    return <AppBootScreen error onRetry={() => { void launchApp(); }} />;
+  }
+
+  const appFallback = (
+    <AppBootScreen
+      profileName={workspace.profileName}
+      statusLabel="Открываем раздел"
+    />
+  );
+
   return (
-    <AppLayout
-      screen={screen}
-      onNavigate={setScreen}
-      onNewChat={newChat}
-      online={online}
-      persistenceAvailable={persistenceAvailable}
-    >
-      {screen === 'workspace' ? <WorkspaceScreen profileName={workspace.profileName} threads={workspace.threads} onSubmit={createThreadFromPrompt} onOpenThread={openThread} /> : null}
-      {screen === 'chat' ? <ChatScreen thread={activeThread} onNewChat={newChat} onSend={sendMessage} /> : null}
-      {screen === 'history' ? <HistoryScreen threads={workspace.threads} onOpen={openThread} onDelete={deleteThread} /> : null}
-      {screen === 'profile' ? <ProfileScreen profileName={workspace.profileName} onSaveName={saveProfileName} onOpenStates={() => setScreen('states')} onReset={resetDemo} /> : null}
-      {screen === 'states' ? <StatesScreen /> : null}
-    </AppLayout>
+    <Suspense fallback={appFallback}>
+      <AppLayout
+        screen={screen}
+        onNavigate={setScreen}
+        onNewChat={newChat}
+        online={online}
+        persistenceAvailable={persistenceAvailable}
+      >
+        {screen === 'workspace' ? <WorkspaceScreen profileName={workspace.profileName} threads={workspace.threads} onSubmit={createThreadFromPrompt} onOpenThread={openThread} /> : null}
+        {screen === 'chat' ? <ChatScreen thread={activeThread} onNewChat={newChat} onSend={sendMessage} /> : null}
+        {screen === 'history' ? <HistoryScreen threads={workspace.threads} onOpen={openThread} onDelete={deleteThread} /> : null}
+        {screen === 'profile' ? <ProfileScreen profileName={workspace.profileName} onSaveName={saveProfileName} onOpenStates={() => setScreen('states')} onReset={resetPreview} /> : null}
+        {screen === 'states' ? <StatesScreen /> : null}
+      </AppLayout>
+    </Suspense>
   );
 }

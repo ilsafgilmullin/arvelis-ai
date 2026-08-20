@@ -5,6 +5,21 @@ const STORAGE_KEY = 'arvelis.demo.workspace.v1';
 const STORAGE_PROBE_KEY = 'arvelis.demo.storage.probe';
 const VALID_ROLES = new Set<DemoMessage['role']>(['user', 'assistant', 'system']);
 
+const LEGACY_PREVIEW_COPY = new Map<string, string>([
+  [
+    'Запрос сохранён локально для тестирования интерфейса. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
+    'Запрос добавлен в локальный preview-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
+  ],
+  [
+    'Запрос добавлен в локальный demo-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
+    'Запрос добавлен в локальный preview-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
+  ],
+  [
+    'Это демонстрационный пример структуры ответа. Реальный AI не подключён. В production здесь появится проверяемый разбор цели, ограничений, рисков и последовательности действий.',
+    'Это предзаписанный пример структуры ответа. Реальный AI не подключён. В рабочей версии здесь должен появиться проверяемый разбор цели, ограничений, рисков и последовательности действий.',
+  ],
+]);
+
 export const DEMO_MAX_THREADS = 40;
 export const DEMO_MAX_MESSAGES_PER_THREAD = 80;
 const DEMO_MAX_TOTAL_CONTENT_CHARS = 1_000_000;
@@ -51,6 +66,18 @@ function isThread(value: unknown): value is DemoThread {
     thread.messages.length <= DEMO_MAX_MESSAGES_PER_THREAD &&
     thread.messages.every(isMessage)
   );
+}
+
+function normalizeKnownLegacyCopy(thread: DemoThread): DemoThread {
+  let changed = false;
+  const messages = thread.messages.map((message) => {
+    const content = LEGACY_PREVIEW_COPY.get(message.content);
+    if (!content) return message;
+    changed = true;
+    return { ...message, content };
+  });
+
+  return changed ? { ...thread, messages } : thread;
 }
 
 function isWithinContentBudget(threads: DemoThread[]): boolean {
@@ -103,12 +130,13 @@ export function loadDemoWorkspace(): DemoWorkspaceState {
       return defaultState();
     }
 
-    const activeThreadId = typeof parsed.activeThreadId === 'string' && parsed.threads.some((thread) => thread.id === parsed.activeThreadId)
+    const threads = parsed.threads.map(normalizeKnownLegacyCopy);
+    const activeThreadId = typeof parsed.activeThreadId === 'string' && threads.some((thread) => thread.id === parsed.activeThreadId)
       ? parsed.activeThreadId
-      : parsed.threads[0]?.id ?? null;
+      : threads[0]?.id ?? null;
 
     return {
-      threads: parsed.threads,
+      threads,
       activeThreadId,
       profileName: typeof parsed.profileName === 'string' && parsed.profileName.trim() && parsed.profileName.length <= 80 ? parsed.profileName : 'Пользователь ARVELIS',
     };
