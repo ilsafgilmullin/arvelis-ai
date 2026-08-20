@@ -16,7 +16,6 @@ import {
 } from './lib/appPreload';
 import { chatDraftKey, clearChatDrafts, removeChatDraft } from './lib/chatDraftStorage';
 import {
-  canUseDemoStorage,
   DEMO_MAX_MESSAGES_PER_THREAD,
   DEMO_MAX_THREADS,
   DEMO_PREVIEW_NOTICE,
@@ -270,7 +269,7 @@ export default function App() {
     clearChatDrafts();
     const next = resetDemoWorkspace();
     setWorkspace(next);
-    setPersistenceAvailable(canUseDemoStorage());
+    setPersistenceAvailable(saveDemoWorkspace(next));
     setScreen('workspace');
   };
 
