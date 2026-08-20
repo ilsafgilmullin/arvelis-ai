@@ -42,6 +42,12 @@
 
 Важно: перечисленные выше последние visualViewport/breakpoint fixes внесены после четвёртого видео и сами ещё не считаются real-device подтверждёнными до следующего Pull → Run.
 
+## Фактические статические проверки последнего head
+
+- `AppLayout.tsx` прогнан через изолированный strict TypeScript smoke с `strict=true`, `noUncheckedIndexedAccess=true`, DOM lib и JSX; ошибок не получено.
+- Локальная среда smoke использовала TypeScript 5.8.3, поэтому это parser/local-type guard, а не замена project TypeScript 6.0.3 `npm run typecheck`.
+- GitHub Actions по-прежнему не запускает ни одного workflow step (`steps=null`), поэтому repository typecheck/build остаются незакрытым gate.
+
 ## Проверки iPhone / mobile
 
 1. Открыть существующий диалог с коротким названием.
