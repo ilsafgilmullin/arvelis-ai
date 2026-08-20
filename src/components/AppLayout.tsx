@@ -15,12 +15,14 @@ export function AppLayout({
   onNavigate,
   onNewChat,
   online,
+  persistenceAvailable,
   children,
 }: {
   screen: AppScreen;
   onNavigate: (screen: AppScreen) => void;
   onNewChat: () => void;
   online: boolean;
+  persistenceAvailable: boolean;
   children: ReactNode;
 }) {
   return (
@@ -56,7 +58,12 @@ export function AppLayout({
       </aside>
 
       <div className="app-main">
-        {!online ? <div className="offline-banner" role="status">Соединение отсутствует. Локальный интерфейс продолжает работать.</div> : null}
+        {(!online || !persistenceAvailable) ? (
+          <div className="status-banners" aria-live="polite">
+            {!online ? <div className="offline-banner" role="status">Соединение отсутствует. Локальный интерфейс продолжает работать.</div> : null}
+            {!persistenceAvailable ? <div className="storage-banner" role="status">Локальное сохранение недоступно. Текущие изменения могут исчезнуть после перезагрузки.</div> : null}
+          </div>
+        ) : null}
         {children}
       </div>
 
