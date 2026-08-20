@@ -19,6 +19,15 @@ function conversationMessageCount(thread: DemoThread): number {
   return thread.messages.reduce((count, message) => count + (message.role === 'system' ? 0 : 1), 0);
 }
 
+function messageCountLabel(count: number): string {
+  const mod100 = count % 100;
+  const mod10 = count % 10;
+  if (mod100 >= 11 && mod100 <= 14) return `${count} сообщений`;
+  if (mod10 === 1) return `${count} сообщение`;
+  if (mod10 >= 2 && mod10 <= 4) return `${count} сообщения`;
+  return `${count} сообщений`;
+}
+
 function threadPreview(thread: DemoThread): string {
   for (let index = thread.messages.length - 1; index >= 0; index -= 1) {
     const message = thread.messages[index];
@@ -96,19 +105,22 @@ export function HistoryScreen({
 
         {filtered.length ? (
           <div className="history-list history-list--large history-v2__list">
-            {filtered.map((thread) => (
-              <div className="history-row history-row--managed history-v2__row" key={thread.id}>
-                <button className="history-row__open history-v2__open" type="button" onClick={() => onOpen(thread.id)}>
-                  <div className="history-v2__copy">
-                    <strong>{thread.title}</strong>
-                    <span className="history-v2__preview">{threadPreview(thread)}</span>
-                    <small>{conversationMessageCount(thread)} сообщ. · {relativeTime(thread.updatedAt)}</small>
-                  </div>
-                  <ArrowIcon />
-                </button>
-                <button className="icon-button icon-button--danger history-v2__delete" type="button" onClick={() => setPendingDelete(thread)} aria-label={`Удалить диалог «${thread.title}»`}><TrashIcon /></button>
-              </div>
-            ))}
+            {filtered.map((thread) => {
+              const conversationCount = conversationMessageCount(thread);
+              return (
+                <div className="history-row history-row--managed history-v2__row" key={thread.id}>
+                  <button className="history-row__open history-v2__open" type="button" onClick={() => onOpen(thread.id)}>
+                    <div className="history-v2__copy">
+                      <strong>{thread.title}</strong>
+                      <span className="history-v2__preview">{threadPreview(thread)}</span>
+                      <small>{messageCountLabel(conversationCount)} · {relativeTime(thread.updatedAt)}</small>
+                    </div>
+                    <ArrowIcon />
+                  </button>
+                  <button className="icon-button icon-button--danger history-v2__delete" type="button" onClick={() => setPendingDelete(thread)} aria-label={`Удалить диалог «${thread.title}»`}><TrashIcon /></button>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="empty-state history-v2__empty">
