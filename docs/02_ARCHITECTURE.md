@@ -69,7 +69,8 @@ History, Profile и System States остаются secondary chunks и прог�
 6. `product-polish.css` — последний визуальный слой продуктовой иерархии;
 7. `post-merge-mobile-qa.css` — подтверждённые iPhone/WebView corrections;
 8. `smart-entry.css` — Smart Entry, task/progress UI и lightweight screen transitions;
-9. `smart-entry-responsive.css` — short-screen/landscape hardening загрузочного экрана.
+9. `smart-entry-responsive.css` — short-screen/landscape hardening загрузочного экрана;
+10. `chat-experience.css` — conversation flow, mobile composer и visual cleanup чата после реального iPhone QA.
 
 Последующие слои не должны самовольно менять утверждённую геометрию бренда.
 
