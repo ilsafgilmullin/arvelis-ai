@@ -6,6 +6,7 @@ import './styles.css';
 import './mobile-polish.css';
 import './qa-hardening.css';
 import './runtime-polish.css';
+import './layout-hardening.css';
 
 const root = document.getElementById('root');
 
