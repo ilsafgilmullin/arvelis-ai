@@ -37,6 +37,15 @@
 
 .chat-page.chat-experience-v2:not(:has(.chat-v2-preview-notice)):not(:has(.chat-v2-preview-tag)):not(:has(.chat-v2-empty__note)) .chat-v2-header__status {
   display: block;
+  font-size: 0;
+}
+
+.chat-page.chat-experience-v2:not(:has(.chat-v2-preview-notice)):not(:has(.chat-v2-preview-tag)):not(:has(.chat-v2-empty__note)) .chat-v2-header__status::after {
+  content: 'Preview · без AI';
+  color: #737983;
+  font-size: 8px;
+  line-height: 1.3;
+  letter-spacing: .02em;
 }
 
 /* Runtime banners are measured by AppLayout and published as a CSS variable.
