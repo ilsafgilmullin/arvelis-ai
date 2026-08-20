@@ -14,3 +14,9 @@ createRoot(root).render(
     <ControlApp />
   </StrictMode>,
 );
+
+window.requestAnimationFrame(() => {
+  window.requestAnimationFrame(() => {
+    document.getElementById('control-preboot')?.remove();
+  });
+});
