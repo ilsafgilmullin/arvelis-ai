@@ -84,6 +84,12 @@
   transition: width .22s ease;
 }
 
+.app-boot__progress--indeterminate .app-boot__track span {
+  width: 36%;
+  transition: none;
+  animation: arvelisBootIndeterminate 1.15s ease-in-out infinite;
+}
+
 .app-boot__status {
   display: flex;
   align-items: center;
@@ -130,6 +136,12 @@
   50% { transform: translateY(-3px); filter: drop-shadow(0 8px 18px rgba(214, 170, 70, .12)); }
 }
 
+@keyframes arvelisBootIndeterminate {
+  0% { transform: translateX(-110%); opacity: .55; }
+  50% { opacity: 1; }
+  100% { transform: translateX(285%); opacity: .55; }
+}
+
 @media (max-width: 520px) {
   .app-boot__brand {
     padding: 24px;
@@ -164,11 +176,17 @@
 
 @media (prefers-reduced-motion: reduce) {
   .app-boot__brand::before,
-  .app-boot__brand .brand-mark--hero {
+  .app-boot__brand .brand-mark--hero,
+  .app-boot__progress--indeterminate .app-boot__track span {
     animation: none;
   }
 
   .app-boot__track span {
     transition: none;
+  }
+
+  .app-boot__progress--indeterminate .app-boot__track span {
+    width: 100%;
+    opacity: .45;
   }
 }
