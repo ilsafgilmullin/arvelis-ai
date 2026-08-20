@@ -118,6 +118,32 @@ export function AppLayout({
     };
   }, []);
 
+  useLayoutEffect(() => {
+    if (screen !== 'chat') return;
+
+    let firstFrame = 0;
+    let secondFrame = 0;
+
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+        const maxScroll = Math.max(0, document.documentElement.scrollHeight - viewportHeight);
+
+        // SPA navigation keeps the previous document scroll position. For a short
+        // chat this can leave the first message underneath the sticky header after
+        // History -> Chat. Long threads retain ChatScreen's own latest-message scroll.
+        if (maxScroll <= 280) {
+          window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        }
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
+  }, [screen]);
+
   return (
     <div ref={shellRef} className={shellClassName}>
       <aside className="sidebar">
