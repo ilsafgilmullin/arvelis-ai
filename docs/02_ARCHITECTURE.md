@@ -32,35 +32,30 @@
 
 ## Структура frontend
 
-- `src/components/` — переиспользуемые элементы интерфейса, навигация, loading и бренд-компоненты;
+- `src/components/` — переиспользуемые элементы интерфейса, навигация и бренд-компоненты;
 - `src/screens/` — основные экраны preview;
 - `src/data/` — только явно обозначенные preview/mock-данные;
-- `src/lib/` — локальная инфраструктура preview, browser storage и module preload orchestration;
+- `src/lib/` — локальная инфраструктура preview, валидация browser storage и Smart Entry preload orchestration;
 - `src/hooks/` — изолированные browser hooks;
 - `src/types.ts` — типы frontend-домена.
 
 `App.tsx` выполняет роль composition/root state и не содержит разметку всех экранов.
 
-## Smart Entry и code splitting
+## Smart Entry / preload model
 
-Стартовая оболочка намеренно не загружает все экраны приложения одним bundle-flow.
+Smart Entry не является декоративной задержкой. На входе параллельно выполняются реальные критические задачи:
 
-Текущая схема:
+1. загрузка App Layout + стартового ARVELIS AI экрана;
+2. загрузка Chat module;
+3. чтение/валидация локального preview-state.
 
-1. Welcome и Preview Access доступны в первоначальном UI.
-2. После действия `Открыть ARVELIS AI` приложение переходит в реальное состояние `boot`.
-3. До входа параллельно готовятся критические части:
-   - App Layout + стартовый экран;
-   - Chat module;
-   - localStorage state/capability.
-4. Процент loading-screen вычисляется только из количества реально завершённых задач.
-5. После готовности критического ядра показывается приложение.
-6. History/Profile/System States прогреваются после первого render через `requestIdleCallback`, где он доступен, либо через короткий безопасный fallback scheduling.
-7. Если отдельный lazy chunk всё же не готов при навигации, React Suspense показывает indeterminate loading без фиктивного процента.
+Progress формируется только из завершённых задач. После готовности core-компоненты используются напрямую, чтобы не запускать второй full-screen `Suspense` loader.
 
-Модули подключаются через `React.lazy` + dynamic `import()`, чтобы уменьшить объём работы в первоначальном пользовательском входе и не блокировать старт загрузкой второстепенных разделов.
+History, Profile и System States остаются secondary chunks и прогреваются после первого экрана последовательно в idle/fallback режиме. Это снижает одновременную нагрузку на слабый телефон и не блокирует вход.
 
-Искусственная задержка loading-screen запрещена: тёплый cache может пройти Smart Entry практически мгновенно.
+Критические dynamic imports имеют защитный timeout. Зависшая загрузка должна перейти в retry-state, а не оставаться бесконечной. Повторный/retry запуск защищён sequence token: устаревшая async-подготовка не должна перезаписывать более новый state/progress.
+
+Никакая из этих оптимизаций не считается production caching/offline architecture. Service Worker/CDN/cache policy требуют отдельного решения перед релизом.
 
 ## CSS layers
 
@@ -71,9 +66,10 @@
 3. `qa-hardening.css` — destructive actions/QA элементы;
 4. `runtime-polish.css` — runtime fallback и keyboard-aware поведение;
 5. `layout-hardening.css` — narrow/tablet/landscape safe layout;
-6. `product-polish.css` — визуальная иерархия продукта;
-7. `post-merge-mobile-qa.css` — исправления, подтверждённые реальными iPhone Safari-скриншотами;
-8. `smart-entry.css` — real loading, friendly entry и restrained screen transitions.
+6. `product-polish.css` — последний визуальный слой продуктовой иерархии;
+7. `post-merge-mobile-qa.css` — подтверждённые iPhone/WebView corrections;
+8. `smart-entry.css` — Smart Entry, task/progress UI и lightweight screen transitions;
+9. `smart-entry-responsive.css` — short-screen/landscape hardening загрузочного экрана.
 
 Последующие слои не должны самовольно менять утверждённую геометрию бренда.
 
@@ -97,7 +93,8 @@ Preview запускается на `0.0.0.0:3000`.
 - отслеживать online/offline состояние браузера;
 - определять недоступность localStorage;
 - валидировать сохранённую структуру до загрузки;
-- нормализовать только точно известные старые служебные preview-тексты без изменения пользовательского контента;
+- нормализовать только известные legacy preview-copy без изменения пользовательского текста;
+- схлопывать повторные известные preview-status до одного уведомления на диалог;
 - не перезаписывать последнюю корректную локальную версию заведомо слишком большим/некорректным состоянием.
 
 Эти функции не являются backend-функциями. Если localStorage недоступен, интерфейс продолжает работать в текущей сессии и явно предупреждает, что изменения могут исчезнуть после перезагрузки.
@@ -112,7 +109,8 @@ QA candidate включает:
 - focus trap и возврат фокуса;
 - safe-area/keyboard hardening;
 - защиту от horizontal overflow длинных данных;
-- retry-state для отказа критического Smart Entry module loading.
+- short-screen/landscape hardening Smart Entry;
+- отказ от постоянного filled `transform` после screen entrance animation, чтобы не создавать лишний containing block для fixed/mobile UI.
 
 Это UX/runtime hardening, а не production security audit.
 
