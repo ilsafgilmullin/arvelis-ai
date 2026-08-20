@@ -18,6 +18,10 @@ const defaultState = (): DemoWorkspaceState => ({
   profileName: 'Пользователь ARVELIS',
 });
 
+function isValidTimestamp(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && !Number.isNaN(new Date(value).getTime());
+}
+
 function isMessage(value: unknown): value is DemoMessage {
   if (!value || typeof value !== 'object') return false;
   const message = value as Partial<DemoMessage>;
@@ -27,8 +31,7 @@ function isMessage(value: unknown): value is DemoMessage {
     VALID_ROLES.has(message.role as DemoMessage['role']) &&
     typeof message.content === 'string' &&
     message.content.length <= 12_000 &&
-    typeof message.createdAt === 'number' &&
-    Number.isFinite(message.createdAt) &&
+    isValidTimestamp(message.createdAt) &&
     (message.mock === undefined || typeof message.mock === 'boolean')
   );
 }
@@ -40,10 +43,8 @@ function isThread(value: unknown): value is DemoThread {
     typeof thread.id === 'string' &&
     typeof thread.title === 'string' &&
     thread.title.length <= 160 &&
-    typeof thread.createdAt === 'number' &&
-    Number.isFinite(thread.createdAt) &&
-    typeof thread.updatedAt === 'number' &&
-    Number.isFinite(thread.updatedAt) &&
+    isValidTimestamp(thread.createdAt) &&
+    isValidTimestamp(thread.updatedAt) &&
     Array.isArray(thread.messages) &&
     thread.messages.length <= DEMO_MAX_MESSAGES_PER_THREAD &&
     thread.messages.every(isMessage)
