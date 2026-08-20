@@ -320,17 +320,17 @@
     margin-right: 0;
   }
 
-  .app-shell:has(.chat-search input:focus) .mobile-nav,
-  .app-shell:has(.chat-rename input:focus) .mobile-nav,
-  .app-shell:has(.message__bubble--editing textarea:focus) .mobile-nav {
+  .app-shell:has(.chat-search) .mobile-nav,
+  .app-shell:has(.chat-rename) .mobile-nav,
+  .app-shell:has(.message__bubble--editing) .mobile-nav {
     transform: translateY(calc(100% + 28px));
     opacity: 0;
     pointer-events: none;
   }
 
-  .app-shell:has(.chat-search input:focus) .chat-composer-wrap,
-  .app-shell:has(.chat-rename input:focus) .chat-composer-wrap,
-  .app-shell:has(.message__bubble--editing textarea:focus) .chat-composer-wrap {
+  .app-shell:has(.chat-search) .chat-composer-wrap,
+  .app-shell:has(.chat-rename) .chat-composer-wrap,
+  .app-shell:has(.message__bubble--editing) .chat-composer-wrap {
     visibility: hidden;
     pointer-events: none;
   }
