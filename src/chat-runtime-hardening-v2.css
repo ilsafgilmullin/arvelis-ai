@@ -10,6 +10,22 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Preview disclosure already exists in the conversation content and empty state.
+   Keep the sticky header focused on identity + thread title + actions. */
+.chat-v2-header__status {
+  display: none;
+}
+
+.chat-v2-header {
+  min-height: 68px;
+  padding-top: 10px;
+  padding-bottom: 9px;
+}
+
+.chat-v2-search {
+  top: 68px;
+}
+
 @media (max-width: 780px) {
   /* The chat page already reserves its own navigation/safe-area clearance.
      Remove the generic AppLayout reserve to avoid a second empty tail. */
@@ -19,6 +35,16 @@
 
   .chat-page.chat-experience-v2 {
     overscroll-behavior-y: contain;
+  }
+
+  .chat-v2-header {
+    min-height: 64px;
+    padding-top: 8px;
+    padding-bottom: 7px;
+  }
+
+  .chat-v2-search {
+    top: 64px;
   }
 
   /* Search is an explicit mode on mobile. Keep the message composer out of that
@@ -44,5 +70,13 @@
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
   .app-shell--chat .app-main {
     padding-bottom: 0;
+  }
+
+  .chat-v2-header {
+    min-height: 58px;
+  }
+
+  .chat-v2-search {
+    top: 0;
   }
 }
