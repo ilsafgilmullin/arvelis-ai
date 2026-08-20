@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { BrandMark } from '../components/Brand';
+import { ChatSheet } from '../components/ChatSheet';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import {
   CheckIcon,
@@ -135,12 +136,9 @@ export function ChatScreen({
   const [searchIndex, setSearchIndex] = useState(0);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const renameInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const menuFirstActionRef = useRef<HTMLButtonElement>(null);
   const messageNodesRef = useRef<Map<string, HTMLElement>>(new Map());
   const copyFeedbackTimerRef = useRef<number | null>(null);
   const copyRequestSequenceRef = useRef(0);
@@ -263,20 +261,6 @@ export function ChatScreen({
     return () => observer.disconnect();
   }, [thread?.id]);
 
-  useEffect(() => {
-    if (!editingMessageId) return;
-    const contentLength = editingMessage.length;
-    window.requestAnimationFrame(() => {
-      editTextareaRef.current?.focus();
-      editTextareaRef.current?.setSelectionRange(contentLength, contentLength);
-    });
-  }, [editingMessageId]);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    window.requestAnimationFrame(() => menuFirstActionRef.current?.focus());
-  }, [menuOpen]);
-
   useEffect(() => () => {
     copyRequestSequenceRef.current += 1;
     if (copyFeedbackTimerRef.current !== null) {
@@ -317,25 +301,6 @@ export function ChatScreen({
       window.removeEventListener('orientationchange', keepComposerVisible);
     };
   }, []);
-
-  useEffect(() => {
-    if (!menuOpen && !renaming && !editingMessageId) return;
-
-    const handleEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      if (editingMessageId) {
-        setEditingMessageId(null);
-        setEditingMessage('');
-      } else if (renaming) {
-        setRenaming(false);
-      } else {
-        setMenuOpen(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [editingMessageId, menuOpen, renaming]);
 
   const focusComposer = () => {
     window.requestAnimationFrame(() => {
@@ -388,12 +353,6 @@ export function ChatScreen({
   };
 
   const handleEditKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      cancelEditing();
-      return;
-    }
-
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) {
       event.preventDefault();
       saveEditing();
@@ -407,10 +366,6 @@ export function ChatScreen({
     setMenuOpen(false);
     setRenameValue(thread.title);
     setRenaming(true);
-    window.requestAnimationFrame(() => {
-      renameInputRef.current?.focus();
-      renameInputRef.current?.select();
-    });
   };
 
   const saveRename = () => {
@@ -422,10 +377,9 @@ export function ChatScreen({
   };
 
   const handleRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      setRenaming(false);
-    }
+    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    saveRename();
   };
 
   const handleCopy = async (item: DemoMessage) => {
@@ -691,75 +645,69 @@ export function ChatScreen({
       </span>
 
       {menuOpen && thread ? (
-        <div className="chat-v2-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setMenuOpen(false); }}>
-          <section className="chat-v2-sheet chat-v2-sheet--actions" role="dialog" aria-modal="true" aria-label="Действия с диалогом">
-            <span className="chat-v2-sheet__handle" aria-hidden="true" />
-            <div className="chat-v2-sheet__heading">
-              <strong>Диалог</strong>
-              <span>{thread.title}</span>
-            </div>
-            <div className="chat-v2-action-list">
-              <button ref={menuFirstActionRef} type="button" onClick={handleNewChat} disabled={threadLimitReached}>
-                <PlusIcon /><span><strong>Новый диалог</strong><small>{threadLimitReached ? 'Локальный лимит диалогов достигнут' : 'Начать чистый разговор'}</small></span>
-              </button>
-              <button type="button" onClick={startRenaming}><EditIcon /><span><strong>Переименовать</strong><small>Изменить название текущего диалога</small></span></button>
-              <button className="chat-v2-action-list__danger" type="button" onClick={openDelete}><TrashIcon /><span><strong>Удалить</strong><small>Удалить диалог и его локальный черновик</small></span></button>
-            </div>
-            <button className="chat-v2-sheet__close" type="button" onClick={() => setMenuOpen(false)}>Закрыть</button>
-          </section>
-        </div>
+        <ChatSheet onClose={() => setMenuOpen(false)} ariaLabel="Действия с диалогом" className="chat-v2-sheet--actions">
+          <span className="chat-v2-sheet__handle" aria-hidden="true" />
+          <div className="chat-v2-sheet__heading">
+            <strong>Диалог</strong>
+            <span>{thread.title}</span>
+          </div>
+          <div className="chat-v2-action-list">
+            <button data-chat-sheet-autofocus type="button" onClick={handleNewChat} disabled={threadLimitReached}>
+              <PlusIcon /><span><strong>Новый диалог</strong><small>{threadLimitReached ? 'Локальный лимит диалогов достигнут' : 'Начать чистый разговор'}</small></span>
+            </button>
+            <button type="button" onClick={startRenaming}><EditIcon /><span><strong>Переименовать</strong><small>Изменить название текущего диалога</small></span></button>
+            <button className="chat-v2-action-list__danger" type="button" onClick={openDelete}><TrashIcon /><span><strong>Удалить</strong><small>Удалить диалог и его локальный черновик</small></span></button>
+          </div>
+          <button className="chat-v2-sheet__close" type="button" onClick={() => setMenuOpen(false)}>Закрыть</button>
+        </ChatSheet>
       ) : null}
 
       {renaming && thread ? (
-        <div className="chat-v2-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setRenaming(false); }}>
-          <form className="chat-v2-sheet chat-v2-form-sheet" role="dialog" aria-modal="true" aria-labelledby="chat-rename-title" onSubmit={(event) => { event.preventDefault(); saveRename(); }}>
-            <span className="chat-v2-sheet__handle" aria-hidden="true" />
-            <div className="chat-v2-sheet__heading">
-              <strong id="chat-rename-title">Переименовать диалог</strong>
-              <span>Название помогает быстрее находить разговор в истории.</span>
-            </div>
-            <label htmlFor="chat-title-input">Название</label>
-            <input
-              ref={renameInputRef}
-              id="chat-title-input"
-              value={renameValue}
-              onChange={(event) => setRenameValue(event.target.value.slice(0, CHAT_THREAD_TITLE_MAX_CHARS))}
-              onKeyDown={handleRenameKeyDown}
-              maxLength={CHAT_THREAD_TITLE_MAX_CHARS}
-              autoComplete="off"
-            />
-            <div className="chat-v2-form-sheet__actions">
-              <button type="button" onClick={() => setRenaming(false)}>Отмена</button>
-              <button className="chat-v2-primary-action" type="submit" disabled={!renameValue.trim()}>Сохранить</button>
-            </div>
-          </form>
-        </div>
+        <ChatSheet onClose={() => setRenaming(false)} ariaLabelledBy="chat-rename-title" className="chat-v2-form-sheet">
+          <span className="chat-v2-sheet__handle" aria-hidden="true" />
+          <div className="chat-v2-sheet__heading">
+            <strong id="chat-rename-title">Переименовать диалог</strong>
+            <span>Название помогает быстрее находить разговор в истории.</span>
+          </div>
+          <label htmlFor="chat-title-input">Название</label>
+          <input
+            data-chat-sheet-autofocus
+            id="chat-title-input"
+            value={renameValue}
+            onChange={(event) => setRenameValue(event.target.value.slice(0, CHAT_THREAD_TITLE_MAX_CHARS))}
+            onKeyDown={handleRenameKeyDown}
+            maxLength={CHAT_THREAD_TITLE_MAX_CHARS}
+            autoComplete="off"
+          />
+          <div className="chat-v2-form-sheet__actions">
+            <button type="button" onClick={() => setRenaming(false)}>Отмена</button>
+            <button className="chat-v2-primary-action" type="button" onClick={saveRename} disabled={!renameValue.trim()}>Сохранить</button>
+          </div>
+        </ChatSheet>
       ) : null}
 
       {editingMessageId && thread ? (
-        <div className="chat-v2-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) cancelEditing(); }}>
-          <section className="chat-v2-sheet chat-v2-form-sheet" role="dialog" aria-modal="true" aria-labelledby="chat-edit-title">
-            <span className="chat-v2-sheet__handle" aria-hidden="true" />
-            <div className="chat-v2-sheet__heading">
-              <strong id="chat-edit-title">Изменить сообщение</strong>
-              <span>Редактируется только ваше локальное сообщение.</span>
-            </div>
-            <textarea
-              ref={editTextareaRef}
-              value={editingMessage}
-              onChange={(event) => setEditingMessage(event.target.value.slice(0, CHAT_MESSAGE_MAX_CHARS))}
-              onKeyDown={handleEditKeyDown}
-              maxLength={CHAT_MESSAGE_MAX_CHARS}
-              rows={5}
-              aria-label="Редактировать сообщение"
-            />
-            <span className="chat-v2-form-sheet__counter">{editingMessage.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')}</span>
-            <div className="chat-v2-form-sheet__actions">
-              <button type="button" onClick={cancelEditing}>Отмена</button>
-              <button className="chat-v2-primary-action" type="button" onClick={saveEditing} disabled={!editingMessage.trim()}>Сохранить</button>
-            </div>
-          </section>
-        </div>
+        <ChatSheet onClose={cancelEditing} ariaLabelledBy="chat-edit-title" className="chat-v2-form-sheet">
+          <span className="chat-v2-sheet__handle" aria-hidden="true" />
+          <div className="chat-v2-sheet__heading">
+            <strong id="chat-edit-title">Изменить сообщение</strong>
+            <span>Редактируется только ваше локальное сообщение.</span>
+          </div>
+          <textarea
+            data-chat-sheet-autofocus
+            value={editingMessage}
+            onChange={(event) => setEditingMessage(event.target.value.slice(0, CHAT_MESSAGE_MAX_CHARS))}
+            onKeyDown={handleEditKeyDown}
+            maxLength={CHAT_MESSAGE_MAX_CHARS}
+            rows={5}
+            aria-label="Редактировать сообщение"
+          />
+          <span className="chat-v2-form-sheet__counter">{editingMessage.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')}</span>
+          <div className="chat-v2-form-sheet__actions">
+            <button type="button" onClick={cancelEditing}>Отмена</button>
+            <button className="chat-v2-primary-action" type="button" onClick={saveEditing} disabled={!editingMessage.trim()}>Сохранить</button>
+          </div>
+        </ChatSheet>
       ) : null}
 
       <ConfirmDialog
