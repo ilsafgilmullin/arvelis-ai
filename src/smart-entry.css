@@ -1,0 +1,174 @@
+/* Smart entry: animations are visual only; progress is driven by real module/data readiness. */
+
+.app-boot {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: max(24px, env(safe-area-inset-top)) clamp(20px, 5vw, 48px) max(24px, env(safe-area-inset-bottom));
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 28%, rgba(214, 170, 70, .075), transparent 22rem),
+    linear-gradient(180deg, #0a0b0d 0%, #070809 100%);
+}
+
+.app-boot__card {
+  width: min(640px, 100%);
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.app-boot__brand {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  isolation: isolate;
+}
+
+.app-boot__brand::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  width: 190px;
+  height: 190px;
+  border: 1px solid rgba(214, 170, 70, .14);
+  border-radius: 50%;
+  box-shadow: 0 0 70px rgba(214, 170, 70, .055);
+  animation: arvelisBootHalo 2.6s ease-in-out infinite;
+}
+
+.app-boot__brand .brand-mark--hero {
+  animation: arvelisBootMark 2.8s ease-in-out infinite;
+}
+
+.app-boot__copy {
+  margin-top: 18px;
+}
+
+.app-boot__copy h1 {
+  margin: 12px auto 12px;
+  max-width: 14ch;
+  font-size: clamp(32px, 7vw, 48px);
+  line-height: 1.04;
+  letter-spacing: -.045em;
+  font-weight: 540;
+  text-wrap: balance;
+}
+
+.app-boot__copy > p:not(.section-kicker) {
+  max-width: 52ch;
+  margin: 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.app-boot__progress {
+  width: min(420px, 100%);
+  margin-top: 34px;
+}
+
+.app-boot__track {
+  width: 100%;
+  height: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, .065);
+}
+
+.app-boot__track span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-dark), var(--gold-light));
+  box-shadow: 0 0 18px rgba(214, 170, 70, .26);
+  transition: width .22s ease;
+}
+
+.app-boot__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 10px;
+  color: var(--muted-2);
+  font-size: 9px;
+  letter-spacing: .06em;
+}
+
+.app-boot__status strong {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.app-boot__retry {
+  margin-top: 30px;
+  min-width: 180px;
+}
+
+.workspace-welcome {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace-welcome::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 14px rgba(214, 170, 70, .34);
+}
+
+@keyframes arvelisBootHalo {
+  0%, 100% { transform: scale(.96); opacity: .55; }
+  50% { transform: scale(1.025); opacity: 1; }
+}
+
+@keyframes arvelisBootMark {
+  0%, 100% { transform: translateY(0); filter: drop-shadow(0 0 0 rgba(214, 170, 70, 0)); }
+  50% { transform: translateY(-3px); filter: drop-shadow(0 8px 18px rgba(214, 170, 70, .12)); }
+}
+
+@media (max-width: 520px) {
+  .app-boot__brand {
+    padding: 24px;
+  }
+
+  .app-boot__brand::before {
+    width: 156px;
+    height: 156px;
+  }
+
+  .app-boot__brand .brand-mark--hero {
+    width: 104px;
+    height: 104px;
+  }
+
+  .app-boot__brand .brand-lockup__wordmark {
+    font-size: 23px;
+  }
+
+  .app-boot__copy {
+    margin-top: 12px;
+  }
+
+  .app-boot__copy h1 {
+    font-size: clamp(31px, 9vw, 39px);
+  }
+
+  .app-boot__progress {
+    margin-top: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-boot__brand::before,
+  .app-boot__brand .brand-mark--hero {
+    animation: none;
+  }
+
+  .app-boot__track span {
+    transition: none;
+  }
+}
