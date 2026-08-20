@@ -104,6 +104,10 @@ export default function App() {
         ? { ...prepared.workspace, profileName: normalizedName }
         : prepared.workspace;
 
+      if (!normalizedName && nextWorkspace.profileName.trim() && nextWorkspace.profileName !== 'Пользователь ARVELIS') {
+        setPendingProfileName(nextWorkspace.profileName);
+      }
+
       // Let the browser paint the truthful 100% / ready state once before switching
       // to the already prepared core UI. This is a frame boundary, not a timer delay.
       await waitForBootPaint();
