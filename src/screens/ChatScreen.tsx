@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { BrandMark } from '../components/Brand';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import {
@@ -128,6 +128,7 @@ export function ChatScreen({
   const messageNodesRef = useRef<Map<string, HTMLElement>>(new Map());
   const copyFeedbackTimerRef = useRef<number | null>(null);
   const pendingOwnSendRef = useRef(false);
+  const isAtEndRef = useRef(true);
 
   const title = useMemo(() => thread?.title ?? 'Новый диалог', [thread]);
   const draftKey = useMemo(() => chatDraftKey(thread?.id ?? null), [thread?.id]);
@@ -149,6 +150,11 @@ export function ChatScreen({
   const activeSearchMessageId = searchMatches.length
     ? searchMatches[Math.min(searchIndex, searchMatches.length - 1)] ?? null
     : null;
+
+  const setEndState = (next: boolean) => {
+    isAtEndRef.current = next;
+    setIsAtEnd((current) => current === next ? current : next);
+  };
 
   const scrollToLatest = (behavior: ScrollBehavior = 'smooth') => {
     window.requestAnimationFrame(() => {
@@ -175,6 +181,8 @@ export function ChatScreen({
     setSearchQuery('');
     setSearchIndex(0);
     messageNodesRef.current.clear();
+    pendingOwnSendRef.current = false;
+    setEndState(true);
   }, [draftKey]);
 
   useEffect(() => {
@@ -186,7 +194,7 @@ export function ChatScreen({
 
   useEffect(() => {
     if (!thread?.messages.length) {
-      setIsAtEnd(true);
+      setEndState(true);
       return;
     }
 
@@ -196,12 +204,12 @@ export function ChatScreen({
 
   useEffect(() => {
     if (!thread?.messages.length) return;
-    if (!pendingOwnSendRef.current && !isAtEnd) return;
+    if (!pendingOwnSendRef.current && !isAtEndRef.current) return;
 
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     scrollToLatest(reducedMotion ? 'auto' : 'smooth');
     pendingOwnSendRef.current = false;
-  }, [thread?.messages.length, isAtEnd]);
+  }, [thread?.id, thread?.messages.length]);
 
   useEffect(() => {
     const end = endRef.current;
@@ -210,7 +218,7 @@ export function ChatScreen({
     const observer = new IntersectionObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      setIsAtEnd(entry.isIntersecting);
+      setEndState(entry.isIntersecting);
     }, {
       root: null,
       rootMargin: '0px 0px 160px 0px',
@@ -301,7 +309,8 @@ export function ChatScreen({
 
   const startEditing = (item: DemoMessage) => {
     if (item.role !== 'user') return;
-    setSearchOpen(false);
+    closeSearch();
+    setRenaming(false);
     setEditingMessageId(item.id);
     setEditingMessage(item.content.slice(0, CHAT_MESSAGE_MAX_CHARS));
   };
@@ -332,11 +341,16 @@ export function ChatScreen({
     }
   };
 
-  const startRenaming = () => {
-    if (!thread) return;
+  const closeSearch = () => {
     setSearchOpen(false);
     setSearchQuery('');
     setSearchIndex(0);
+  };
+
+  const startRenaming = () => {
+    if (!thread) return;
+    closeSearch();
+    cancelEditing();
     setRenameValue(thread.title);
     setRenaming(true);
     window.requestAnimationFrame(() => {
@@ -382,14 +396,9 @@ export function ChatScreen({
   const openSearch = () => {
     if (!thread) return;
     setRenaming(false);
+    cancelEditing();
     setSearchOpen(true);
     window.requestAnimationFrame(() => searchInputRef.current?.focus());
-  };
-
-  const closeSearch = () => {
-    setSearchOpen(false);
-    setSearchQuery('');
-    setSearchIndex(0);
   };
 
   const moveSearch = (direction: 1 | -1) => {
@@ -411,15 +420,15 @@ export function ChatScreen({
   };
 
   const openDelete = () => {
-    setSearchOpen(false);
-    setSearchQuery('');
-    setSearchIndex(0);
+    closeSearch();
     setRenaming(false);
+    cancelEditing();
     setDeleteOpen(true);
   };
 
   const confirmDelete = () => {
     if (!thread) return;
+    clearDraft();
     onDeleteThread(thread.id);
     setDeleteOpen(false);
   };
@@ -507,7 +516,7 @@ export function ChatScreen({
             else messageNodesRef.current.delete(item.id);
           };
 
-          let content;
+          let content: ReactNode;
           if (item.role === 'system') {
             content = (
               <article ref={registerNode} className={searchHit ? 'message message--system preview-notice message--search-hit' : 'message message--system preview-notice'}>
