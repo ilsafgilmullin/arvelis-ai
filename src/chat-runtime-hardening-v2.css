@@ -68,6 +68,13 @@
 }
 
 @media (hover: none) and (pointer: coarse) {
+  /* The visible shortcut copy describes desktop keyboard semantics. On touch,
+     Return creates a new line and send is explicit via the send button, so the
+     desktop-only hint must not contradict the actual interaction model. */
+  .chat-v2-composer-hint {
+    display: none;
+  }
+
   /* Multiple simultaneously blurred sticky/fixed layers are expensive on mobile
      Safari. Nearly opaque graphite surfaces keep the same visual hierarchy with
      less compositing work while scrolling and typing. */
