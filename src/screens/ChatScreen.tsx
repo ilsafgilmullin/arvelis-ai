@@ -1,4 +1,5 @@
-import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { BrandMark } from '../components/Brand';
 import {
   CheckIcon,
@@ -188,7 +189,9 @@ export function ChatScreen({
     const end = endRef.current;
     if (!end || typeof IntersectionObserver === 'undefined') return;
 
-    const observer = new IntersectionObserver(([entry]) => {
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
       setIsAtEnd(entry.isIntersecting);
     }, {
       root: null,
@@ -277,7 +280,7 @@ export function ChatScreen({
   const startEditing = (item: DemoMessage) => {
     if (item.role !== 'user') return;
     setEditingMessageId(item.id);
-    setEditingMessage(item.content);
+    setEditingMessage(item.content.slice(0, MAX_MESSAGE_LENGTH));
   };
 
   const cancelEditing = () => {
