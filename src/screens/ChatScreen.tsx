@@ -36,9 +36,11 @@ export function ChatScreen({
 
   useEffect(() => {
     if (!thread?.messages.length) return;
-    window.requestAnimationFrame(() => {
-      endRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const frame = window.requestAnimationFrame(() => {
+      endRef.current?.scrollIntoView({ block: 'end', behavior: reducedMotion ? 'auto' : 'smooth' });
     });
+    return () => window.cancelAnimationFrame(frame);
   }, [thread?.id, thread?.messages.length]);
 
   const submit = () => {
@@ -75,7 +77,7 @@ export function ChatScreen({
             <BrandMark size="default" />
             <p className="section-kicker">НОВЫЙ ДИАЛОГ</p>
             <h2>Начните с задачи.</h2>
-            <p>Сообщение будет сохранено только в localStorage этого браузера. AI-запрос не выполняется.</p>
+            <p>AI-запрос не выполняется. При доступном localStorage demo-диалог сохраняется только в этом браузере.</p>
           </section>
         )}
         <div ref={endRef} className="chat-thread__end" aria-hidden="true" />
@@ -96,7 +98,7 @@ export function ChatScreen({
           />
           <button className="send-button" type="button" disabled={!message.trim()} onClick={submit} aria-label="Добавить сообщение в локальный demo-диалог"><SendIcon /></button>
         </div>
-        <p>DEMO · Enter — отправить, Shift+Enter — новая строка · данные остаются на устройстве</p>
+        <p>DEMO · Enter — отправить, Shift+Enter — новая строка · локальное хранение зависит от браузера</p>
       </div>
     </div>
   );
