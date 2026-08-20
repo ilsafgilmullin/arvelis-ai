@@ -34,11 +34,13 @@ function greetingFor(profileName: string): string {
 export function WorkspaceScreen({
   profileName,
   threads,
+  threadLimitReached,
   onSubmit,
   onOpenThread,
 }: {
   profileName: string;
   threads: DemoThread[];
+  threadLimitReached: boolean;
   onSubmit: (prompt: string) => void;
   onOpenThread: (threadId: string) => void;
 }) {
@@ -46,7 +48,7 @@ export function WorkspaceScreen({
 
   const submit = () => {
     const prompt = draft.trim();
-    if (!prompt) return;
+    if (!prompt || threadLimitReached) return;
     onSubmit(prompt);
     setDraft('');
   };
@@ -61,19 +63,25 @@ export function WorkspaceScreen({
           <h2>С чего начнём?</h2>
           <p>Опишите задачу своими словами. Можно начать с цели, вопроса или просто контекста — ARVELIS AI создан, чтобы помогать двигаться от мысли к понятному результату.</p>
         </div>
-        <div className="composer composer--hero">
-          <textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Например: помоги сравнить варианты, разобраться в теме или составить план…"
-            aria-label="Описание задачи"
-            rows={5}
-            maxLength={6000}
-          />
-          <div className="composer__footer">
-            <span>{draft.length.toLocaleString('ru-RU')} / 6 000 · LOCAL PREVIEW</span>
-            <button className="send-button" type="button" disabled={!draft.trim()} onClick={submit} aria-label="Создать локальный preview-диалог"><SendIcon /></button>
+        <div>
+          <div className="composer composer--hero">
+            <textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Например: помоги сравнить варианты, разобраться в теме или составить план…"
+              aria-label="Описание задачи"
+              rows={5}
+              maxLength={6000}
+              disabled={threadLimitReached}
+            />
+            <div className="composer__footer">
+              <span>{draft.length.toLocaleString('ru-RU')} / 6 000 · LOCAL PREVIEW</span>
+              <button className="send-button" type="button" disabled={!draft.trim() || threadLimitReached} onClick={submit} aria-label="Создать локальный preview-диалог"><SendIcon /></button>
+            </div>
           </div>
+          {threadLimitReached ? (
+            <p className="workspace-limit-note" role="status">Локальный preview достиг лимита диалогов. Удалите ненужный диалог в «Истории», чтобы создать новый.</p>
+          ) : null}
         </div>
       </section>
 
@@ -81,7 +89,7 @@ export function WorkspaceScreen({
         <div className="section-heading"><p className="section-kicker">МОЖНО НАЧАТЬ ОТСЮДА</p><h2>Быстрые сценарии</h2></div>
         <div className="scenario-list">
           {starterPrompts.map((item) => (
-            <button className="scenario-row" type="button" key={item.id} onClick={() => onSubmit(item.prompt)}>
+            <button className="scenario-row" type="button" key={item.id} onClick={() => onSubmit(item.prompt)} disabled={threadLimitReached}>
               <span className="scenario-row__index">{item.index}</span>
               <div><strong>{item.title}</strong><p>{item.description}</p></div>
               <ArrowIcon />
