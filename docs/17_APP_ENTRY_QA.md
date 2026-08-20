@@ -5,16 +5,25 @@
 
 ## Entry flow
 
-1. Первый paint — только брендовый Splash ARVELIS AI.
-2. Splash не показывает fake progress и автоматически переходит к auth foundation.
-3. `Вход` и `Регистрация` переключаются без layout jump.
-4. Поле имени не вызывает iOS auto-zoom; keyboard не обрезает submit.
-5. Preview disclosure остаётся видимым и не выдаёт локальный flow за production auth.
-6. Submit переводит в существующую Smart Entry.
-7. Smart Entry показывает реальные stages `Интерфейс / Диалог / Данные`.
-8. Boot error по-прежнему имеет Retry.
-9. После успешной Smart Entry открывается новый пустой Chat.
-10. Старый active thread не должен автоматически открываться после auth.
+1. Первый paint — брендовый ARVELIS preboot **ещё до загрузки JavaScript**; пустого чёрного экрана при медленном dev/runtime быть не должно.
+2. React Splash бесшовно заменяет static preboot и не показывает fake progress.
+3. Splash автоматически переходит к auth foundation.
+4. `Вход` и `Регистрация` переключаются без layout jump.
+5. Поле имени не вызывает iOS auto-zoom; keyboard не обрезает submit.
+6. Preview disclosure остаётся коротким, понятным и не выдаёт локальный flow за production auth.
+7. Submit переводит в существующую Smart Entry.
+8. Smart Entry показывает реальные stages `Интерфейс / Диалог / Данные`.
+9. Boot error по-прежнему имеет Retry.
+10. После успешной Smart Entry открывается новый пустой Chat.
+11. Старый active thread не должен автоматически открываться после auth.
+
+## Video QA — 2026-08-21
+
+По реальной iPhone-записи подтверждены и исправлены:
+
+- длительный blank/black first paint до React Splash → static preboot в `index.html`;
+- перегруженный auth preview copy → один компактный disclosure;
+- Profile выглядел как internal QA page → пользовательские заголовки/copy, QA states отделены как `Диагностика preview`.
 
 ## Navigation
 
@@ -36,13 +45,30 @@
 6. Недавние диалоги открываются.
 7. Нет горизонтального overflow на 320–430 px.
 
+## Profile
+
+1. Заголовки и настройки ориентированы на пользователя, а не на разработчика.
+2. Локальный характер профиля обозначен без повторяющегося технического текста.
+3. Internal system states явно называются `Диагностика preview`.
+4. Reset остаётся destructive action с confirm-dialog.
+5. Production account/security не имитируются как работающие до backend.
+
 ## PWA / iPhone
 
 1. `viewport-fit=cover` сохранён.
-2. iPhone safe areas не перекрывают Splash/Auth/navigation.
+2. iPhone safe areas не перекрывают static preboot / Splash / Auth / navigation.
 3. Title = `ARVELIS AI`.
 4. Apple standalone metadata присутствует.
-5. Add-to-Home-Screen запуск проверяется отдельно; web preview не называется native app.
+5. Apple Touch Icon использует утверждённый ARVELIS mark.
+6. Add-to-Home-Screen запуск проверяется отдельно; web preview не называется native app.
+
+## Auth architecture
+
+1. `src/auth/contracts.ts` не зависит от конкретного provider SDK.
+2. Production auth-state не должен храниться в localStorage.
+3. UI обязан иметь session-expired / offline / rate-limit / error states до backend integration.
+4. Конкретные email/phone/external/passkey methods остаются server-configurable.
+5. ARVELIS CONTROL не делит user session с ARVELIS AI.
 
 ## Known gates
 
