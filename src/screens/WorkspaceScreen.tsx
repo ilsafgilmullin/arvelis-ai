@@ -59,7 +59,7 @@ export function WorkspaceScreen({
         <div className="workspace-hero__copy">
           <p className="section-kicker workspace-welcome">ВАШ АССИСТЕНТ</p>
           <h2>С чего начнём?</h2>
-          <p>Опишите задачу своими словами. Можно начать с цели, вопроса или просто контекста — ARVELIS AI должен помогать двигаться от мысли к понятному результату.</p>
+          <p>Опишите задачу своими словами. Можно начать с цели, вопроса или просто контекста — ARVELIS AI создан, чтобы помогать двигаться от мысли к понятному результату.</p>
         </div>
         <div className="composer composer--hero">
           <textarea
