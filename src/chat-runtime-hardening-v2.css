@@ -28,6 +28,29 @@
   margin-top: 3px;
 }
 
+/* The jump control is intentionally icon-only in the viewport-shell. The full
+   meaning stays in aria-label/title while the visible control no longer covers
+   a large part of the bottom message. */
+.chat-v2-jump-latest {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  top: -48px;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.chat-v2-jump-latest span {
+  display: none;
+}
+
+.chat-v2-jump-latest .icon {
+  width: 16px;
+  height: 16px;
+}
+
 /* Prefer one disclosure location. Most threads already have a system notice,
    a MOCK/PREVIEW assistant tag, or the empty-state note. Legacy/demo threads
    that contain only user content still need an explicit explanation in header. */
