@@ -1,0 +1,29 @@
+/* Final mobile hardening for the chat refactor candidate.
+   Loaded after the visual chat layers so route-specific viewport rules are deterministic. */
+
+.chat-v2-sheet,
+.chat-v2-composer textarea {
+  overscroll-behavior: contain;
+}
+
+.chat-v2-sheet {
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 780px) {
+  /* The chat page already reserves its own navigation/safe-area clearance.
+     Remove the generic AppLayout reserve to avoid a second empty tail. */
+  .app-shell--chat .app-main {
+    padding-bottom: 0;
+  }
+
+  .chat-page.chat-experience-v2 {
+    overscroll-behavior-y: contain;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
+  .app-shell--chat .app-main {
+    padding-bottom: 0;
+  }
+}
