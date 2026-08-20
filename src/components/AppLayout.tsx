@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { BrandLockup } from './Brand';
 import { ChatIcon, HistoryIcon, HomeIcon, PlusIcon, ProfileIcon } from './Icons';
 import type { AppScreen } from '../types';
@@ -33,7 +33,7 @@ export function AppLayout({
   const statusBannersRef = useRef<HTMLDivElement>(null);
   const shellClassName = screen === 'chat' ? 'app-shell app-shell--chat' : 'app-shell';
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const shell = shellRef.current;
     if (!shell) return;
 
