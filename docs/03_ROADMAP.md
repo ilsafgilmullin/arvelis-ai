@@ -23,13 +23,15 @@
 - [ ] финальный `logo-full.svg`;
 - [ ] финальный `logo-full-tagline.svg`;
 - [x] чистый `logo-mark.svg` для preview;
-- [ ] `logo-mark-small.svg`;
+- [x] `logo-mark-small.svg` с неизменённой геометрией знака;
 - [ ] `logo-full-light.svg`;
 - [ ] `app-icon-512.png`;
-- [ ] отдельный `favicon.svg`;
+- [x] отдельный `favicon.svg` на базе утверждённого знака;
 - [ ] `favicon-32.png`;
 - [ ] `social-preview-1200x630.png`;
+- [ ] `brand-preview.png`;
 - [x] базовые UI design tokens в CSS;
+- [ ] финальная vector typography/outline для full lockup;
 - [ ] отдельный бренд-гайд и master-assets.
 
 ## Этап 3 — Runnable UX/UI Preview
