@@ -1,6 +1,6 @@
 export type AppScreen = 'workspace' | 'chat' | 'history' | 'profile' | 'states';
 
-export type EntryScreen = 'welcome' | 'auth' | 'boot' | 'app';
+export type EntryScreen = 'splash' | 'auth' | 'boot' | 'app';
 
 export type DemoMessageRole = 'user' | 'assistant' | 'system';
 
