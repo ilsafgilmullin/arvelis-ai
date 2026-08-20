@@ -214,6 +214,14 @@ export function saveDemoWorkspace(state: DemoWorkspaceState): boolean {
 
 export function resetDemoWorkspace(): DemoWorkspaceState {
   const state = defaultState();
-  saveDemoWorkspace(state);
+
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // The caller will attempt to persist the clean state and surface the result.
+    }
+  }
+
   return state;
 }
