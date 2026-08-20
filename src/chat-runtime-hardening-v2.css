@@ -125,26 +125,33 @@
   }
 
   .app-shell--chat .mobile-nav {
-    background: rgba(10, 11, 13, .99);
+    background: #0a0b0d;
   }
 }
 
 /*
   Mobile runtime architecture after real iPhone QA:
   - the document itself does not scroll while Chat is open;
+  - the Chat shell mirrors the complete visualViewport rectangle, not only height;
   - header/search/composer are stable flex children;
   - only the message stream scrolls;
-  - the shell height follows visualViewport, so the software keyboard simply
-    reduces the available chat height instead of requiring fragile sticky offsets.
+  - keyboard/browser chrome changes resize/reposition the shell directly.
 */
 @media (max-width: 780px) {
   .app-shell--chat {
-    position: relative;
-    width: 100%;
+    position: fixed;
+    z-index: 1;
+    top: var(--visual-viewport-top, 0px);
+    left: var(--visual-viewport-left, 0px);
+    right: auto;
+    bottom: auto;
+    width: var(--visual-viewport-width, 100vw);
     height: var(--visual-viewport-height, 100dvh);
     min-height: 0;
+    max-width: none;
     max-height: var(--visual-viewport-height, 100dvh);
     overflow: hidden;
+    background: var(--bg);
   }
 
   .app-shell--chat .app-main {
@@ -226,11 +233,11 @@
     left: max(10px, env(safe-area-inset-left));
     right: max(10px, env(safe-area-inset-right));
     bottom: max(7px, env(safe-area-inset-bottom));
+    background: #0a0b0d;
   }
 
-  /* Keyboard mode: navigation disappears and the composer simply becomes the
-     last visible flex child of the shrunken visual viewport. No sticky/fixed
-     keyboard offset is applied. */
+  /* Keyboard mode: navigation disappears and the composer becomes the last
+     visible flex child of the shrunken/repositioned visual viewport. */
   .app-shell--chat:has(.chat-v2-composer textarea:focus) .chat-page.chat-experience-v2 {
     padding-bottom: max(4px, env(safe-area-inset-bottom));
   }
@@ -258,8 +265,15 @@
   }
 }
 
+/* Landscape Safari has very little usable vertical space once browser chrome and
+   the software keyboard are visible. Compress non-essential chrome while keeping
+   44px touch targets. While typing, hide the header entirely so the composer can
+   never be pushed outside the visual viewport. */
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
   .app-shell--chat {
+    top: var(--visual-viewport-top, 0px);
+    left: var(--visual-viewport-left, 0px);
+    width: var(--visual-viewport-width, 100vw);
     height: var(--visual-viewport-height, 100dvh);
     max-height: var(--visual-viewport-height, 100dvh);
   }
@@ -267,20 +281,83 @@
   .chat-v2-header {
     position: relative;
     top: auto;
-    min-height: 58px;
+    min-height: 52px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .chat-v2-header__identity > .brand-mark {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+  }
+
+  .chat-v2-header h1 {
+    font-size: 16px;
   }
 
   .chat-v2-search {
     position: relative;
     top: auto;
+    margin-top: 4px;
   }
 
   .chat-page.chat-experience-v2 {
-    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+    padding-bottom: calc(52px + env(safe-area-inset-bottom));
+  }
+
+  .chat-v2-composer-wrap {
+    padding-top: 4px;
+    padding-bottom: 1px;
+  }
+
+  .chat-v2-composer {
+    min-height: 50px;
+  }
+
+  .chat-v2-composer textarea {
+    min-height: 42px;
+    max-height: 82px;
+  }
+
+  .app-shell--chat .mobile-nav {
+    min-height: 48px;
+    padding: 2px 5px;
+    background: #0a0b0d;
+  }
+
+  .app-shell--chat .mobile-nav__item {
+    min-height: 44px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+
+  .app-shell--chat .mobile-nav__item span {
+    display: none;
+  }
+
+  .app-shell--chat:has(.chat-v2-composer textarea:focus) .chat-v2-header,
+  .app-shell--chat:has(.chat-v2-composer textarea:focus) .chat-v2-search,
+  .app-shell--chat:has(.chat-v2-search input:focus) .chat-v2-header {
+    display: none;
   }
 
   .app-shell--chat:has(.chat-v2-composer textarea:focus) .chat-page.chat-experience-v2,
   .app-shell--chat:has(.chat-v2-search) .chat-page.chat-experience-v2 {
-    padding-bottom: max(3px, env(safe-area-inset-bottom));
+    padding-bottom: max(2px, env(safe-area-inset-bottom));
+  }
+
+  .app-shell--chat:has(.chat-v2-composer textarea:focus) .chat-v2-thread {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .app-shell--chat:has(.chat-v2-composer textarea:focus) .chat-v2-composer-wrap {
+    padding-top: 3px;
+    padding-bottom: 1px;
+  }
+
+  .app-shell--chat:has(.chat-v2-composer textarea:focus) .chat-v2-jump-latest {
+    display: none;
   }
 }
