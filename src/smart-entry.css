@@ -106,6 +106,56 @@
   font-weight: 700;
 }
 
+.app-boot__tasks {
+  width: min(420px, 100%);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.app-boot__task {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 7px 8px;
+  border: 1px solid rgba(255, 255, 255, .06);
+  background: rgba(255, 255, 255, .015);
+  color: var(--muted-2);
+  font-size: 8px;
+  letter-spacing: .055em;
+  transition: color .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.app-boot__task-dot {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 50%;
+  color: transparent;
+  font-size: 9px;
+  line-height: 1;
+  transition: color .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.app-boot__task--done {
+  border-color: rgba(214, 170, 70, .18);
+  background: rgba(214, 170, 70, .025);
+  color: #b7b1a5;
+}
+
+.app-boot__task--done .app-boot__task-dot {
+  border-color: rgba(240, 210, 125, .5);
+  background: rgba(214, 170, 70, .09);
+  color: var(--gold-light);
+}
+
 .app-boot__retry {
   margin-top: 30px;
   min-width: 180px;
@@ -117,7 +167,10 @@
 
 .content-page,
 .chat-page {
-  animation: arvelisScreenIn .18s ease-out both;
+  /* `backwards` keeps the entrance effect but releases transform after the animation.
+     Leaving translateY(0) as a filled transform creates a containing block that can
+     break fixed dialogs/keyboard UI in Safari. */
+  animation: arvelisScreenIn .18s ease-out backwards;
 }
 
 .module-loading {
@@ -232,6 +285,24 @@
     margin-top: 28px;
   }
 
+  .app-boot__tasks {
+    gap: 5px;
+    margin-top: 12px;
+  }
+
+  .app-boot__task {
+    min-height: 32px;
+    padding: 6px 5px;
+    gap: 4px;
+    font-size: 7px;
+  }
+
+  .app-boot__task-dot {
+    width: 13px;
+    height: 13px;
+    font-size: 8px;
+  }
+
   .module-loading {
     min-height: 52dvh;
     justify-content: flex-start;
@@ -251,7 +322,9 @@
     animation: none;
   }
 
-  .app-boot__track span {
+  .app-boot__track span,
+  .app-boot__task,
+  .app-boot__task-dot {
     transition: none;
   }
 
