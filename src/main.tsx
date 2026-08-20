@@ -11,6 +11,7 @@ import './product-polish.css';
 import './post-merge-mobile-qa.css';
 import './smart-entry.css';
 import './smart-entry-responsive.css';
+import './chat-experience.css';
 
 const root = document.getElementById('root');
 
