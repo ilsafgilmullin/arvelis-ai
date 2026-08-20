@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { AppBootScreen } from './components/AppBootScreen';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import {
@@ -14,6 +14,7 @@ import {
 } from './lib/appPreload';
 import {
   canUseDemoStorage,
+  loadDemoWorkspace,
   resetDemoWorkspace,
   saveDemoWorkspace,
 } from './lib/demoStorage';
@@ -24,6 +25,8 @@ import type { AppScreen, DemoMessage, DemoThread, DemoWorkspaceState, EntryScree
 const HistoryScreen = lazy(() => loadHistoryModule().then((module) => ({ default: module.HistoryScreen })));
 const ProfileScreen = lazy(() => loadProfileModule().then((module) => ({ default: module.ProfileScreen })));
 const StatesScreen = lazy(() => loadStatesModule().then((module) => ({ default: module.StatesScreen })));
+
+const DEFAULT_PROFILE_NAME = 'Пользователь ARVELIS';
 
 const INITIAL_LOAD_PROGRESS: AppLoadProgress = {
   completed: 0,
@@ -72,6 +75,7 @@ export default function App() {
   const [loadProgress, setLoadProgress] = useState<AppLoadProgress>(INITIAL_LOAD_PROGRESS);
   const [loadError, setLoadError] = useState(false);
   const [pendingProfileName, setPendingProfileName] = useState<string | undefined>();
+  const launchSequenceRef = useRef(0);
   const online = useOnlineStatus();
 
   useEffect(() => {
@@ -89,6 +93,7 @@ export default function App() {
   );
 
   const launchApp = async (profileName?: string) => {
+    const launchSequence = ++launchSequenceRef.current;
     const normalizedName = profileName?.trim() || undefined;
     setPendingProfileName(normalizedName);
     setLoadProgress(INITIAL_LOAD_PROGRESS);
@@ -97,20 +102,28 @@ export default function App() {
     setEntry('boot');
 
     await waitForBootPaint();
+    if (launchSequence !== launchSequenceRef.current) return;
 
     try {
-      const prepared = await prepareApp(setLoadProgress);
+      const prepared = await prepareApp((progress) => {
+        if (launchSequence === launchSequenceRef.current) {
+          setLoadProgress(progress);
+        }
+      });
+      if (launchSequence !== launchSequenceRef.current) return;
+
       const nextWorkspace = normalizedName
         ? { ...prepared.workspace, profileName: normalizedName }
         : prepared.workspace;
 
-      if (!normalizedName && nextWorkspace.profileName.trim() && nextWorkspace.profileName !== 'Пользователь ARVELIS') {
+      if (!normalizedName && nextWorkspace.profileName.trim() && nextWorkspace.profileName !== DEFAULT_PROFILE_NAME) {
         setPendingProfileName(nextWorkspace.profileName);
       }
 
       // Let the browser paint the truthful 100% / ready state once before switching
       // to the already prepared core UI. This is a frame boundary, not a timer delay.
       await waitForBootPaint();
+      if (launchSequence !== launchSequenceRef.current) return;
 
       setCore(prepared.core);
       setWorkspace(nextWorkspace);
@@ -119,8 +132,16 @@ export default function App() {
       setEntry('app');
       preloadSecondaryAppModules();
     } catch {
-      setLoadError(true);
+      if (launchSequence === launchSequenceRef.current) {
+        setLoadError(true);
+      }
     }
+  };
+
+  const openAuth = () => {
+    const storedProfileName = loadDemoWorkspace().profileName.trim();
+    setPendingProfileName(storedProfileName && storedProfileName !== DEFAULT_PROFILE_NAME ? storedProfileName : undefined);
+    setEntry('auth');
   };
 
   const openThread = (threadId: string) => {
@@ -192,13 +213,13 @@ export default function App() {
   };
 
   if (entry === 'welcome') {
-    return <WelcomeScreen onDemo={() => { void launchApp(); }} onAuth={() => setEntry('auth')} />;
+    return <WelcomeScreen onDemo={() => { void launchApp(); }} onAuth={openAuth} />;
   }
 
   if (entry === 'auth') {
     return (
       <AuthScreen
-        initialName={workspace?.profileName ?? 'Пользователь ARVELIS'}
+        initialName={pendingProfileName ?? workspace?.profileName ?? DEFAULT_PROFILE_NAME}
         onBack={() => setEntry('welcome')}
         onContinue={(name) => { void launchApp(name); }}
       />
