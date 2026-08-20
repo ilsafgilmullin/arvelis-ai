@@ -6,6 +6,11 @@ const STORAGE_PROBE_KEY = 'arvelis.demo.storage.probe';
 const VALID_ROLES = new Set<DemoMessage['role']>(['user', 'assistant', 'system']);
 export const DEMO_PREVIEW_NOTICE = 'Сообщение сохранено на этом устройстве. AI-ответы в этой версии пока недоступны.';
 
+const LEGACY_MOCK_COPY = new Set<string>([
+  'Это демонстрационный пример структуры ответа. Реальный AI не подключён. В production здесь появится проверяемый разбор цели, ограничений, рисков и последовательности действий.',
+  'Это предзаписанный пример структуры ответа. Реальный AI не подключён. В рабочей версии здесь должен появиться проверяемый разбор цели, ограничений, рисков и последовательности действий.',
+]);
+
 const LEGACY_PREVIEW_COPY = new Map<string, string>([
   [
     'Запрос сохранён локально для тестирования интерфейса. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
@@ -23,14 +28,7 @@ const LEGACY_PREVIEW_COPY = new Map<string, string>([
     'Сохранено в локальном preview. AI пока не подключён.',
     DEMO_PREVIEW_NOTICE,
   ],
-  [
-    'Это демонстрационный пример структуры ответа. Реальный AI не подключён. В production здесь появится проверяемый разбор цели, ограничений, рисков и последовательности действий.',
-    DEMO_MOCK_RESPONSE,
-  ],
-  [
-    'Это предзаписанный пример структуры ответа. Реальный AI не подключён. В рабочей версии здесь должен появиться проверяемый разбор цели, ограничений, рисков и последовательности действий.',
-    DEMO_MOCK_RESPONSE,
-  ],
+  ...Array.from(LEGACY_MOCK_COPY, (content) => [content, DEMO_MOCK_RESPONSE] as const),
 ]);
 
 export const DEMO_MAX_THREADS = 40;
@@ -88,12 +86,16 @@ function normalizeKnownLegacyCopy(thread: DemoThread): DemoThread {
   const messages: DemoMessage[] = [];
 
   for (const message of thread.messages) {
-    const normalizedContent = LEGACY_PREVIEW_COPY.get(message.content) ?? message.content;
-    const normalizedMessage = normalizedContent === message.content
-      ? message
-      : { ...message, content: normalizedContent };
+    const canNormalize = message.role === 'system' || message.role === 'assistant';
+    const normalizedContent = canNormalize
+      ? LEGACY_PREVIEW_COPY.get(message.content) ?? message.content
+      : message.content;
+    const shouldMarkMock = message.role === 'assistant' && LEGACY_MOCK_COPY.has(message.content);
+    const normalizedMessage = normalizedContent !== message.content || (shouldMarkMock && message.mock !== true)
+      ? { ...message, content: normalizedContent, ...(shouldMarkMock ? { mock: true } : {}) }
+      : message;
 
-    if (normalizedContent !== message.content) changed = true;
+    if (normalizedMessage !== message) changed = true;
 
     if (normalizedMessage.role === 'system' && normalizedContent === DEMO_PREVIEW_NOTICE) {
       if (previewStatusSeen) {
