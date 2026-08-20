@@ -29,6 +29,7 @@ const INITIAL_LOAD_PROGRESS: AppLoadProgress = {
   completed: 0,
   total: 3,
   label: 'Подготавливаем ARVELIS AI',
+  completedTasks: [],
 };
 
 const makeId = (prefix: string): string => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -102,6 +103,10 @@ export default function App() {
       const nextWorkspace = normalizedName
         ? { ...prepared.workspace, profileName: normalizedName }
         : prepared.workspace;
+
+      // Let the browser paint the truthful 100% / ready state once before switching
+      // to the already prepared core UI. This is a frame boundary, not a timer delay.
+      await waitForBootPaint();
 
       setCore(prepared.core);
       setWorkspace(nextWorkspace);
