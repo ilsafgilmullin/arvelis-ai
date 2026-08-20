@@ -9,12 +9,22 @@ type IdleCapableWindow = Window & {
   requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
 };
 
-function warmSecondaryModules(): void {
-  void Promise.allSettled([
-    loadHistoryModule(),
-    loadProfileModule(),
-    loadStatesModule(),
-  ]);
+const secondaryLoaders = [
+  loadHistoryModule,
+  loadProfileModule,
+  loadStatesModule,
+] as const;
+
+async function warmSecondaryModules(): Promise<void> {
+  // Warm secondary chunks one by one so a slower phone does not parse/evaluate
+  // every non-critical screen at the same moment immediately after app entry.
+  for (const loadModule of secondaryLoaders) {
+    try {
+      await loadModule();
+    } catch {
+      // A secondary preload failure is non-fatal. React.lazy will retry on demand.
+    }
+  }
 }
 
 export function preloadSecondaryAppModules(): void {
@@ -22,9 +32,17 @@ export function preloadSecondaryAppModules(): void {
 
   const idleWindow = window as IdleCapableWindow;
   if (idleWindow.requestIdleCallback) {
-    idleWindow.requestIdleCallback(warmSecondaryModules, { timeout: 1200 });
+    idleWindow.requestIdleCallback(() => {
+      void warmSecondaryModules();
+    }, { timeout: 1200 });
     return;
   }
 
-  window.setTimeout(warmSecondaryModules, 120);
+  // Safari does not consistently expose requestIdleCallback. Two frame boundaries
+  // allow the first ARVELIS AI screen to paint before background chunk evaluation.
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      void warmSecondaryModules();
+    });
+  });
 }
