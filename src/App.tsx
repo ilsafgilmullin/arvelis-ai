@@ -35,6 +35,16 @@ const INITIAL_LOAD_PROGRESS: AppLoadProgress = {
 
 const makeId = (prefix: string): string => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
+function waitForBootPaint(): Promise<void> {
+  if (typeof window === 'undefined' || typeof document === 'undefined' || document.visibilityState !== 'visible') {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
 function titleFromPrompt(prompt: string): string {
   const normalized = prompt.replace(/\s+/g, ' ').trim();
   if (!normalized) return 'Новый диалог';
@@ -84,6 +94,8 @@ export default function App() {
     setLoadProgress(INITIAL_LOAD_PROGRESS);
     setLoadError(false);
     setEntry('boot');
+
+    await waitForBootPaint();
 
     try {
       const prepared = await prepareApp(setLoadProgress);
@@ -195,13 +207,13 @@ export default function App() {
   }
 
   if (!workspace) {
-    return <AppBootScreen progress={INITIAL_LOAD_PROGRESS} error onRetry={() => { void launchApp(); }} />;
+    return <AppBootScreen error onRetry={() => { void launchApp(); }} />;
   }
 
   const appFallback = (
     <AppBootScreen
-      progress={{ completed: 2, total: 3, label: 'Открываем раздел' }}
       profileName={workspace.profileName}
+      statusLabel="Открываем раздел"
     />
   );
 
