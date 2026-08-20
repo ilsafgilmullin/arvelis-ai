@@ -3,7 +3,7 @@ import { CHAT_DRAFT_MAX_ENTRIES, CHAT_MESSAGE_MAX_CHARS } from '../domain/chatPo
 const DRAFT_STORAGE_KEY = 'arvelis.preview.chatDrafts.v1';
 const MAX_THREAD_ID_LENGTH = 128;
 const MAX_DRAFT_KEY_LENGTH = 'thread:'.length + MAX_THREAD_ID_LENGTH;
-const MAX_DRAFT_STORE_CHARS = CHAT_DRAFT_MAX_ENTRIES * (CHAT_MESSAGE_MAX_CHARS + MAX_DRAFT_KEY_LENGTH + 16);
+const MAX_DRAFT_STORE_CHARS = 1_000_000;
 
 type DraftStore = Record<string, string>;
 
