@@ -3,42 +3,13 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ArrowIcon, SearchIcon, TrashIcon } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
 import { CHAT_SEARCH_MAX_CHARS } from '../domain/chatPolicy';
+import {
+  conversationMessageCount,
+  conversationMessageCountLabel,
+  conversationPreview,
+  conversationRelativeTime,
+} from '../domain/chatPresentation';
 import type { DemoThread } from '../types';
-
-function relativeTime(timestamp: number): string {
-  const delta = Math.max(0, Date.now() - timestamp);
-  if (delta < 60_000) return 'только что';
-  const minutes = Math.floor(delta / 60_000);
-  if (minutes < 60) return `${minutes} мин назад`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} ч назад`;
-  const days = Math.floor(hours / 24);
-  return `${days} дн назад`;
-}
-
-function conversationMessageCount(thread: DemoThread): number {
-  return thread.messages.reduce((count, message) => count + (message.role === 'system' ? 0 : 1), 0);
-}
-
-function messageCountLabel(count: number): string {
-  const mod100 = count % 100;
-  const mod10 = count % 10;
-  if (mod100 >= 11 && mod100 <= 14) return `${count} сообщений`;
-  if (mod10 === 1) return `${count} сообщение`;
-  if (mod10 >= 2 && mod10 <= 4) return `${count} сообщения`;
-  return `${count} сообщений`;
-}
-
-function threadPreview(thread: DemoThread): string {
-  for (let index = thread.messages.length - 1; index >= 0; index -= 1) {
-    const message = thread.messages[index];
-    if (!message || message.role === 'system') continue;
-    const normalized = message.content.replace(/\s+/g, ' ').trim();
-    if (!normalized) continue;
-    return normalized.length > 92 ? `${normalized.slice(0, 91)}…` : normalized;
-  }
-  return 'Диалог без содержимого';
-}
 
 export function HistoryScreen({
   threads,
@@ -113,8 +84,8 @@ export function HistoryScreen({
                   <button className="history-row__open history-v2__open" type="button" onClick={() => onOpen(thread.id)}>
                     <div className="history-v2__copy">
                       <strong>{thread.title}</strong>
-                      <span className="history-v2__preview">{threadPreview(thread)}</span>
-                      <small>{messageCountLabel(conversationCount)} · {relativeTime(thread.updatedAt)}</small>
+                      <span className="history-v2__preview">{conversationPreview(thread)}</span>
+                      <small>{conversationMessageCountLabel(conversationCount)} · {conversationRelativeTime(thread.updatedAt)}</small>
                     </div>
                     <ArrowIcon />
                   </button>
