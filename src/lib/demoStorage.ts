@@ -53,6 +53,7 @@ function isMessage(value: unknown): value is DemoMessage {
     typeof message.content === 'string' &&
     message.content.length <= 12_000 &&
     isValidTimestamp(message.createdAt) &&
+    (message.editedAt === undefined || isValidTimestamp(message.editedAt)) &&
     (message.mock === undefined || typeof message.mock === 'boolean')
   );
 }
