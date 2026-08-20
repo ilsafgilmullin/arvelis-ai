@@ -1,33 +1,66 @@
 import { FormEvent, useState } from 'react';
 import { BrandLockup } from '../components/Brand';
 
+type AuthMode = 'signin' | 'signup';
+
 export function AuthScreen({
   initialName,
-  onBack,
   onContinue,
 }: {
   initialName: string;
-  onBack: () => void;
   onContinue: (name: string) => void;
 }) {
+  const [mode, setMode] = useState<AuthMode>(initialName === 'Пользователь ARVELIS' ? 'signup' : 'signin');
   const [name, setName] = useState(initialName === 'Пользователь ARVELIS' ? '' : initialName);
+  const normalizedName = name.trim();
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    onContinue(name.trim() || 'Пользователь ARVELIS');
+    onContinue(normalizedName || 'Пользователь ARVELIS');
   };
 
+  const isSignIn = mode === 'signin';
+
   return (
-    <main className="auth-shell">
-      <section className="auth-panel">
-        <button className="text-button" type="button" onClick={onBack}>← Назад</button>
-        <BrandLockup compact />
-        <div className="auth-heading">
-          <p className="section-kicker">PREVIEW ACCESS</p>
-          <h1>Давайте познакомимся.</h1>
-          <p>Скажите, как к вам обращаться. ARVELIS AI использует это имя в приветствии и сохранит его только в локальном preview этого браузера.</p>
+    <main className="auth-shell auth-shell--v2">
+      <section className="auth-panel auth-panel--v2">
+        <header className="auth-brand">
+          <BrandLockup compact />
+          <span className="auth-preview-badge">PREVIEW</span>
+        </header>
+
+        <div className="auth-heading auth-heading--v2">
+          <p className="section-kicker">ДОБРО ПОЖАЛОВАТЬ</p>
+          <h1>{isSignIn ? 'Войти в ARVELIS AI' : 'Создать профиль ARVELIS'}</h1>
+          <p>
+            {isSignIn
+              ? 'Продолжите с локальным профилем этого устройства. Настоящая серверная сессия будет подключена на следующем backend-этапе.'
+              : 'Сейчас создаётся только локальный preview-профиль. Email, пароль и другие секреты мы пока не запрашиваем.'}
+          </p>
         </div>
-        <form className="auth-form" onSubmit={submit}>
+
+        <div className="auth-mode-switch" role="tablist" aria-label="Режим входа">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={isSignIn}
+            className={isSignIn ? 'auth-mode-switch__item auth-mode-switch__item--active' : 'auth-mode-switch__item'}
+            onClick={() => setMode('signin')}
+          >
+            Вход
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!isSignIn}
+            className={!isSignIn ? 'auth-mode-switch__item auth-mode-switch__item--active' : 'auth-mode-switch__item'}
+            onClick={() => setMode('signup')}
+          >
+            Регистрация
+          </button>
+        </div>
+
+        <form className="auth-form auth-form--v2" onSubmit={submit}>
           <label>
             Как к вам обращаться
             <input
@@ -36,12 +69,26 @@ export function AuthScreen({
               placeholder="Например: Ильсаф"
               maxLength={80}
               autoComplete="nickname"
+              autoCapitalize="words"
+              enterKeyHint="go"
             />
           </label>
-          <button className="button button--primary" type="submit">Продолжить в ARVELIS AI</button>
+          <button className="button button--primary auth-submit" type="submit">
+            {isSignIn ? 'Продолжить' : 'Создать локальный профиль'}
+          </button>
         </form>
-        <p className="demo-safety-note">В этом preview мы не просим email, пароль, токены или другие секреты.</p>
-        <p className="auth-footnote">Настоящая авторизация пока не подключена.</p>
+
+        <section className="auth-security-note" aria-label="Статус авторизации">
+          <span className="auth-security-note__signal" aria-hidden="true" />
+          <div>
+            <strong>Защищённая авторизация ещё не подключена</strong>
+            <p>Этот экран проверяет пользовательский поток приложения и не создаёт реальную учётную запись.</p>
+          </div>
+        </section>
+
+        <p className="auth-legal-note">
+          Продолжая, вы используете локальную тестовую версию ARVELIS AI. Production-условия, политика конфиденциальности и способы входа будут утверждены до подключения реальных аккаунтов.
+        </p>
       </section>
     </main>
   );
