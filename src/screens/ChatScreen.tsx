@@ -78,7 +78,7 @@ async function copyText(content: string): Promise<boolean> {
       return true;
     }
   } catch {
-    // Fall through to the DOM copy fallback below.
+    // Fall through to the DOM fallback below.
   }
 
   let textarea: HTMLTextAreaElement | null = null;
@@ -154,18 +154,23 @@ export function ChatScreen({
     flush: flushDraft,
     clear: clearDraft,
   } = useChatDraft(draftKey);
+
   const sendLimitReached = thread ? messageLimitReached : threadLimitReached;
   const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase('ru-RU');
-  const searchableMessages = useMemo(() => thread?.messages.map((item) => ({
-    id: item.id,
-    content: item.content.toLocaleLowerCase('ru-RU'),
-  })) ?? [], [thread?.messages]);
+  const searchableMessages = useMemo(() => (thread?.messages ?? [])
+    .filter((item) => item.role !== 'system')
+    .map((item) => ({
+      id: item.id,
+      content: item.content.toLocaleLowerCase('ru-RU'),
+    })), [thread?.messages]);
+
   const searchMatches = useMemo(() => {
     if (!normalizedSearchQuery) return [];
     return searchableMessages
       .filter((item) => item.content.includes(normalizedSearchQuery))
       .map((item) => item.id);
   }, [normalizedSearchQuery, searchableMessages]);
+
   const activeSearchMessageId = searchMatches.length
     ? searchMatches[Math.min(searchIndex, searchMatches.length - 1)] ?? null
     : null;
@@ -512,7 +517,9 @@ export function ChatScreen({
               autoComplete="off"
             />
             <span className="chat-v2-search__count" aria-live="polite">
-              {normalizedSearchQuery ? (searchMatches.length ? `${Math.min(searchIndex + 1, searchMatches.length)} / ${searchMatches.length}` : '0 / 0') : '—'}
+              {normalizedSearchQuery
+                ? (searchMatches.length ? `${Math.min(searchIndex + 1, searchMatches.length)} / ${searchMatches.length}` : '0 / 0')
+                : '—'}
             </span>
           </div>
           <div className="chat-v2-search__actions">
@@ -536,7 +543,7 @@ export function ChatScreen({
           let content: ReactNode;
           if (item.role === 'system') {
             content = (
-              <article ref={registerNode} className={searchHit ? 'message message--system preview-notice chat-v2-preview-notice message--search-hit' : 'message message--system preview-notice chat-v2-preview-notice'}>
+              <article ref={registerNode} className="message message--system preview-notice chat-v2-preview-notice">
                 <span className="preview-notice__dot" aria-hidden="true" />
                 <span>{displaySystemMessage(item.content)}</span>
               </article>
@@ -612,12 +619,14 @@ export function ChatScreen({
             <ChevronDownIcon /><span>К последнему</span>
           </button>
         ) : null}
+
         {messageLimitReached && thread ? (
           <div className="chat-limit-notice chat-v2-limit-notice" role="status">
             <strong>Локальный лимит сообщений достигнут.</strong>
             <button type="button" onClick={handleNewChat} disabled={threadLimitReached}>Новый диалог</button>
           </div>
         ) : null}
+
         <div className="chat-composer chat-v2-composer">
           <textarea
             ref={textareaRef}
@@ -634,9 +643,14 @@ export function ChatScreen({
           />
           <button className="send-button chat-v2-send-button" type="button" disabled={!message.trim() || sendLimitReached} onClick={submit} aria-label="Отправить сообщение"><SendIcon /></button>
         </div>
+
         <div className="chat-v2-composer-meta">
-          {draftSaveFailed ? <span className="chat-draft-warning" role="status">Черновик не удалось сохранить.</span> : <span className="chat-v2-composer-hint">Enter — отправить · Shift+Enter — новая строка</span>}
-          {message.length >= CHAT_COMPOSER_COUNTER_THRESHOLD ? <span className="chat-char-count chat-v2-char-count">{message.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')}</span> : null}
+          {draftSaveFailed
+            ? <span className="chat-draft-warning" role="status">Черновик не удалось сохранить.</span>
+            : <span className="chat-v2-composer-hint">Enter — отправить · Shift+Enter — новая строка</span>}
+          {message.length >= CHAT_COMPOSER_COUNTER_THRESHOLD
+            ? <span className="chat-char-count chat-v2-char-count">{message.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')}</span>
+            : null}
         </div>
       </div>
 
@@ -672,6 +686,7 @@ export function ChatScreen({
           <label htmlFor="chat-title-input">Название</label>
           <input
             data-chat-sheet-autofocus
+            data-chat-sheet-select="all"
             id="chat-title-input"
             value={renameValue}
             onChange={(event) => setRenameValue(event.target.value.slice(0, CHAT_THREAD_TITLE_MAX_CHARS))}
@@ -695,6 +710,7 @@ export function ChatScreen({
           </div>
           <textarea
             data-chat-sheet-autofocus
+            data-chat-sheet-select="end"
             value={editingMessage}
             onChange={(event) => setEditingMessage(event.target.value.slice(0, CHAT_MESSAGE_MAX_CHARS))}
             onKeyDown={handleEditKeyDown}
