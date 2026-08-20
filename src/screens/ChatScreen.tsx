@@ -1,4 +1,4 @@
-import { KeyboardEvent, useMemo, useState } from 'react';
+import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandMark } from '../components/Brand';
 import { PlusIcon, SendIcon } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
@@ -18,8 +18,28 @@ export function ChatScreen({
   onSend: (content: string) => void;
 }) {
   const [message, setMessage] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
 
   const title = useMemo(() => thread?.title ?? 'Новый диалог', [thread]);
+
+  useEffect(() => {
+    setMessage('');
+  }, [thread?.id]);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+  }, [message]);
+
+  useEffect(() => {
+    if (!thread?.messages.length) return;
+    window.requestAnimationFrame(() => {
+      endRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    });
+  }, [thread?.id, thread?.messages.length]);
 
   const submit = () => {
     const content = message.trim();
@@ -58,16 +78,19 @@ export function ChatScreen({
             <p>Сообщение будет сохранено только в localStorage этого браузера. AI-запрос не выполняется.</p>
           </section>
         )}
+        <div ref={endRef} className="chat-thread__end" aria-hidden="true" />
       </div>
 
       <div className="chat-composer-wrap">
         <div className="chat-composer">
           <button className="icon-button icon-button--muted" type="button" onClick={onNewChat} aria-label="Новый диалог"><PlusIcon /></button>
           <textarea
+            ref={textareaRef}
             value={message}
             onChange={(event) => setMessage(event.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Сообщение…"
+            aria-label="Сообщение"
             rows={1}
             maxLength={6000}
           />
