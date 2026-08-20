@@ -5,7 +5,7 @@ import { starterPrompts } from '../data/demo';
 import type { DemoThread } from '../types';
 
 function relativeTime(timestamp: number): string {
-  const delta = Date.now() - timestamp;
+  const delta = Math.max(0, Date.now() - timestamp);
   const minutes = Math.max(1, Math.round(delta / 60_000));
   if (minutes < 60) return `${minutes} мин назад`;
   const hours = Math.round(minutes / 60);
@@ -42,7 +42,7 @@ export function WorkspaceScreen({
         <div className="workspace-hero__copy">
           <p className="section-kicker">ARVELIS WORKSPACE</p>
           <h2>Какую задачу нужно решить?</h2>
-          <p>Опишите цель, контекст и ограничения. В этой версии запрос сохраняется локально и открывает тестовый диалог без обращения к AI.</p>
+          <p>Опишите цель, контекст и ограничения. Запрос открывает локальный тестовый диалог без обращения к AI; при доступном хранилище браузера demo-состояние сохраняется на этом устройстве.</p>
         </div>
         <div className="composer composer--hero">
           <textarea
