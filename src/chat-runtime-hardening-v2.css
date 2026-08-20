@@ -93,6 +93,30 @@
   }
 }
 
+/* Brand decision: on the narrowest phones keep the geometric ARVELIS mark and
+   remove only the repeated compact product label. The thread title remains the
+   primary text identity beside the mark. */
+@media (max-width: 370px) {
+  .chat-v2-header__identity {
+    gap: 7px;
+  }
+
+  .chat-v2-header__identity > .brand-mark {
+    display: block;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+  }
+
+  .chat-v2-header__product {
+    display: none;
+  }
+
+  .chat-v2-header h1 {
+    font-size: 16px;
+  }
+}
+
 @media (hover: none) and (pointer: coarse) {
   /* The visible shortcut copy describes desktop keyboard semantics. On touch,
      Return creates a new line and send is explicit via the send button, so the
