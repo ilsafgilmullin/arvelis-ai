@@ -3,8 +3,6 @@ import { AppLayout } from './components/AppLayout';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import {
   canUseDemoStorage,
-  DEMO_MAX_MESSAGES_PER_THREAD,
-  DEMO_MAX_THREADS,
   loadDemoWorkspace,
   resetDemoWorkspace,
   saveDemoWorkspace,
@@ -82,7 +80,7 @@ export default function App() {
     setWorkspace((current) => ({
       ...current,
       activeThreadId: thread.id,
-      threads: [thread, ...current.threads].slice(0, DEMO_MAX_THREADS),
+      threads: [thread, ...current.threads],
     }));
     setScreen('chat');
   };
@@ -102,7 +100,7 @@ export default function App() {
       threads: current.threads.map((thread) => thread.id === activeThread.id ? {
         ...thread,
         updatedAt: timestamp,
-        messages: [...thread.messages, userMessage, systemMessage].slice(-DEMO_MAX_MESSAGES_PER_THREAD),
+        messages: [...thread.messages, userMessage, systemMessage],
       } : thread).sort((a, b) => b.updatedAt - a.updatedAt),
     }));
   };
