@@ -29,6 +29,7 @@ const ProfileScreen = lazy(() => loadProfileModule().then((module) => ({ default
 const StatesScreen = lazy(() => loadStatesModule().then((module) => ({ default: module.StatesScreen })));
 
 const DEFAULT_PROFILE_NAME = 'Пользователь ARVELIS';
+const MAX_CHAT_MESSAGE_LENGTH = 6000;
 
 const INITIAL_LOAD_PROGRESS: AppLoadProgress = {
   completed: 0,
@@ -179,7 +180,7 @@ export default function App() {
       return;
     }
 
-    const userMessage = createUserMessage(content);
+    const userMessage = createUserMessage(content.slice(0, MAX_CHAT_MESSAGE_LENGTH));
     const timestamp = Date.now();
 
     setWorkspace((current) => current ? {
@@ -193,7 +194,7 @@ export default function App() {
   };
 
   const editMessage = (threadId: string, messageId: string, content: string) => {
-    const normalizedContent = content.trim();
+    const normalizedContent = content.trim().slice(0, MAX_CHAT_MESSAGE_LENGTH);
     if (!normalizedContent) return;
 
     const timestamp = Date.now();
