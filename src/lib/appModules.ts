@@ -22,7 +22,8 @@ async function warmSecondaryModules(): Promise<void> {
     try {
       await loadModule();
     } catch {
-      // A secondary preload failure is non-fatal. React.lazy will retry on demand.
+      // Secondary warmup must never block startup. If the module is still unavailable
+      // later, the existing lazy/runtime error path will surface that failure explicitly.
     }
   }
 }
