@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { AppBootScreen } from './components/AppBootScreen';
+import { normalizeChatMessage, normalizeThreadTitle } from './domain/chatPolicy';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import {
   loadHistoryModule,
@@ -31,7 +32,6 @@ const ProfileScreen = lazy(() => loadProfileModule().then((module) => ({ default
 const StatesScreen = lazy(() => loadStatesModule().then((module) => ({ default: module.StatesScreen })));
 
 const DEFAULT_PROFILE_NAME = 'Пользователь ARVELIS';
-const MAX_CHAT_MESSAGE_LENGTH = 6000;
 
 const INITIAL_LOAD_PROGRESS: AppLoadProgress = {
   completed: 0,
@@ -161,7 +161,7 @@ export default function App() {
   };
 
   const createThreadFromPrompt = (prompt: string) => {
-    const normalizedPrompt = prompt.trim().slice(0, MAX_CHAT_MESSAGE_LENGTH);
+    const normalizedPrompt = normalizeChatMessage(prompt);
     if (!normalizedPrompt || threadLimitReached) return;
 
     const timestamp = Date.now();
@@ -186,13 +186,16 @@ export default function App() {
 
   const sendMessage = (content: string) => {
     if (!workspace) return;
+    const normalizedContent = normalizeChatMessage(content);
+    if (!normalizedContent) return;
+
     if (!activeThread) {
-      createThreadFromPrompt(content);
+      createThreadFromPrompt(normalizedContent);
       return;
     }
     if (activeThread.messages.length >= DEMO_MAX_MESSAGES_PER_THREAD) return;
 
-    const userMessage = createUserMessage(content.slice(0, MAX_CHAT_MESSAGE_LENGTH));
+    const userMessage = createUserMessage(normalizedContent);
     const timestamp = Date.now();
 
     setWorkspace((current) => current ? {
@@ -209,7 +212,7 @@ export default function App() {
   };
 
   const editMessage = (threadId: string, messageId: string, content: string) => {
-    const normalizedContent = content.trim().slice(0, MAX_CHAT_MESSAGE_LENGTH);
+    const normalizedContent = normalizeChatMessage(content);
     if (!normalizedContent) return;
 
     const timestamp = Date.now();
@@ -234,7 +237,7 @@ export default function App() {
   };
 
   const renameThread = (threadId: string, title: string) => {
-    const normalizedTitle = title.replace(/\s+/g, ' ').trim().slice(0, 80);
+    const normalizedTitle = normalizeThreadTitle(title);
     if (!normalizedTitle) return;
 
     const timestamp = Date.now();
