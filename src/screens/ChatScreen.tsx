@@ -14,6 +14,12 @@ import {
 } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
 import {
+  CHAT_COMPOSER_COUNTER_THRESHOLD,
+  CHAT_MESSAGE_MAX_CHARS,
+  CHAT_SEARCH_MAX_CHARS,
+  CHAT_THREAD_TITLE_MAX_CHARS,
+} from '../domain/chatPolicy';
+import {
   chatDraftKey,
   loadChatDraft,
   removeChatDraft,
@@ -21,8 +27,6 @@ import {
 } from '../lib/chatDraftStorage';
 import type { DemoMessage, DemoThread } from '../types';
 
-const MAX_MESSAGE_LENGTH = 6000;
-const MAX_SEARCH_LENGTH = 160;
 const DRAFT_SAVE_DELAY = 180;
 
 const QUICK_STARTS = [
@@ -44,18 +48,15 @@ function dayKey(timestamp: number): string {
 function dateLabel(timestamp: number): string {
   const date = new Date(timestamp);
   const today = new Date();
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const dayDelta = Math.round((todayStart - dateStart) / 86_400_000);
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  yesterday.setDate(yesterday.getDate() - 1);
 
-  if (dayDelta === 0) return 'Сегодня';
-  if (dayDelta === 1) return 'Вчера';
+  if (dayKey(timestamp) === dayKey(today.getTime())) return 'Сегодня';
+  if (dayKey(timestamp) === dayKey(yesterday.getTime())) return 'Вчера';
 
-  return new Intl.DateTimeFormat('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    ...(date.getFullYear() !== today.getFullYear() ? { year: 'numeric' as const } : {}),
-  }).format(date);
+  return new Intl.DateTimeFormat('ru-RU', date.getFullYear() === today.getFullYear()
+    ? { day: 'numeric', month: 'long' }
+    : { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
 }
 
 function isCoarsePointer(): boolean {
@@ -165,7 +166,7 @@ export function ChatScreen({
   };
 
   const updateComposerMessage = (nextMessage: string) => {
-    const limited = nextMessage.slice(0, MAX_MESSAGE_LENGTH);
+    const limited = nextMessage.slice(0, CHAT_MESSAGE_MAX_CHARS);
     messageRef.current = limited;
     setMessage(limited);
     scheduleDraftSave(limited);
@@ -354,8 +355,9 @@ export function ChatScreen({
 
   const startEditing = (item: DemoMessage) => {
     if (item.role !== 'user') return;
+    setSearchOpen(false);
     setEditingMessageId(item.id);
-    setEditingMessage(item.content.slice(0, MAX_MESSAGE_LENGTH));
+    setEditingMessage(item.content.slice(0, CHAT_MESSAGE_MAX_CHARS));
   };
 
   const cancelEditing = () => {
@@ -386,6 +388,9 @@ export function ChatScreen({
 
   const startRenaming = () => {
     if (!thread) return;
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchIndex(0);
     setRenameValue(thread.title);
     setRenaming(true);
     window.requestAnimationFrame(() => {
@@ -430,6 +435,7 @@ export function ChatScreen({
 
   const openSearch = () => {
     if (!thread) return;
+    setRenaming(false);
     setSearchOpen(true);
     window.requestAnimationFrame(() => searchInputRef.current?.focus());
   };
@@ -458,6 +464,14 @@ export function ChatScreen({
     }
   };
 
+  const openDelete = () => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchIndex(0);
+    setRenaming(false);
+    setDeleteOpen(true);
+  };
+
   const confirmDelete = () => {
     if (!thread) return;
     onDeleteThread(thread.id);
@@ -478,7 +492,7 @@ export function ChatScreen({
       <button className="chat-header-action" type="button" onClick={startRenaming} aria-label="Переименовать диалог" title="Переименовать диалог">
         <EditIcon />
       </button>
-      <button className="chat-header-action chat-header-action--danger" type="button" onClick={() => setDeleteOpen(true)} aria-label="Удалить диалог" title="Удалить диалог">
+      <button className="chat-header-action chat-header-action--danger" type="button" onClick={openDelete} aria-label="Удалить диалог" title="Удалить диалог">
         <TrashIcon />
       </button>
       <button className="chat-header-action" type="button" onClick={onNewChat} aria-label="Новый диалог" title="Новый диалог">
@@ -498,13 +512,13 @@ export function ChatScreen({
             ref={searchInputRef}
             value={searchQuery}
             onChange={(event) => {
-              setSearchQuery(event.target.value.slice(0, MAX_SEARCH_LENGTH));
+              setSearchQuery(event.target.value.slice(0, CHAT_SEARCH_MAX_CHARS));
               setSearchIndex(0);
             }}
             onKeyDown={handleSearchKeyDown}
             placeholder="Найти в диалоге"
             aria-label="Найти сообщение в диалоге"
-            maxLength={MAX_SEARCH_LENGTH}
+            maxLength={CHAT_SEARCH_MAX_CHARS}
             autoComplete="off"
           />
           <span className="chat-search__count" aria-live="polite">
@@ -526,9 +540,9 @@ export function ChatScreen({
               ref={renameInputRef}
               id="chat-title-input"
               value={renameValue}
-              onChange={(event) => setRenameValue(event.target.value.slice(0, 80))}
+              onChange={(event) => setRenameValue(event.target.value.slice(0, CHAT_THREAD_TITLE_MAX_CHARS))}
               onKeyDown={handleRenameKeyDown}
-              maxLength={80}
+              maxLength={CHAT_THREAD_TITLE_MAX_CHARS}
               autoComplete="off"
             />
             <button className="button button--primary" type="submit" disabled={!renameValue.trim()}>Сохранить</button>
@@ -564,9 +578,9 @@ export function ChatScreen({
                     <textarea
                       ref={editTextareaRef}
                       value={editingMessage}
-                      onChange={(event) => setEditingMessage(event.target.value.slice(0, MAX_MESSAGE_LENGTH))}
+                      onChange={(event) => setEditingMessage(event.target.value.slice(0, CHAT_MESSAGE_MAX_CHARS))}
                       onKeyDown={handleEditKeyDown}
-                      maxLength={MAX_MESSAGE_LENGTH}
+                      maxLength={CHAT_MESSAGE_MAX_CHARS}
                       rows={2}
                       aria-label="Редактировать сообщение"
                     />
@@ -658,10 +672,10 @@ export function ChatScreen({
             placeholder={sendLimitReached ? 'Отправка временно недоступна' : 'Сообщение ARVELIS AI…'}
             aria-label="Сообщение"
             rows={1}
-            maxLength={MAX_MESSAGE_LENGTH}
+            maxLength={CHAT_MESSAGE_MAX_CHARS}
             disabled={sendLimitReached}
           />
-          {message.length >= 4800 ? <span className="chat-char-count">{message.length.toLocaleString('ru-RU')} / 6 000</span> : null}
+          {message.length >= CHAT_COMPOSER_COUNTER_THRESHOLD ? <span className="chat-char-count">{message.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')}</span> : null}
           <button className="send-button" type="button" disabled={!message.trim() || sendLimitReached} onClick={submit} aria-label="Добавить сообщение в локальный preview-диалог"><SendIcon /></button>
         </div>
         {draftSaveFailed ? (
@@ -670,6 +684,10 @@ export function ChatScreen({
           <p className="chat-composer-helper">PREVIEW · Enter — отправить на компьютере · Shift+Enter — новая строка</p>
         )}
       </div>
+
+      <span className="chat-a11y-status" aria-live="polite">
+        {copyFeedback ? (copyFeedback.status === 'copied' ? 'Сообщение скопировано' : 'Не удалось скопировать сообщение') : ''}
+      </span>
 
       <ConfirmDialog
         open={deleteOpen}
