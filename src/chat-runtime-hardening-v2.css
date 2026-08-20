@@ -97,8 +97,8 @@
 
   /* Mobile Safari may keep part of its bottom browser chrome inside the layout
      viewport, and software-keyboard resize behaviour changes across iOS releases.
-     AppLayout publishes the measured visualViewport bottom inset so both fixed
-     navigation and the sticky composer stay above what the user can actually see. */
+     AppLayout publishes the measured visualViewport bottom inset for fixed chrome.
+     The unfocused sticky composer also uses it while it sits above mobile nav. */
   .app-shell--chat .mobile-nav {
     bottom: calc(max(7px, env(safe-area-inset-bottom)) + var(--visual-viewport-bottom-inset, 0px));
   }
@@ -107,8 +107,11 @@
     bottom: calc(70px + env(safe-area-inset-bottom) + var(--visual-viewport-bottom-inset, 0px));
   }
 
+  /* Important iOS detail: once the textarea owns focus, Safari already exposes
+     the reduced visual viewport to sticky positioning. Adding the measured inset
+     again lifts the composer twice (confirmed by real iPhone recording). */
   .app-shell--chat:has(.chat-v2-composer textarea:focus) .chat-v2-composer-wrap {
-    bottom: calc(max(5px, env(safe-area-inset-bottom)) + var(--visual-viewport-bottom-inset, 0px));
+    bottom: max(5px, env(safe-area-inset-bottom));
   }
 
   /* ChatSheet syncs its fixed overlay to window.visualViewport. Bound the sheet
@@ -212,6 +215,6 @@
   }
 
   .app-shell--chat:has(.chat-v2-composer textarea:focus) .chat-v2-composer-wrap {
-    bottom: calc(max(4px, env(safe-area-inset-bottom)) + var(--visual-viewport-bottom-inset, 0px));
+    bottom: max(4px, env(safe-area-inset-bottom));
   }
 }
