@@ -31,3 +31,9 @@ createRoot(root).render(
     </ErrorBoundary>
   </StrictMode>,
 );
+
+window.requestAnimationFrame(() => {
+  window.requestAnimationFrame(() => {
+    document.getElementById('arvelis-preboot')?.remove();
+  });
+});
