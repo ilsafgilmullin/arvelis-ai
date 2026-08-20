@@ -10,7 +10,7 @@ const FOCUSABLE_SELECTOR = [
 ].join(', ');
 
 function focusPreferredControl(sheet: HTMLElement | null) {
-  const preferred = sheet?.querySelector<HTMLElement>('[data-chat-sheet-autofocus]');
+  const preferred = sheet?.querySelector<HTMLElement>('[data-chat-sheet-autofocus]:not([disabled])');
   const firstFocusable = sheet?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
   const target = preferred ?? firstFocusable ?? sheet;
   target?.focus();
