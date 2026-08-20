@@ -59,13 +59,13 @@ export function ChatScreen({
 
   return (
     <div className="chat-page">
-      <Topbar title={title} subtitle="Локальный тест интерфейса. Реальный AI не подключён." />
+      <Topbar title={title} subtitle="Frontend preview · запрос к модели не выполняется" />
 
       <div className="chat-thread" aria-live="polite">
         {thread?.messages.length ? thread.messages.map((item) => (
           <article key={item.id} className={`message message--${item.role}`}>
             {item.role === 'assistant' ? (
-              <div className="assistant-label"><BrandMark size="compact" /><span>ARVELIS AI · {item.mock ? 'MOCK' : 'DEMO'}</span></div>
+              <div className="assistant-label"><BrandMark size="compact" /><span>ARVELIS AI · {item.mock ? 'MOCK' : 'PREVIEW'}</span></div>
             ) : (
               <div className="message__meta"><span>{item.role === 'user' ? 'ВЫ' : 'СИСТЕМА'}</span><time>{timeLabel(item.createdAt)}</time></div>
             )}
@@ -76,8 +76,8 @@ export function ChatScreen({
           <section className="chat-empty">
             <BrandMark size="default" />
             <p className="section-kicker">НОВЫЙ ДИАЛОГ</p>
-            <h2>Начните с задачи.</h2>
-            <p>AI-запрос не выполняется. При доступном localStorage demo-диалог сохраняется только в этом браузере.</p>
+            <h2>Опишите задачу.</h2>
+            <p>Сообщение создаст локальный preview-диалог. AI-запрос не выполняется; сохранение зависит от возможностей браузера.</p>
           </section>
         )}
         <div ref={endRef} className="chat-thread__end" aria-hidden="true" />
@@ -85,7 +85,16 @@ export function ChatScreen({
 
       <div className="chat-composer-wrap">
         <div className="chat-composer">
-          <button className="icon-button icon-button--muted" type="button" onClick={onNewChat} aria-label="Новый диалог"><PlusIcon /></button>
+          <button
+            className="icon-button icon-button--muted"
+            type="button"
+            onClick={onNewChat}
+            disabled={!thread}
+            aria-label="Начать новый диалог"
+            title={thread ? 'Начать новый диалог' : 'Новый диалог уже открыт'}
+          >
+            <PlusIcon />
+          </button>
           <textarea
             ref={textareaRef}
             value={message}
@@ -96,9 +105,9 @@ export function ChatScreen({
             rows={1}
             maxLength={6000}
           />
-          <button className="send-button" type="button" disabled={!message.trim()} onClick={submit} aria-label="Добавить сообщение в локальный demo-диалог"><SendIcon /></button>
+          <button className="send-button" type="button" disabled={!message.trim()} onClick={submit} aria-label="Добавить сообщение в локальный preview-диалог"><SendIcon /></button>
         </div>
-        <p>DEMO · Enter — отправить, Shift+Enter — новая строка · локальное хранение зависит от браузера</p>
+        <p>LOCAL PREVIEW · Enter — отправить · Shift+Enter — новая строка</p>
       </div>
     </div>
   );
