@@ -23,7 +23,7 @@ export function Topbar({
       </div>
       <div className="topbar__actions">
         {actions}
-        {demo ? <span className="demo-chip" title="Frontend preview: реальный AI и backend пока не подключены">PREVIEW</span> : null}
+        {demo ? <span className="demo-chip" title="Тестовая версия: AI и серверная часть пока не подключены">PREVIEW</span> : null}
       </div>
     </header>
   );
