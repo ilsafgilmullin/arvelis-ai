@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { BrandMark } from '../components/Brand';
 import { ChatSheet } from '../components/ChatSheet';
@@ -29,29 +29,6 @@ const QUICK_STARTS = [
   { label: 'Сравнить варианты', prompt: 'Помоги сравнить варианты: ' },
   { label: 'Составить план', prompt: 'Помоги составить план: ' },
 ] as const;
-
-function timeLabel(timestamp: number): string {
-  return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(timestamp);
-}
-
-function dayKey(timestamp: number): string {
-  const date = new Date(timestamp);
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-}
-
-function dateLabel(timestamp: number): string {
-  const date = new Date(timestamp);
-  const today = new Date();
-  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  if (dayKey(timestamp) === dayKey(today.getTime())) return 'Сегодня';
-  if (dayKey(timestamp) === dayKey(yesterday.getTime())) return 'Вчера';
-
-  return new Intl.DateTimeFormat('ru-RU', date.getFullYear() === today.getFullYear()
-    ? { day: 'numeric', month: 'long' }
-    : { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
-}
 
 function isCoarsePointer(): boolean {
   return typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches ?? false);
@@ -137,8 +114,8 @@ export function ChatScreen({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const composerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
   const messageNodesRef = useRef<Map<string, HTMLElement>>(new Map());
   const copyFeedbackTimerRef = useRef<number | null>(null);
   const copyRequestSequenceRef = useRef(0);
@@ -250,15 +227,16 @@ export function ChatScreen({
 
   useEffect(() => {
     const end = endRef.current;
-    if (!end || typeof IntersectionObserver === 'undefined') return;
+    const root = threadRef.current;
+    if (!end || !root || typeof IntersectionObserver === 'undefined') return;
 
     const observer = new IntersectionObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
       setEndState(entry.isIntersecting);
     }, {
-      root: null,
-      rootMargin: '0px 0px 140px 0px',
+      root,
+      rootMargin: '0px 0px 96px 0px',
       threshold: 0.01,
     });
 
@@ -286,42 +264,12 @@ export function ChatScreen({
     if (searchIndex >= searchMatches.length) setSearchIndex(0);
   }, [searchIndex, searchMatches.length]);
 
-  useEffect(() => {
-    const viewport = window.visualViewport;
-
-    const keepComposerVisible = () => {
-      if (document.activeElement !== textareaRef.current) return;
-      window.requestAnimationFrame(() => {
-        composerRef.current?.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'auto' });
-      });
-    };
-
-    viewport?.addEventListener('resize', keepComposerVisible);
-    viewport?.addEventListener('scroll', keepComposerVisible);
-    window.addEventListener('orientationchange', keepComposerVisible);
-
-    return () => {
-      viewport?.removeEventListener('resize', keepComposerVisible);
-      viewport?.removeEventListener('scroll', keepComposerVisible);
-      window.removeEventListener('orientationchange', keepComposerVisible);
-    };
-  }, []);
-
-  const focusComposer = () => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        composerRef.current?.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'auto' });
-      });
-    });
-  };
-
   const focusComposerWith = (content: string) => {
     if (sendLimitReached) return;
     updateComposerMessage(content);
     window.requestAnimationFrame(() => {
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(content.length, content.length);
-      focusComposer();
     });
   };
 
@@ -530,10 +478,8 @@ export function ChatScreen({
         </section>
       ) : null}
 
-      <div className="chat-thread chat-v2-thread" role="log" aria-live="polite" aria-relevant="additions text">
-        {thread?.messages.length ? thread.messages.map((item, index) => {
-          const previous = index > 0 ? thread.messages[index - 1] : undefined;
-          const showDate = !previous || dayKey(previous.createdAt) !== dayKey(item.createdAt);
+      <div ref={threadRef} className="chat-thread chat-v2-thread" role="log" aria-live="polite" aria-relevant="additions text">
+        {thread?.messages.length ? thread.messages.map((item) => {
           const searchHit = item.id === activeSearchMessageId;
           const registerNode = (node: HTMLElement | null) => {
             if (node) messageNodesRef.current.set(item.id, node);
@@ -543,17 +489,16 @@ export function ChatScreen({
           let content: ReactNode;
           if (item.role === 'system') {
             content = (
-              <article ref={registerNode} className="message message--system preview-notice chat-v2-preview-notice">
+              <article key={item.id} ref={registerNode} className="message message--system preview-notice chat-v2-preview-notice">
                 <span className="preview-notice__dot" aria-hidden="true" />
                 <span>{displaySystemMessage(item.content)}</span>
               </article>
             );
           } else if (item.role === 'user') {
             content = (
-              <article ref={registerNode} className={searchHit ? 'message message--user chat-v2-message chat-v2-message--user message--search-hit' : 'message message--user chat-v2-message chat-v2-message--user'}>
+              <article key={item.id} ref={registerNode} className={searchHit ? 'message message--user chat-v2-message chat-v2-message--user message--search-hit' : 'message message--user chat-v2-message chat-v2-message--user'}>
                 <div className="message__bubble chat-v2-user-bubble"><p>{item.content}</p></div>
                 <div className="message__footer message__footer--user chat-v2-message-footer">
-                  <span className="message__time">{timeLabel(item.createdAt)}{item.editedAt ? ' · изменено' : ''}</span>
                   <div className="message__actions chat-v2-message-actions">
                     <button type="button" onClick={() => { void handleCopy(item); }} aria-label={`${copyLabel(item.id)} сообщение`} title={copyLabel(item.id)}>
                       {copyFeedback?.id === item.id && copyFeedback.status === 'copied' ? <CheckIcon /> : <CopyIcon />}
@@ -566,7 +511,7 @@ export function ChatScreen({
             );
           } else {
             content = (
-              <article ref={registerNode} className={searchHit ? 'message message--assistant chat-v2-message chat-v2-message--assistant message--search-hit' : 'message message--assistant chat-v2-message chat-v2-message--assistant'}>
+              <article key={item.id} ref={registerNode} className={searchHit ? 'message message--assistant chat-v2-message chat-v2-message--assistant message--search-hit' : 'message message--assistant chat-v2-message chat-v2-message--assistant'}>
                 <div className="assistant-label chat-v2-assistant-label">
                   <BrandMark size="compact" />
                   <span>ARVELIS AI</span>
@@ -575,7 +520,6 @@ export function ChatScreen({
                 <p>{item.content}</p>
                 {item.mock ? <span className="mock-disclaimer">Демонстрационный текст — не ответ модели.</span> : null}
                 <div className="message__footer chat-v2-message-footer">
-                  <span className="message__time">{timeLabel(item.createdAt)}</span>
                   <div className="message__actions chat-v2-message-actions">
                     <button type="button" onClick={() => { void handleCopy(item); }} aria-label={`${copyLabel(item.id)} сообщение ARVELIS AI`} title={copyLabel(item.id)}>
                       {copyFeedback?.id === item.id && copyFeedback.status === 'copied' ? <CheckIcon /> : <CopyIcon />}
@@ -587,12 +531,7 @@ export function ChatScreen({
             );
           }
 
-          return (
-            <Fragment key={item.id}>
-              {showDate ? <div className="chat-date-separator chat-v2-date-separator"><span>{dateLabel(item.createdAt)}</span></div> : null}
-              {content}
-            </Fragment>
-          );
+          return content;
         }) : (
           <section className="chat-empty chat-v2-empty">
             <BrandMark size="compact" />
@@ -613,9 +552,9 @@ export function ChatScreen({
         <div ref={endRef} className="chat-thread__end" aria-hidden="true" />
       </div>
 
-      <div ref={composerRef} className="chat-composer-wrap chat-v2-composer-wrap">
+      <div className="chat-composer-wrap chat-v2-composer-wrap">
         {!isAtEnd && thread?.messages.length ? (
-          <button className="chat-jump-latest chat-v2-jump-latest" type="button" onClick={() => scrollToLatest('smooth')} aria-label="Перейти к последнему сообщению">
+          <button className="chat-jump-latest chat-v2-jump-latest" type="button" onClick={() => scrollToLatest('smooth')} aria-label="Перейти к последнему сообщению" title="К последнему сообщению">
             <ChevronDownIcon /><span>К последнему</span>
           </button>
         ) : null}
@@ -633,7 +572,6 @@ export function ChatScreen({
             value={message}
             onChange={(event) => updateComposerMessage(event.target.value)}
             onKeyDown={handleKeyDown}
-            onFocus={focusComposer}
             onBlur={flushDraft}
             placeholder={sendLimitReached ? 'Отправка недоступна' : 'Сообщение'}
             aria-label="Сообщение"
