@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { ControlErrorBoundary } from './ControlErrorBoundary';
 import { ControlRuntime } from './ControlRuntime';
 import './control.css';
+import './runtime.css';
 
 const root = document.getElementById('control-root');
 
