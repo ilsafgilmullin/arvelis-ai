@@ -3,17 +3,13 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ArrowIcon, SearchIcon, TrashIcon } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
 import { CHAT_SEARCH_MAX_CHARS } from '../domain/chatPolicy';
+import {
+  conversationMessageCount,
+  conversationMessageCountLabel,
+  conversationPreview,
+  conversationRelativeTime,
+} from '../domain/chatPresentation';
 import type { DemoThread } from '../types';
-
-function relativeTime(timestamp: number): string {
-  const delta = Math.max(0, Date.now() - timestamp);
-  const minutes = Math.max(1, Math.round(delta / 60_000));
-  if (minutes < 60) return `${minutes} мин назад`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} ч назад`;
-  const days = Math.round(hours / 24);
-  return `${days} дн назад`;
-}
 
 export function HistoryScreen({
   threads,
@@ -29,7 +25,12 @@ export function HistoryScreen({
 
   const searchIndex = useMemo(() => threads.map((thread) => ({
     thread,
-    content: [thread.title, ...thread.messages.map((message) => message.content)]
+    content: [
+      thread.title,
+      ...thread.messages
+        .filter((message) => message.role !== 'system')
+        .map((message) => message.content),
+    ]
       .join('\n')
       .toLocaleLowerCase('ru-RU'),
   })), [threads]);
@@ -51,39 +52,54 @@ export function HistoryScreen({
   const hasQuery = Boolean(query.trim());
 
   return (
-    <div className="content-page">
-      <Topbar title="История" subtitle="Локальные preview-диалоги этого браузера · серверная история не подключена" />
-      <section className="history-section">
-        <label className="search-field">
+    <div className="content-page history-v2">
+      <Topbar title="История" subtitle="Ваши локальные диалоги на этом устройстве" />
+      <section className="history-section history-v2__section">
+        <div className="search-field history-v2__search" role="search" aria-label="Поиск по истории диалогов">
           <SearchIcon />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value.slice(0, CHAT_SEARCH_MAX_CHARS))}
-            placeholder="Поиск по локальной истории"
-            aria-label="Поиск по истории"
+            placeholder="Найти диалог или сообщение"
+            aria-label="Поиск по истории диалогов"
             maxLength={CHAT_SEARCH_MAX_CHARS}
             autoComplete="off"
           />
-        </label>
+          {hasQuery ? (
+            <button className="history-v2__clear" type="button" onClick={() => setQuery('')} aria-label="Очистить поиск">×</button>
+          ) : null}
+        </div>
 
-        <div className="history-summary"><span>{filtered.length} из {threads.length}</span><small>LOCAL PREVIEW</small></div>
+        <div className="history-summary history-v2__summary">
+          <span>Диалогов: {filtered.length}{hasQuery ? ` из ${threads.length}` : ''}</span>
+          <small>ЛОКАЛЬНО</small>
+        </div>
 
         {filtered.length ? (
-          <div className="history-list history-list--large">
-            {filtered.map((thread) => (
-              <div className="history-row history-row--managed" key={thread.id}>
-                <button className="history-row__open" type="button" onClick={() => onOpen(thread.id)}>
-                  <div><strong>{thread.title}</strong><span>{thread.messages.length} сообщ. · {relativeTime(thread.updatedAt)}</span></div><ArrowIcon />
-                </button>
-                <button className="icon-button icon-button--danger" type="button" onClick={() => setPendingDelete(thread)} aria-label={`Удалить диалог «${thread.title}»`}><TrashIcon /></button>
-              </div>
-            ))}
+          <div className="history-list history-list--large history-v2__list">
+            {filtered.map((thread) => {
+              const conversationCount = conversationMessageCount(thread);
+              return (
+                <div className="history-row history-row--managed history-v2__row" key={thread.id}>
+                  <button className="history-row__open history-v2__open" type="button" onClick={() => onOpen(thread.id)}>
+                    <div className="history-v2__copy">
+                      <strong>{thread.title}</strong>
+                      <span className="history-v2__preview">{conversationPreview(thread)}</span>
+                      <small>{conversationMessageCountLabel(conversationCount)} · {conversationRelativeTime(thread.updatedAt)}</small>
+                    </div>
+                    <ArrowIcon />
+                  </button>
+                  <button className="icon-button icon-button--danger history-v2__delete" type="button" onClick={() => setPendingDelete(thread)} aria-label={`Удалить диалог «${thread.title}»`}><TrashIcon /></button>
+                </div>
+              );
+            })}
           </div>
         ) : (
-          <div className="empty-state">
-            <p className="section-kicker">{hasQuery ? 'SEARCH' : 'EMPTY'}</p>
-            <h2>{hasQuery ? 'Совпадений нет' : 'История пока пуста'}</h2>
-            <p>{hasQuery ? 'Измените запрос или очистите строку поиска.' : 'Создайте первый локальный диалог — он появится здесь.'}</p>
+          <div className="empty-state history-v2__empty">
+            <p className="section-kicker">{hasQuery ? 'ПОИСК' : 'ИСТОРИЯ'}</p>
+            <h2>{hasQuery ? 'Ничего не найдено' : 'Диалогов пока нет'}</h2>
+            <p>{hasQuery ? 'Попробуйте изменить запрос или очистить поиск.' : 'Начните новый диалог — после первого сообщения он появится здесь.'}</p>
+            {hasQuery ? <button className="button button--secondary" type="button" onClick={() => setQuery('')}>Очистить поиск</button> : null}
           </div>
         )}
       </section>

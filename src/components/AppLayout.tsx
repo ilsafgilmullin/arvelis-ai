@@ -1,7 +1,9 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { BrandLockup } from './Brand';
 import { ChatIcon, HistoryIcon, HomeIcon, PlusIcon, ProfileIcon } from './Icons';
 import type { AppScreen } from '../types';
+
+const MOBILE_CHAT_MEDIA_QUERY = '(max-width: 780px), (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 520px)';
 
 const navigation = [
   { id: 'workspace' as const, label: 'Главная', desktopLabel: 'ARVELIS AI', icon: <HomeIcon /> },
@@ -29,8 +31,146 @@ export function AppLayout({
   persistenceAvailable: boolean;
   children: ReactNode;
 }) {
+  const shellRef = useRef<HTMLDivElement>(null);
+  const statusBannersRef = useRef<HTMLDivElement>(null);
+  const shellClassName = screen === 'chat' ? 'app-shell app-shell--chat' : 'app-shell';
+
+  useLayoutEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+
+    const syncStatusBannerHeight = () => {
+      const height = statusBannersRef.current?.getBoundingClientRect().height ?? 0;
+      shell.style.setProperty('--status-banners-height', `${Math.ceil(height)}px`);
+    };
+
+    syncStatusBannerHeight();
+
+    const banners = statusBannersRef.current;
+    const observer = banners && typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(syncStatusBannerHeight)
+      : null;
+    observer?.observe(banners as Element);
+    window.addEventListener('resize', syncStatusBannerHeight);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', syncStatusBannerHeight);
+      shell.style.removeProperty('--status-banners-height');
+    };
+  }, [online, persistenceAvailable]);
+
+  useLayoutEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+
+    const visualViewport = window.visualViewport;
+    let frame: number | null = null;
+    let orientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+    let layoutViewportHeight = Math.max(
+      window.innerHeight,
+      document.documentElement.clientHeight,
+      visualViewport ? visualViewport.offsetTop + visualViewport.height : 0,
+    );
+
+    const syncVisualViewport = () => {
+      frame = null;
+      const viewport = window.visualViewport;
+      const nextOrientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+      const currentLayoutHeight = Math.max(
+        window.innerHeight,
+        document.documentElement.clientHeight,
+        viewport ? viewport.offsetTop + viewport.height : 0,
+      );
+
+      if (nextOrientation !== orientation) {
+        orientation = nextOrientation;
+        layoutViewportHeight = currentLayoutHeight;
+      } else {
+        layoutViewportHeight = Math.max(layoutViewportHeight, currentLayoutHeight);
+      }
+
+      const viewportTop = viewport?.offsetTop ?? 0;
+      const viewportLeft = viewport?.offsetLeft ?? 0;
+      const viewportWidth = viewport?.width ?? window.innerWidth;
+      const viewportHeight = viewport?.height ?? currentLayoutHeight;
+      const bottomInset = viewport
+        ? Math.max(0, layoutViewportHeight - (viewportTop + viewportHeight))
+        : 0;
+
+      shell.style.setProperty('--visual-viewport-top', `${Math.ceil(viewportTop)}px`);
+      shell.style.setProperty('--visual-viewport-left', `${Math.ceil(viewportLeft)}px`);
+      shell.style.setProperty('--visual-viewport-width', `${Math.ceil(viewportWidth)}px`);
+      shell.style.setProperty('--visual-viewport-height', `${Math.ceil(viewportHeight)}px`);
+      shell.style.setProperty('--visual-viewport-bottom-inset', `${Math.ceil(bottomInset)}px`);
+    };
+
+    const scheduleVisualViewportSync = () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(syncVisualViewport);
+    };
+
+    syncVisualViewport();
+    visualViewport?.addEventListener('resize', scheduleVisualViewportSync);
+    visualViewport?.addEventListener('scroll', scheduleVisualViewportSync);
+    window.addEventListener('resize', scheduleVisualViewportSync);
+    window.addEventListener('orientationchange', scheduleVisualViewportSync);
+
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      visualViewport?.removeEventListener('resize', scheduleVisualViewportSync);
+      visualViewport?.removeEventListener('scroll', scheduleVisualViewportSync);
+      window.removeEventListener('resize', scheduleVisualViewportSync);
+      window.removeEventListener('orientationchange', scheduleVisualViewportSync);
+      shell.style.removeProperty('--visual-viewport-top');
+      shell.style.removeProperty('--visual-viewport-left');
+      shell.style.removeProperty('--visual-viewport-width');
+      shell.style.removeProperty('--visual-viewport-height');
+      shell.style.removeProperty('--visual-viewport-bottom-inset');
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (screen !== 'chat') return;
+
+    const media = window.matchMedia(MOBILE_CHAT_MEDIA_QUERY);
+    const body = document.body;
+    const root = document.documentElement;
+    const previousBodyOverflow = body.style.overflow;
+    const previousRootOverflow = root.style.overflow;
+    const previousBodyOverscroll = body.style.overscrollBehavior;
+    const previousRootOverscroll = root.style.overscrollBehavior;
+
+    const syncMobileScrollLock = () => {
+      if (media.matches) {
+        body.style.overflow = 'hidden';
+        root.style.overflow = 'hidden';
+        body.style.overscrollBehavior = 'none';
+        root.style.overscrollBehavior = 'none';
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        return;
+      }
+
+      body.style.overflow = previousBodyOverflow;
+      root.style.overflow = previousRootOverflow;
+      body.style.overscrollBehavior = previousBodyOverscroll;
+      root.style.overscrollBehavior = previousRootOverscroll;
+    };
+
+    syncMobileScrollLock();
+    media.addEventListener('change', syncMobileScrollLock);
+
+    return () => {
+      media.removeEventListener('change', syncMobileScrollLock);
+      body.style.overflow = previousBodyOverflow;
+      root.style.overflow = previousRootOverflow;
+      body.style.overscrollBehavior = previousBodyOverscroll;
+      root.style.overscrollBehavior = previousRootOverscroll;
+    };
+  }, [screen]);
+
   return (
-    <div className="app-shell">
+    <div ref={shellRef} className={shellClassName}>
       <aside className="sidebar">
         <div className="sidebar__top">
           <BrandLockup compact />
@@ -60,7 +200,7 @@ export function AppLayout({
 
       <div className="app-main">
         {(!online || !persistenceAvailable) ? (
-          <div className="status-banners" aria-live="polite">
+          <div ref={statusBannersRef} className="status-banners" aria-live="polite">
             {!online ? <div className="offline-banner" role="status">Соединение отсутствует. Локальный интерфейс продолжает работать.</div> : null}
             {!persistenceAvailable ? <div className="storage-banner" role="status">Локальное сохранение недоступно. Текущие изменения могут исчезнуть после перезагрузки.</div> : null}
           </div>

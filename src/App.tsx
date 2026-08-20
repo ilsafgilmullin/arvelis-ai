@@ -16,7 +16,6 @@ import {
 } from './lib/appPreload';
 import { chatDraftKey, clearChatDrafts, removeChatDraft } from './lib/chatDraftStorage';
 import {
-  canUseDemoStorage,
   DEMO_MAX_MESSAGES_PER_THREAD,
   DEMO_MAX_THREADS,
   DEMO_PREVIEW_NOTICE,
@@ -241,12 +240,11 @@ export default function App() {
     const normalizedTitle = normalizeThreadTitle(title);
     if (!normalizedTitle) return;
 
-    const timestamp = Date.now();
     setWorkspace((current) => current ? {
       ...current,
       threads: current.threads.map((thread) => thread.id === threadId && thread.title !== normalizedTitle
-        ? { ...thread, title: normalizedTitle, updatedAt: timestamp }
-        : thread).sort((a, b) => b.updatedAt - a.updatedAt),
+        ? { ...thread, title: normalizedTitle }
+        : thread),
     } : current);
   };
 
@@ -271,7 +269,7 @@ export default function App() {
     clearChatDrafts();
     const next = resetDemoWorkspace();
     setWorkspace(next);
-    setPersistenceAvailable(canUseDemoStorage());
+    setPersistenceAvailable(saveDemoWorkspace(next));
     setScreen('workspace');
   };
 

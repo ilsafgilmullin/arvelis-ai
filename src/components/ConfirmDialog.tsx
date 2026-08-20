@@ -75,7 +75,7 @@ export function ConfirmDialog({
     <div
       className="confirm-layer"
       role="presentation"
-      onMouseDown={(event) => {
+      onClick={(event) => {
         if (event.target === event.currentTarget) onCancel();
       }}
     >

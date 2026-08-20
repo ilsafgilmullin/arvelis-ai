@@ -43,14 +43,18 @@
 - Новый диалог использует общий draft между Home и пустым Chat: переход между этими экранами не должен терять введённый текст.
 - Быстрые сценарии/заготовки только заполняют composer и не отправляют сообщение автоматически.
 - На touch/iPhone Return остаётся новой строкой; отправка выполняется кнопкой. На desktop Enter отправляет, Shift+Enter добавляет строку.
-- Автоскролл не должен принудительно уводить пользователя вниз, если он читает старую часть истории; в таком случае показывается `К последнему`.
+- Автоскролл не должен принудительно уводить пользователя вниз, если он читает старую часть истории; в таком случае показывается компактная 44px icon-only кнопка перехода к последнему сообщению.
 - Поиск по текущему диалогу работает локально по тексту сообщений, без HTML injection; переход между совпадениями прокручивает к целому сообщению.
-- В длинной переписке используются датированные разделители (`Сегодня`, `Вчера`, дата).
+- Датированные разделители `Сегодня/Вчера` и per-message clock timestamps скрыты в Chat v2 как лишний messenger-like шум; относительное время остаётся в History.
 - Пользовательские Chat-ограничения централизованы в `src/domain/chatPolicy.ts`, а не размножаются по UI-компонентам.
 - Preview-лимиты threads/messages показываются явно и не являются тарифными или production-ограничениями.
 - PREVIEW-маркировка должна оставаться честной и заметной, но не дублироваться в каждой служебной строке. Предпочтение: один стабильный `PREVIEW` indicator и контекстные объяснения только там, где пользователь принимает решение или ожидает AI-ответ.
 - Реалистичный демонстрационный ответ допустим только как явно помеченный `MOCK` с прямым пояснением, что это предзаписанный текст, а не результат модели.
 - На mobile Search, Rename и Edit считаются отдельными interaction modes: нижняя навигация и основной composer не должны конкурировать с клавиатурой и активной формой.
+- На mobile Chat использует отдельный bounded viewport-shell: document/root scroll блокируется, прокручивается только message stream, а shell синхронизируется с полным `window.visualViewport` (`top/left/width/height`).
+- Touch-landscape с малой высотой остаётся в mobile Chat contract независимо от CSS-width устройства; breakpoint не должен отключать mobile shell после поворота iPhone.
+- В очень низком landscape viewport при software keyboard header может временно скрываться, чтобы composer и send-control гарантированно оставались доступными.
+- При выходе из Chat обычный document scroll Home/History/Profile полностью восстанавливается.
 - На узком iPhone header сохраняет знак ARVELIS, но может скрывать повторяющий compact wordmark, чтобы не создавать collision с действиями Chat.
 - `+` внутри composer не показывается до появления реального attachment/action menu. Кнопка не должна обещать несуществующую функцию.
 - `Regenerate`, `Stop generation`, upload, voice, web-search, citations и model selector не показываются как доступные до реальной provider/backend реализации и отдельного продуктового решения.
@@ -84,11 +88,19 @@
 - Merge в `main`, force push, удаление веток и production deploy — только после отдельного подтверждения.
 - Replit Agent не используется для обычной разработки; обновление тестового Replit идёт через GitHub Pull.
 
-## 2026-08-20 — Preview QA
+## 2026-08-21 — Preview QA / PR №10 merge decision
 
-- `main` фактически запускался в Replit на iPhone после PR №6, №7 и №8.
-- Реальный iPhone/WebView тест подтвердил Smart Entry, персональный greeting, локальный chat/history/profile flow и один preview-status на диалог.
-- Текущий глобальный Chat candidate развивается в Draft PR №9 и не считается runtime-подтверждённым, пока отдельно не разрешён, не слит и не проверен через `Pull → Run`.
+- PR №9 (`feat: build ARVELIS AI conversational chat experience`) уже слит в `main`; после фактического iPhone запуска были выявлены существенные mobile Chat UX/runtime проблемы.
+- Для `feat/chat-refactor-v2` / PR №10 выполнены четыре фактических iPhone video-smoke прохода без Replit Agent. Подтверждены отправка, drafts, History/thread transitions, action/rename sheets, portrait message-scroll containment и rotation без падения приложения.
+- Safari edge-case из последнего видео привёл к переходу на bounded `visualViewport` Chat shell и единому mobile contract для portrait/touch-landscape.
+- Финальный pre-merge аудит всего frontend-preview зафиксирован в `docs/14_PRE_MERGE_AUDIT.md`.
+- Во время финального аудита удалён оставшийся legacy viewport-listener, который принудительно вызывал `scrollIntoView()` и мог конфликтовать с новой Safari layout-моделью; `IntersectionObserver` привязан к внутреннему message stream.
+- Также исправлен reset preview-данных: старое состояние удаляется, чистое состояние сохраняется отдельно, а UI получает фактический результат persistence.
+- Незакрытых PR review-thread/review замечаний на PR №10 нет.
+- GitHub Actions остаётся инфраструктурно неисправным: job завершается до первого step (`steps=null`), поэтому project TypeScript 6.0.3 `typecheck/build` нельзя считать выполненным.
+- В репозитории пока отсутствует dependency lockfile. Это зафиксированный инфраструктурный долг; lockfile нельзя подменять вручную без реального npm resolution.
+- Пользователь отдельно разрешил merge PR №10 после полного аудита и исправления критических ошибок. Это разрешение относится к private frontend-preview и **не является production release approval**.
+- После merge дальнейшая работа без подключения AI начинается с нового clean branch и идёт от авторизации/onboarding к Главной, Профилю и остальным product screens.
 
 ## Не утверждено для production
 
