@@ -265,6 +265,11 @@
     max-width: 100%;
   }
 
+  .chat-header-action {
+    width: 40px;
+    height: 40px;
+  }
+
   .chat-search {
     grid-template-columns: 18px minmax(0, 1fr) auto;
     gap: 7px;
@@ -292,7 +297,7 @@
   }
 
   .chat-search__actions button {
-    min-height: 36px;
+    min-height: 40px;
   }
 
   .chat-date-separator {
@@ -334,6 +339,43 @@
 
   .chat-search {
     border-radius: 12px;
+  }
+}
+
+@media (max-width: 390px) {
+  .chat-experience .topbar {
+    gap: 6px;
+  }
+
+  .chat-experience .topbar__mobile-brand .brand-lockup__compact-word {
+    display: none;
+  }
+
+  .chat-experience .topbar__mobile-brand .brand-lockup--compact {
+    gap: 0;
+  }
+
+  .chat-experience .topbar__mobile-brand {
+    margin-bottom: 13px;
+  }
+
+  .chat-experience .topbar__actions,
+  .chat-header-actions {
+    gap: 0;
+  }
+
+  .chat-header-action {
+    width: 38px;
+    height: 40px;
+  }
+
+  .chat-experience .topbar h1 {
+    font-size: 20px;
+  }
+
+  .chat-experience .topbar p {
+    max-width: 100%;
+    font-size: 9px;
   }
 }
 
