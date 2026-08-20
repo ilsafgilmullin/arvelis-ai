@@ -29,6 +29,18 @@
   }
 }
 
+@media (max-width: 370px) {
+  .chat-v2-icon-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .chat-v2-search__actions button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
   .app-shell--chat .app-main {
     padding-bottom: 0;
