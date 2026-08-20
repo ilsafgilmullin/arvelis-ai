@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { BrandLockup } from './Brand';
-import { ChatIcon, HistoryIcon, HomeIcon, PlusIcon, ProfileIcon, StateIcon } from './Icons';
+import { ChatIcon, HistoryIcon, HomeIcon, PlusIcon, ProfileIcon } from './Icons';
 import type { AppScreen } from '../types';
 
 const navigation = [
@@ -30,30 +30,27 @@ export function AppLayout({
       <aside className="sidebar">
         <div className="sidebar__top">
           <BrandLockup compact />
-          <button className="new-chat" type="button" onClick={onNewChat}><PlusIcon />Новый чат</button>
+          <button className="new-chat" type="button" onClick={onNewChat}><PlusIcon />Новый диалог</button>
           <nav className="sidebar__nav" aria-label="Основная навигация">
-            {navigation.map((item) => (
-              <button
-                type="button"
-                key={item.id}
-                className={screen === item.id ? 'nav-item nav-item--active' : 'nav-item'}
-                onClick={() => onNavigate(item.id)}
-              >
-                {item.icon}<span>{item.desktopLabel}</span>
-              </button>
-            ))}
-            <button
-              type="button"
-              className={screen === 'states' ? 'nav-item nav-item--active' : 'nav-item'}
-              onClick={() => onNavigate('states')}
-            >
-              <StateIcon /><span>Состояния интерфейса</span>
-            </button>
+            {navigation.map((item) => {
+              const active = screen === item.id;
+              return (
+                <button
+                  type="button"
+                  key={item.id}
+                  className={active ? 'nav-item nav-item--active' : 'nav-item'}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => onNavigate(item.id)}
+                >
+                  {item.icon}<span>{item.desktopLabel}</span>
+                </button>
+              );
+            })}
           </nav>
         </div>
         <div className="sidebar__status">
           <span className={online ? 'status-dot status-dot--online' : 'status-dot status-dot--offline'} />
-          <div><strong>{online ? 'Сеть доступна' : 'Нет соединения'}</strong><span>Локальный demo-режим</span></div>
+          <div><strong>{online ? 'Сеть доступна' : 'Нет соединения'}</strong><span>Frontend preview · локальный режим</span></div>
         </div>
       </aside>
 
@@ -68,16 +65,20 @@ export function AppLayout({
       </div>
 
       <nav className="mobile-nav" aria-label="Мобильная навигация">
-        {navigation.map((item) => (
-          <button
-            type="button"
-            key={item.id}
-            className={screen === item.id ? 'mobile-nav__item mobile-nav__item--active' : 'mobile-nav__item'}
-            onClick={() => onNavigate(item.id)}
-          >
-            {item.icon}<span>{item.label}</span>
-          </button>
-        ))}
+        {navigation.map((item) => {
+          const active = screen === item.id;
+          return (
+            <button
+              type="button"
+              key={item.id}
+              className={active ? 'mobile-nav__item mobile-nav__item--active' : 'mobile-nav__item'}
+              aria-current={active ? 'page' : undefined}
+              onClick={() => onNavigate(item.id)}
+            >
+              {item.icon}<span>{item.label}</span>
+            </button>
+          );
+        })}
       </nav>
     </div>
   );
