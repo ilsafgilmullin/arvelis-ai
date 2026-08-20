@@ -88,15 +88,19 @@
 - Merge в `main`, force push, удаление веток и production deploy — только после отдельного подтверждения.
 - Replit Agent не используется для обычной разработки; обновление тестового Replit идёт через GitHub Pull.
 
-## 2026-08-20 — Preview QA
+## 2026-08-21 — Preview QA / PR №10 merge decision
 
-- `main` фактически запускался в Replit на iPhone после PR №6, №7 и №8.
-- PR №9 (`feat: build ARVELIS AI conversational chat experience`) слит в `main`; после фактического iPhone запуска подтверждена работоспособность local chat/history flow, одновременно выявлены существенные UX-проблемы Chat на mobile: вертикальный ритм, тяжёлый header, keyboard interactions, rename/search/edit modes, composer/navigation composition и presentation локальной истории.
-- Исправляющий candidate развивается отдельно в `feat/chat-refactor-v2` / Draft PR №10. Для него уже выполнены четыре фактических iPhone video-smoke прохода: подтверждены portrait message-scroll containment, отправка, drafts, History/thread transitions, action/rename sheets и rotation без падения приложения.
-- Четвёртый iPhone video-smoke выявил два блокирующих edge-case: Safari `visualViewport.offsetTop` при keyboard и выпадение landscape из mobile contract из-за `max-width: 780px`. Исправления внесены, но именно последний visualViewport/breakpoint head ещё требует повторного real-device smoke.
-- Последний `AppLayout.tsx` отдельно прошёл изолированный strict TypeScript smoke-check без ошибок; это не заменяет project TypeScript 6.0.3 `npm run typecheck`.
-- PR №10 не должен сливаться в `main` до фактических `typecheck/build` и финального iPhone smoke последнего head.
-- `main` остаётся источником стабильного состояния до отдельного подтверждения merge PR №10.
+- PR №9 (`feat: build ARVELIS AI conversational chat experience`) уже слит в `main`; после фактического iPhone запуска были выявлены существенные mobile Chat UX/runtime проблемы.
+- Для `feat/chat-refactor-v2` / PR №10 выполнены четыре фактических iPhone video-smoke прохода без Replit Agent. Подтверждены отправка, drafts, History/thread transitions, action/rename sheets, portrait message-scroll containment и rotation без падения приложения.
+- Safari edge-case из последнего видео привёл к переходу на bounded `visualViewport` Chat shell и единому mobile contract для portrait/touch-landscape.
+- Финальный pre-merge аудит всего frontend-preview зафиксирован в `docs/14_PRE_MERGE_AUDIT.md`.
+- Во время финального аудита удалён оставшийся legacy viewport-listener, который принудительно вызывал `scrollIntoView()` и мог конфликтовать с новой Safari layout-моделью; `IntersectionObserver` привязан к внутреннему message stream.
+- Также исправлен reset preview-данных: старое состояние удаляется, чистое состояние сохраняется отдельно, а UI получает фактический результат persistence.
+- Незакрытых PR review-thread/review замечаний на PR №10 нет.
+- GitHub Actions остаётся инфраструктурно неисправным: job завершается до первого step (`steps=null`), поэтому project TypeScript 6.0.3 `typecheck/build` нельзя считать выполненным.
+- В репозитории пока отсутствует dependency lockfile. Это зафиксированный инфраструктурный долг; lockfile нельзя подменять вручную без реального npm resolution.
+- Пользователь отдельно разрешил merge PR №10 после полного аудита и исправления критических ошибок. Это разрешение относится к private frontend-preview и **не является production release approval**.
+- После merge дальнейшая работа без подключения AI начинается с нового clean branch и идёт от авторизации/onboarding к Главной, Профилю и остальным product screens.
 
 ## Не утверждено для production
 
