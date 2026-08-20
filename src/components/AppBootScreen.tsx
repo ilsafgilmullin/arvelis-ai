@@ -12,14 +12,16 @@ export function AppBootScreen({
   profileName,
   error,
   onRetry,
+  statusLabel = 'Открываем ARVELIS AI',
 }: {
-  progress: AppLoadProgress;
+  progress?: AppLoadProgress;
   profileName?: string;
   error?: boolean;
   onRetry?: () => void;
+  statusLabel?: string;
 }) {
   const name = greetingName(profileName);
-  const percent = Math.round((progress.completed / Math.max(progress.total, 1)) * 100);
+  const percent = progress ? Math.round((progress.completed / Math.max(progress.total, 1)) * 100) : null;
 
   return (
     <main className="app-boot" aria-live="polite" aria-busy={!error}>
@@ -41,10 +43,15 @@ export function AppBootScreen({
           <button className="button button--primary app-boot__retry" type="button" onClick={onRetry}>
             Повторить
           </button>
-        ) : (
+        ) : progress && percent !== null ? (
           <div className="app-boot__progress" role="status" aria-label={`Подготовка ARVELIS AI: ${percent}%`}>
             <div className="app-boot__track" aria-hidden="true"><span style={{ width: `${percent}%` }} /></div>
             <div className="app-boot__status"><span>{progress.label}</span><strong>{percent}%</strong></div>
+          </div>
+        ) : (
+          <div className="app-boot__progress app-boot__progress--indeterminate" role="status">
+            <div className="app-boot__track" aria-hidden="true"><span /></div>
+            <div className="app-boot__status"><span>{statusLabel}</span></div>
           </div>
         )}
       </section>
