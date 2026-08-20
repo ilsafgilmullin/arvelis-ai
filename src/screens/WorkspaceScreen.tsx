@@ -32,7 +32,7 @@ function greetingFor(profileName: string): string {
   const greeting = hour < 6 ? 'Доброй ночи' : hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
   const normalized = profileName.trim();
   if (!normalized || normalized === 'Пользователь ARVELIS') return `${greeting}. Можно начинать.`;
-  const firstName = normalized.split(/\s+/)[0];
+  const firstName = normalized.split(/\s+/)[0] ?? normalized;
   return `${greeting}, ${firstName}. Можно начинать.`;
 }
 
@@ -99,15 +99,15 @@ export function WorkspaceScreen({
               disabled={threadLimitReached}
             />
             <div className="composer__footer">
-              <span>{draft.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')} · LOCAL PREVIEW</span>
-              <button className="send-button" type="button" disabled={!draft.trim() || threadLimitReached} onClick={submit} aria-label="Создать локальный preview-диалог"><SendIcon /></button>
+              <span>{draft.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')}</span>
+              <button className="send-button" type="button" disabled={!draft.trim() || threadLimitReached} onClick={submit} aria-label="Создать тестовый диалог"><SendIcon /></button>
             </div>
           </div>
           {draftSaveFailed ? (
             <p className="workspace-draft-note" role="status">Черновик не удалось сохранить на устройстве.</p>
           ) : null}
           {threadLimitReached ? (
-            <p className="workspace-limit-note" role="status">Локальный preview достиг лимита диалогов. Удалите ненужный диалог в «Истории», чтобы создать новый.</p>
+            <p className="workspace-limit-note" role="status">Локальная тестовая версия достигла лимита диалогов. Удалите ненужный диалог в «Истории», чтобы создать новый.</p>
           ) : null}
         </div>
       </section>
