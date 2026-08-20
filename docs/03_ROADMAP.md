@@ -8,45 +8,58 @@
 - [x] Логотип-концепция.
 - [x] Репозиторий и рабочая ветка.
 - [ ] Одна главная проблема первого AI MVP.
-- [ ] Финальные границы MVP.
-- [ ] Критерии готовности первого релиза.
+- [ ] Финальные границы AI MVP.
+- [ ] Критерии готовности первого AI-релиза.
 
 ## Этап 2 — Brand Assets
 
-- [ ] `logo-full.svg`.
-- [ ] `logo-full-tagline.svg`.
-- [ ] `logo-mark.svg`.
-- [ ] `logo-mark-small.svg`.
-- [ ] `logo-full-light.svg`.
-- [ ] `app-icon-512.png`.
-- [ ] `favicon.svg`.
-- [ ] `favicon-32.png`.
-- [ ] `social-preview-1200x630.png`.
-- [ ] design tokens.
+- [ ] финальный `logo-full.svg`;
+- [ ] финальный `logo-full-tagline.svg`;
+- [x] чистый `logo-mark.svg` для preview;
+- [ ] `logo-mark-small.svg`;
+- [ ] `logo-full-light.svg`;
+- [ ] `app-icon-512.png`;
+- [ ] отдельный `favicon.svg`;
+- [ ] `favicon-32.png`;
+- [ ] `social-preview-1200x630.png`;
+- [x] базовые UI design tokens в CSS;
+- [ ] отдельный бренд-гайд и master-assets.
 
-## Этап 3 — UX/UI Prototype
+## Этап 3 — Runnable UX/UI Preview v0.2
 
-- [ ] карта экранов;
-- [ ] mobile-first layout;
-- [ ] desktop layout;
-- [ ] welcome/auth shell;
-- [ ] workspace;
-- [ ] chat shell;
-- [ ] history;
-- [ ] profile/settings;
-- [ ] loading/empty/error/offline/limit states;
-- [ ] accessibility and mobile checks.
+- [x] mobile-first layout;
+- [x] desktop layout;
+- [x] welcome screen;
+- [x] demo-auth screen;
+- [x] workspace;
+- [x] интерактивный локальный chat flow;
+- [x] поиск/удаление локальной истории;
+- [x] profile/settings;
+- [x] loading/empty/error/offline/limit states;
+- [x] browser online/offline detection;
+- [x] safe-area support;
+- [x] reduced-motion support;
+- [x] keyboard-aware mobile chat layout;
+- [x] Replit Run configuration;
+- [ ] фактический smoke-test на iPhone через Replit Preview;
+- [ ] фактический smoke-test на Android;
+- [ ] фактический desktop browser smoke-test;
+- [ ] визуальный QA после реального запуска.
 
-Любые mock/demo данные должны быть явно маркированы.
+Все demo/mock-данные явно маркируются. Никакой mock не выдаётся за AI/backend.
 
 ## Этап 4 — Technical Foundation
 
-- [ ] утвердить стек и версии;
-- [ ] авторизация;
-- [ ] модель данных;
-- [ ] серверный доступ;
-- [ ] логирование и обработка ошибок;
-- [ ] CI и preview.
+- [x] технический стек preview зафиксирован;
+- [x] frontend разбит на компоненты, экраны, data/lib/hooks/types;
+- [x] локальное demo-хранилище отделено от UI;
+- [ ] подтверждённый CI build — GitHub hosted runner сейчас завершается до выполнения шагов;
+- [ ] сгенерировать и закоммитить проверенный `package-lock.json`;
+- [ ] утвердить production auth;
+- [ ] утвердить модель данных;
+- [ ] серверный API/gateway;
+- [ ] логирование и обработка серверных ошибок;
+- [ ] preview deployment policy.
 
 ## Этап 5 — AI MVP
 
@@ -54,7 +67,7 @@
 - [ ] один основной AI-сценарий;
 - [ ] таймауты, отмена, retry;
 - [ ] rate/cost limits;
-- [ ] история;
+- [ ] серверная история;
 - [ ] защита системных инструкций и данных.
 
 ## Этап 6 — Closed Beta
