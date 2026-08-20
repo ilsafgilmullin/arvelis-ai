@@ -106,6 +106,54 @@
   font-weight: 700;
 }
 
+.app-boot__tasks {
+  width: min(420px, 100%);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, .045);
+}
+
+.app-boot__task {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 3px 2px;
+  color: var(--muted-2);
+  font-size: 8px;
+  letter-spacing: .055em;
+  transition: color .18s ease, opacity .18s ease;
+}
+
+.app-boot__task-dot {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 50%;
+  color: transparent;
+  font-size: 9px;
+  line-height: 1;
+  transition: color .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.app-boot__task--done {
+  color: #b7b1a5;
+}
+
+.app-boot__task--done .app-boot__task-dot {
+  border-color: rgba(240, 210, 125, .5);
+  background: rgba(214, 170, 70, .09);
+  color: var(--gold-light);
+}
+
 .app-boot__retry {
   margin-top: 30px;
   min-width: 180px;
@@ -117,7 +165,45 @@
 
 .content-page,
 .chat-page {
-  animation: arvelisScreenIn .18s ease-out both;
+  /* `backwards` keeps the entrance effect but releases transform after the animation.
+     Leaving translateY(0) as a filled transform creates a containing block that can
+     break fixed dialogs/keyboard UI in Safari. */
+  animation: arvelisScreenIn .18s ease-out backwards;
+}
+
+.module-loading {
+  min-height: min(520px, 70dvh);
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: max(38px, env(safe-area-inset-top)) clamp(24px, 4vw, 46px) 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--muted);
+}
+
+.module-loading__pulse {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 16px rgba(214, 170, 70, .3);
+  animation: arvelisModulePulse 1s ease-in-out infinite;
+}
+
+.module-loading strong {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.module-loading p {
+  margin: 5px 0 0;
+  color: var(--muted-2);
+  font-size: 10px;
 }
 
 .workspace-welcome {
@@ -161,6 +247,11 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes arvelisModulePulse {
+  0%, 100% { opacity: .35; transform: scale(.72); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
 @media (max-width: 520px) {
   .app-boot__brand {
     padding: 24px;
@@ -191,6 +282,32 @@
   .app-boot__progress {
     margin-top: 28px;
   }
+
+  .app-boot__tasks {
+    gap: 5px;
+    margin-top: 10px;
+    padding-top: 9px;
+  }
+
+  .app-boot__task {
+    min-height: 24px;
+    padding: 2px 1px;
+    gap: 4px;
+    font-size: 7px;
+  }
+
+  .app-boot__task-dot {
+    width: 13px;
+    height: 13px;
+    font-size: 8px;
+  }
+
+  .module-loading {
+    min-height: 52dvh;
+    justify-content: flex-start;
+    padding-left: 22px;
+    padding-right: 22px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -199,11 +316,14 @@
   .app-boot__progress--indeterminate .app-boot__track span,
   .app-shell,
   .content-page,
-  .chat-page {
+  .chat-page,
+  .module-loading__pulse {
     animation: none;
   }
 
-  .app-boot__track span {
+  .app-boot__track span,
+  .app-boot__task,
+  .app-boot__task-dot {
     transition: none;
   }
 

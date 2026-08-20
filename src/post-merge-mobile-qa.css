@@ -2,25 +2,20 @@
 
 @media (max-width: 780px) {
   /*
-   * A sticky composer can remain at its document position when iOS Safari opens
-   * the software keyboard. While the textarea is focused, promote the composer
-   * to a fixed visual-viewport control so it stays close to the keyboard/browser
-   * chrome instead of leaving a large dead zone below it.
+   * Keep one positioning model for the chat composer. iOS/WebView keyboard
+   * geometry is handled from ChatScreen via visualViewport + scrollIntoView;
+   * this layer only improves focus presentation and frees vertical space.
    */
   .chat-composer-wrap:focus-within {
-    position: fixed;
-    z-index: 90;
-    left: 20px;
-    right: 20px;
-    bottom: max(8px, env(safe-area-inset-bottom));
-    width: auto;
-    margin: 0;
-    padding: 10px 0 0;
-    background: linear-gradient(180deg, transparent, var(--bg) 22%);
+    z-index: 45;
+    scroll-margin-bottom: 12px;
+    padding-top: 8px;
+    background: linear-gradient(180deg, transparent, var(--bg) 18%);
   }
 
   .chat-composer-wrap:focus-within .chat-composer {
-    box-shadow: 0 18px 52px rgba(0, 0, 0, .42);
+    border-color: rgba(214, 170, 70, .24);
+    box-shadow: 0 14px 42px rgba(0, 0, 0, .34);
   }
 
   .chat-composer-wrap:focus-within > p {
@@ -44,12 +39,5 @@
 
   .setting-action--danger:hover {
     color: inherit;
-  }
-}
-
-@media (max-width: 360px) {
-  .chat-composer-wrap:focus-within {
-    left: 16px;
-    right: 16px;
   }
 }

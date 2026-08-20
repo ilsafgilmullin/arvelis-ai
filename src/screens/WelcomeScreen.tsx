@@ -3,7 +3,7 @@ import { BrandLockup } from '../components/Brand';
 export function WelcomeScreen({ onDemo, onAuth }: { onDemo: () => void; onAuth: () => void }) {
   return (
     <main className="entry-shell">
-      <div className="entry-status"><span>PRODUCT PREVIEW</span><i />AI и backend пока не подключены</div>
+      <div className="entry-status"><span>PRODUCT PREVIEW</span><i />Модель пока не подключена</div>
       <section className="welcome-layout">
         <div className="welcome-brand"><BrandLockup /></div>
         <div className="welcome-copy">
@@ -14,7 +14,7 @@ export function WelcomeScreen({ onDemo, onAuth }: { onDemo: () => void; onAuth: 
             <button className="button button--primary" type="button" onClick={onDemo}>Открыть ARVELIS AI</button>
             <button className="button button--secondary" type="button" onClick={onAuth}>Продолжить с именем</button>
           </div>
-          <p className="entry-note">Сейчас это frontend-preview: реальный AI-запрос не выполняется, а локальные данные остаются только в этом браузере.</p>
+          <p className="entry-note">Сейчас мы проверяем интерфейс: AI-ответы ещё не включены, а локальные данные остаются только в этом браузере.</p>
         </div>
       </section>
       <section className="principles-strip" aria-label="Принципы ARVELIS AI">

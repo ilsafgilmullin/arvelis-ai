@@ -1,18 +1,21 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { AppBootScreen } from './components/AppBootScreen';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import {
-  loadAppLayoutModule,
-  loadChatModule,
   loadHistoryModule,
   loadProfileModule,
   loadStatesModule,
-  loadWorkspaceModule,
   preloadSecondaryAppModules,
 } from './lib/appModules';
-import { prepareApp, type AppLoadProgress } from './lib/appPreload';
+import {
+  APP_LOAD_TASKS,
+  prepareApp,
+  type AppLoadProgress,
+  type PreparedCoreModules,
+} from './lib/appPreload';
 import {
   canUseDemoStorage,
+  loadDemoWorkspace,
   resetDemoWorkspace,
   saveDemoWorkspace,
 } from './lib/demoStorage';
@@ -20,17 +23,17 @@ import { AuthScreen } from './screens/AuthScreen';
 import { WelcomeScreen } from './screens/WelcomeScreen';
 import type { AppScreen, DemoMessage, DemoThread, DemoWorkspaceState, EntryScreen } from './types';
 
-const AppLayout = lazy(() => loadAppLayoutModule().then((module) => ({ default: module.AppLayout })));
-const WorkspaceScreen = lazy(() => loadWorkspaceModule().then((module) => ({ default: module.WorkspaceScreen })));
-const ChatScreen = lazy(() => loadChatModule().then((module) => ({ default: module.ChatScreen })));
 const HistoryScreen = lazy(() => loadHistoryModule().then((module) => ({ default: module.HistoryScreen })));
 const ProfileScreen = lazy(() => loadProfileModule().then((module) => ({ default: module.ProfileScreen })));
 const StatesScreen = lazy(() => loadStatesModule().then((module) => ({ default: module.StatesScreen })));
 
+const DEFAULT_PROFILE_NAME = 'Пользователь ARVELIS';
+
 const INITIAL_LOAD_PROGRESS: AppLoadProgress = {
   completed: 0,
-  total: 3,
+  total: APP_LOAD_TASKS.length,
   label: 'Подготавливаем ARVELIS AI',
+  completedTasks: [],
 };
 
 const makeId = (prefix: string): string => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -60,7 +63,7 @@ function createSystemMessage(): DemoMessage {
     id: makeId('sys'),
     role: 'system',
     createdAt: Date.now() + 1,
-    content: 'Запрос добавлен в локальный preview-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
+    content: 'Сохранено в локальном preview. AI пока не подключён.',
   };
 }
 
@@ -68,10 +71,12 @@ export default function App() {
   const [entry, setEntry] = useState<EntryScreen>('welcome');
   const [screen, setScreen] = useState<AppScreen>('workspace');
   const [workspace, setWorkspace] = useState<DemoWorkspaceState | null>(null);
+  const [core, setCore] = useState<PreparedCoreModules | null>(null);
   const [persistenceAvailable, setPersistenceAvailable] = useState(true);
   const [loadProgress, setLoadProgress] = useState<AppLoadProgress>(INITIAL_LOAD_PROGRESS);
   const [loadError, setLoadError] = useState(false);
   const [pendingProfileName, setPendingProfileName] = useState<string | undefined>();
+  const launchSequenceRef = useRef(0);
   const online = useOnlineStatus();
 
   useEffect(() => {
@@ -89,28 +94,55 @@ export default function App() {
   );
 
   const launchApp = async (profileName?: string) => {
+    const launchSequence = ++launchSequenceRef.current;
     const normalizedName = profileName?.trim() || undefined;
     setPendingProfileName(normalizedName);
     setLoadProgress(INITIAL_LOAD_PROGRESS);
     setLoadError(false);
+    setCore(null);
     setEntry('boot');
 
     await waitForBootPaint();
+    if (launchSequence !== launchSequenceRef.current) return;
 
     try {
-      const prepared = await prepareApp(setLoadProgress);
+      const prepared = await prepareApp((progress) => {
+        if (launchSequence === launchSequenceRef.current) {
+          setLoadProgress(progress);
+        }
+      });
+      if (launchSequence !== launchSequenceRef.current) return;
+
       const nextWorkspace = normalizedName
         ? { ...prepared.workspace, profileName: normalizedName }
         : prepared.workspace;
 
+      if (!normalizedName && nextWorkspace.profileName.trim() && nextWorkspace.profileName !== DEFAULT_PROFILE_NAME) {
+        setPendingProfileName(nextWorkspace.profileName);
+      }
+
+      // Let the browser paint the truthful 100% / ready state once before switching
+      // to the already prepared core UI. This is a frame boundary, not a timer delay.
+      await waitForBootPaint();
+      if (launchSequence !== launchSequenceRef.current) return;
+
+      setCore(prepared.core);
       setWorkspace(nextWorkspace);
       setPersistenceAvailable(prepared.persistenceAvailable);
       setScreen('workspace');
       setEntry('app');
       preloadSecondaryAppModules();
     } catch {
-      setLoadError(true);
+      if (launchSequence === launchSequenceRef.current) {
+        setLoadError(true);
+      }
     }
+  };
+
+  const openAuth = () => {
+    const storedProfileName = loadDemoWorkspace().profileName.trim();
+    setPendingProfileName(storedProfileName && storedProfileName !== DEFAULT_PROFILE_NAME ? storedProfileName : undefined);
+    setEntry('auth');
   };
 
   const openThread = (threadId: string) => {
@@ -149,7 +181,6 @@ export default function App() {
     }
 
     const userMessage = createUserMessage(content);
-    const systemMessage = createSystemMessage();
     const timestamp = Date.now();
 
     setWorkspace((current) => current ? {
@@ -157,7 +188,7 @@ export default function App() {
       threads: current.threads.map((thread) => thread.id === activeThread.id ? {
         ...thread,
         updatedAt: timestamp,
-        messages: [...thread.messages, userMessage, systemMessage],
+        messages: [...thread.messages, userMessage],
       } : thread).sort((a, b) => b.updatedAt - a.updatedAt),
     } : current);
   };
@@ -182,13 +213,13 @@ export default function App() {
   };
 
   if (entry === 'welcome') {
-    return <WelcomeScreen onDemo={() => { void launchApp(); }} onAuth={() => setEntry('auth')} />;
+    return <WelcomeScreen onDemo={() => { void launchApp(); }} onAuth={openAuth} />;
   }
 
   if (entry === 'auth') {
     return (
       <AuthScreen
-        initialName={workspace?.profileName ?? 'Пользователь ARVELIS'}
+        initialName={pendingProfileName ?? workspace?.profileName ?? DEFAULT_PROFILE_NAME}
         onBack={() => setEntry('welcome')}
         onContinue={(name) => { void launchApp(name); }}
       />
@@ -206,32 +237,46 @@ export default function App() {
     );
   }
 
-  if (!workspace) {
-    return <AppBootScreen error onRetry={() => { void launchApp(); }} />;
+  if (!workspace || !core) {
+    return <AppBootScreen error onRetry={() => { void launchApp(pendingProfileName); }} />;
   }
 
-  const appFallback = (
-    <AppBootScreen
-      profileName={workspace.profileName}
-      statusLabel="Открываем раздел"
-    />
+  const { AppLayout, WorkspaceScreen, ChatScreen } = core;
+  const secondaryFallback = (
+    <section className="module-loading" role="status" aria-live="polite">
+      <span className="module-loading__pulse" aria-hidden="true" />
+      <div>
+        <strong>Открываем раздел</strong>
+        <p>Подгружаем интерфейс в фоне.</p>
+      </div>
+    </section>
   );
 
   return (
-    <Suspense fallback={appFallback}>
-      <AppLayout
-        screen={screen}
-        onNavigate={setScreen}
-        onNewChat={newChat}
-        online={online}
-        persistenceAvailable={persistenceAvailable}
-      >
-        {screen === 'workspace' ? <WorkspaceScreen profileName={workspace.profileName} threads={workspace.threads} onSubmit={createThreadFromPrompt} onOpenThread={openThread} /> : null}
-        {screen === 'chat' ? <ChatScreen thread={activeThread} onNewChat={newChat} onSend={sendMessage} /> : null}
-        {screen === 'history' ? <HistoryScreen threads={workspace.threads} onOpen={openThread} onDelete={deleteThread} /> : null}
-        {screen === 'profile' ? <ProfileScreen profileName={workspace.profileName} onSaveName={saveProfileName} onOpenStates={() => setScreen('states')} onReset={resetPreview} /> : null}
-        {screen === 'states' ? <StatesScreen /> : null}
-      </AppLayout>
-    </Suspense>
+    <AppLayout
+      screen={screen}
+      onNavigate={setScreen}
+      onNewChat={newChat}
+      online={online}
+      persistenceAvailable={persistenceAvailable}
+    >
+      {screen === 'workspace' ? <WorkspaceScreen profileName={workspace.profileName} threads={workspace.threads} onSubmit={createThreadFromPrompt} onOpenThread={openThread} /> : null}
+      {screen === 'chat' ? <ChatScreen thread={activeThread} onNewChat={newChat} onSend={sendMessage} /> : null}
+      {screen === 'history' ? (
+        <Suspense fallback={secondaryFallback}>
+          <HistoryScreen threads={workspace.threads} onOpen={openThread} onDelete={deleteThread} />
+        </Suspense>
+      ) : null}
+      {screen === 'profile' ? (
+        <Suspense fallback={secondaryFallback}>
+          <ProfileScreen profileName={workspace.profileName} onSaveName={saveProfileName} onOpenStates={() => setScreen('states')} onReset={resetPreview} />
+        </Suspense>
+      ) : null}
+      {screen === 'states' ? (
+        <Suspense fallback={secondaryFallback}>
+          <StatesScreen />
+        </Suspense>
+      ) : null}
+    </AppLayout>
   );
 }

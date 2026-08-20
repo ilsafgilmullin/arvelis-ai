@@ -26,9 +26,9 @@ function greetingFor(profileName: string): string {
   const hour = new Date().getHours();
   const greeting = hour < 6 ? 'Доброй ночи' : hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
   const normalized = profileName.trim();
-  if (!normalized || normalized === 'Пользователь ARVELIS') return `${greeting}. Всё готово.`;
+  if (!normalized || normalized === 'Пользователь ARVELIS') return `${greeting}. Можно начинать.`;
   const firstName = normalized.split(/\s+/)[0];
-  return `${greeting}, ${firstName}. Всё готово.`;
+  return `${greeting}, ${firstName}. Можно начинать.`;
 }
 
 export function WorkspaceScreen({
@@ -59,7 +59,7 @@ export function WorkspaceScreen({
         <div className="workspace-hero__copy">
           <p className="section-kicker workspace-welcome">ВАШ АССИСТЕНТ</p>
           <h2>С чего начнём?</h2>
-          <p>Опишите задачу своими словами. Можно начать с цели, вопроса или просто контекста — ARVELIS AI должен помогать двигаться от мысли к понятному результату.</p>
+          <p>Опишите задачу своими словами. Можно начать с цели, вопроса или просто контекста — ARVELIS AI создан, чтобы помогать двигаться от мысли к понятному результату.</p>
         </div>
         <div className="composer composer--hero">
           <textarea
