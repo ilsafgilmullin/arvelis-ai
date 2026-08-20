@@ -54,7 +54,7 @@ export function AppLayout({
         </div>
         <div className="sidebar__status">
           <span className={online ? 'status-dot status-dot--online' : 'status-dot status-dot--offline'} />
-          <div><strong>{online ? 'Сеть доступна' : 'Нет соединения'}</strong><span>Frontend preview · локальный режим</span></div>
+          <div><strong>{online ? 'Сеть доступна' : 'Нет соединения'}</strong><span>Тестовая версия · локальный режим</span></div>
         </div>
       </aside>
 
