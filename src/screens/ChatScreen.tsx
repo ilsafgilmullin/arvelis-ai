@@ -458,7 +458,7 @@ export function ChatScreen({
 
   return (
     <div className="chat-page chat-experience">
-      <Topbar title={title} subtitle="Preview · AI пока не подключён" actions={headerActions} />
+      <Topbar title={title} subtitle="AI-ответы пока недоступны в этой версии" actions={headerActions} />
 
       {searchOpen && thread ? (
         <section className="chat-search" role="search" aria-label="Поиск по текущему диалогу">
@@ -590,7 +590,7 @@ export function ChatScreen({
             <BrandMark size="default" />
             <p className="section-kicker">НОВЫЙ ДИАЛОГ</p>
             <h2>{threadLimitReached ? 'Освободите место для нового диалога' : 'Что хотите решить?'}</h2>
-            <p>{threadLimitReached ? 'Локальный preview достиг лимита диалогов. Удалите ненужный диалог в «Истории», затем вернитесь сюда.' : 'Начните своими словами или выберите заготовку. Сейчас это локальный preview: сообщение сохранится на устройстве, но запрос к AI не отправляется.'}</p>
+            <p>{threadLimitReached ? 'Локальная тестовая версия достигла лимита диалогов. Удалите ненужный диалог в «Истории», затем вернитесь сюда.' : 'Начните своими словами или выберите заготовку. Сообщение сохранится на устройстве; AI-ответы в этой тестовой версии пока не формируются.'}</p>
             {!threadLimitReached ? (
               <div className="chat-quick-starts" aria-label="Быстрые заготовки">
                 {QUICK_STARTS.map((item) => (
@@ -611,7 +611,7 @@ export function ChatScreen({
         ) : null}
         {messageLimitReached && thread ? (
           <div className="chat-limit-notice" role="status">
-            <strong>Локальный лимит диалога достигнут.</strong>
+            <strong>Локальный лимит тестовой версии достигнут.</strong>
             <span>Начните новый диалог, чтобы продолжить.</span>
             <button type="button" onClick={onNewChat}>Новый диалог</button>
           </div>
@@ -631,12 +631,12 @@ export function ChatScreen({
             disabled={sendLimitReached}
           />
           {message.length >= CHAT_COMPOSER_COUNTER_THRESHOLD ? <span className="chat-char-count">{message.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')}</span> : null}
-          <button className="send-button" type="button" disabled={!message.trim() || sendLimitReached} onClick={submit} aria-label="Добавить сообщение в локальный preview-диалог"><SendIcon /></button>
+          <button className="send-button" type="button" disabled={!message.trim() || sendLimitReached} onClick={submit} aria-label="Добавить сообщение в тестовый диалог"><SendIcon /></button>
         </div>
         {draftSaveFailed ? (
           <p className="chat-draft-warning" role="status">Черновик не удалось сохранить на устройстве.</p>
         ) : (
-          <p className="chat-composer-helper">PREVIEW · Enter — отправить на компьютере · Shift+Enter — новая строка</p>
+          <p className="chat-composer-helper">Enter — отправить · Shift+Enter — новая строка</p>
         )}
       </div>
 
