@@ -49,6 +49,7 @@ export function WorkspaceScreen({
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder="Например: сравнить два решения, разобрать документ или построить план…"
+            aria-label="Описание задачи"
             rows={5}
             maxLength={6000}
           />
