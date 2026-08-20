@@ -72,8 +72,8 @@ function createSystemMessage(): DemoMessage {
 }
 
 export default function App() {
-  const [entry, setEntry] = useState<EntryScreen>('welcome');
-  const [screen, setScreen] = useState<AppScreen>('workspace');
+  const [entry, setEntry] = useState<EntryScreen>('splash');
+  const [screen, setScreen] = useState<AppScreen>('chat');
   const [workspace, setWorkspace] = useState<DemoWorkspaceState | null>(null);
   const [core, setCore] = useState<PreparedCoreModules | null>(null);
   const [persistenceAvailable, setPersistenceAvailable] = useState(true);
@@ -120,9 +120,10 @@ export default function App() {
       });
       if (launchSequence !== launchSequenceRef.current) return;
 
-      const nextWorkspace = normalizedName
+      const namedWorkspace = normalizedName
         ? { ...prepared.workspace, profileName: normalizedName }
         : prepared.workspace;
+      const nextWorkspace = { ...namedWorkspace, activeThreadId: null };
 
       if (!normalizedName && nextWorkspace.profileName.trim() && nextWorkspace.profileName !== DEFAULT_PROFILE_NAME) {
         setPendingProfileName(nextWorkspace.profileName);
@@ -134,7 +135,7 @@ export default function App() {
       setCore(prepared.core);
       setWorkspace(nextWorkspace);
       setPersistenceAvailable(prepared.persistenceAvailable);
-      setScreen('workspace');
+      setScreen('chat');
       setEntry('app');
       preloadSecondaryAppModules();
     } catch {
@@ -273,15 +274,14 @@ export default function App() {
     setScreen('workspace');
   };
 
-  if (entry === 'welcome') {
-    return <WelcomeScreen onDemo={() => { void launchApp(); }} onAuth={openAuth} />;
+  if (entry === 'splash') {
+    return <WelcomeScreen onComplete={openAuth} />;
   }
 
   if (entry === 'auth') {
     return (
       <AuthScreen
         initialName={pendingProfileName ?? workspace?.profileName ?? DEFAULT_PROFILE_NAME}
-        onBack={() => setEntry('welcome')}
         onContinue={(name) => { void launchApp(name); }}
       />
     );
@@ -326,7 +326,7 @@ export default function App() {
           profileName={workspace.profileName}
           threads={workspace.threads}
           threadLimitReached={threadLimitReached}
-          onSubmit={createThreadFromPrompt}
+          onNewChat={newChat}
           onOpenThread={openThread}
         />
       ) : null}
