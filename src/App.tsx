@@ -42,6 +42,10 @@ export default function App() {
     saveDemoWorkspace(workspace);
   }, [workspace]);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [entry, screen]);
+
   const activeThread = useMemo(
     () => workspace.threads.find((thread) => thread.id === workspace.activeThreadId) ?? null,
     [workspace.activeThreadId, workspace.threads],
