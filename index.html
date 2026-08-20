@@ -15,8 +15,28 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>ARVELIS AI</title>
+    <style>
+      #arvelis-preboot{position:fixed;inset:0;z-index:2147483647;display:grid;grid-template-rows:1fr auto;place-items:center;min-width:320px;min-height:100vh;min-height:100dvh;padding:max(28px,env(safe-area-inset-top)) 24px max(24px,env(safe-area-inset-bottom));box-sizing:border-box;background:radial-gradient(circle at 50% 44%,rgba(214,170,70,.07),transparent 29%),#090a0c;color:#f4f2ec;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif}
+      #arvelis-preboot .preboot-lockup{align-self:center;display:grid;justify-items:center;transform:translateY(3vh)}
+      #arvelis-preboot img{display:block;width:116px;height:116px}
+      #arvelis-preboot .preboot-word{margin-top:7px;color:#f0d27d;font-size:24px;font-weight:560;letter-spacing:.31em;margin-right:-.31em}
+      #arvelis-preboot .preboot-ai{margin-top:8px;display:flex;align-items:center;gap:12px;color:#d6aa46;font-size:10px;font-weight:650;letter-spacing:.28em;margin-right:-.28em}
+      #arvelis-preboot .preboot-ai i{display:block;width:44px;height:1px;background:linear-gradient(90deg,transparent,rgba(214,170,70,.9))}
+      #arvelis-preboot .preboot-ai i:last-child{background:linear-gradient(90deg,rgba(214,170,70,.9),transparent)}
+      #arvelis-preboot .preboot-tagline{margin-top:10px;color:#85817b;font-size:7px;font-weight:600;letter-spacing:.19em}
+      #arvelis-preboot .preboot-foot{text-align:center;color:#62676f;font-size:8px;letter-spacing:.06em}
+    </style>
   </head>
   <body>
+    <div id="arvelis-preboot" aria-label="ARVELIS AI">
+      <div class="preboot-lockup">
+        <img src="/brand/logo-mark.svg" alt="" />
+        <div class="preboot-word">ARVELIS</div>
+        <div class="preboot-ai"><i></i>AI<i></i></div>
+        <div class="preboot-tagline">INTELLIGENCE. PRECISION. RESULTS.</div>
+      </div>
+      <div class="preboot-foot">PRODUCT PREVIEW</div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
