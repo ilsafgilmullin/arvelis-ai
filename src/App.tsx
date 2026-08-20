@@ -2,15 +2,16 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { AppBootScreen } from './components/AppBootScreen';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import {
-  loadAppLayoutModule,
-  loadChatModule,
   loadHistoryModule,
   loadProfileModule,
   loadStatesModule,
-  loadWorkspaceModule,
   preloadSecondaryAppModules,
 } from './lib/appModules';
-import { prepareApp, type AppLoadProgress } from './lib/appPreload';
+import {
+  prepareApp,
+  type AppLoadProgress,
+  type PreparedCoreModules,
+} from './lib/appPreload';
 import {
   canUseDemoStorage,
   resetDemoWorkspace,
@@ -20,9 +21,6 @@ import { AuthScreen } from './screens/AuthScreen';
 import { WelcomeScreen } from './screens/WelcomeScreen';
 import type { AppScreen, DemoMessage, DemoThread, DemoWorkspaceState, EntryScreen } from './types';
 
-const AppLayout = lazy(() => loadAppLayoutModule().then((module) => ({ default: module.AppLayout })));
-const WorkspaceScreen = lazy(() => loadWorkspaceModule().then((module) => ({ default: module.WorkspaceScreen })));
-const ChatScreen = lazy(() => loadChatModule().then((module) => ({ default: module.ChatScreen })));
 const HistoryScreen = lazy(() => loadHistoryModule().then((module) => ({ default: module.HistoryScreen })));
 const ProfileScreen = lazy(() => loadProfileModule().then((module) => ({ default: module.ProfileScreen })));
 const StatesScreen = lazy(() => loadStatesModule().then((module) => ({ default: module.StatesScreen })));
@@ -60,7 +58,7 @@ function createSystemMessage(): DemoMessage {
     id: makeId('sys'),
     role: 'system',
     createdAt: Date.now() + 1,
-    content: 'Запрос добавлен в локальный preview-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
+    content: 'Сохранено в локальном preview. AI пока не подключён.',
   };
 }
 
@@ -68,6 +66,7 @@ export default function App() {
   const [entry, setEntry] = useState<EntryScreen>('welcome');
   const [screen, setScreen] = useState<AppScreen>('workspace');
   const [workspace, setWorkspace] = useState<DemoWorkspaceState | null>(null);
+  const [core, setCore] = useState<PreparedCoreModules | null>(null);
   const [persistenceAvailable, setPersistenceAvailable] = useState(true);
   const [loadProgress, setLoadProgress] = useState<AppLoadProgress>(INITIAL_LOAD_PROGRESS);
   const [loadError, setLoadError] = useState(false);
@@ -93,6 +92,7 @@ export default function App() {
     setPendingProfileName(normalizedName);
     setLoadProgress(INITIAL_LOAD_PROGRESS);
     setLoadError(false);
+    setCore(null);
     setEntry('boot');
 
     await waitForBootPaint();
@@ -103,6 +103,7 @@ export default function App() {
         ? { ...prepared.workspace, profileName: normalizedName }
         : prepared.workspace;
 
+      setCore(prepared.core);
       setWorkspace(nextWorkspace);
       setPersistenceAvailable(prepared.persistenceAvailable);
       setScreen('workspace');
@@ -206,32 +207,46 @@ export default function App() {
     );
   }
 
-  if (!workspace) {
-    return <AppBootScreen error onRetry={() => { void launchApp(); }} />;
+  if (!workspace || !core) {
+    return <AppBootScreen error onRetry={() => { void launchApp(pendingProfileName); }} />;
   }
 
-  const appFallback = (
-    <AppBootScreen
-      profileName={workspace.profileName}
-      statusLabel="Открываем раздел"
-    />
+  const { AppLayout, WorkspaceScreen, ChatScreen } = core;
+  const secondaryFallback = (
+    <section className="module-loading" role="status" aria-live="polite">
+      <span className="module-loading__pulse" aria-hidden="true" />
+      <div>
+        <strong>Открываем раздел</strong>
+        <p>Подгружаем интерфейс в фоне.</p>
+      </div>
+    </section>
   );
 
   return (
-    <Suspense fallback={appFallback}>
-      <AppLayout
-        screen={screen}
-        onNavigate={setScreen}
-        onNewChat={newChat}
-        online={online}
-        persistenceAvailable={persistenceAvailable}
-      >
-        {screen === 'workspace' ? <WorkspaceScreen profileName={workspace.profileName} threads={workspace.threads} onSubmit={createThreadFromPrompt} onOpenThread={openThread} /> : null}
-        {screen === 'chat' ? <ChatScreen thread={activeThread} onNewChat={newChat} onSend={sendMessage} /> : null}
-        {screen === 'history' ? <HistoryScreen threads={workspace.threads} onOpen={openThread} onDelete={deleteThread} /> : null}
-        {screen === 'profile' ? <ProfileScreen profileName={workspace.profileName} onSaveName={saveProfileName} onOpenStates={() => setScreen('states')} onReset={resetPreview} /> : null}
-        {screen === 'states' ? <StatesScreen /> : null}
-      </AppLayout>
-    </Suspense>
+    <AppLayout
+      screen={screen}
+      onNavigate={setScreen}
+      onNewChat={newChat}
+      online={online}
+      persistenceAvailable={persistenceAvailable}
+    >
+      {screen === 'workspace' ? <WorkspaceScreen profileName={workspace.profileName} threads={workspace.threads} onSubmit={createThreadFromPrompt} onOpenThread={openThread} /> : null}
+      {screen === 'chat' ? <ChatScreen thread={activeThread} onNewChat={newChat} onSend={sendMessage} /> : null}
+      {screen === 'history' ? (
+        <Suspense fallback={secondaryFallback}>
+          <HistoryScreen threads={workspace.threads} onOpen={openThread} onDelete={deleteThread} />
+        </Suspense>
+      ) : null}
+      {screen === 'profile' ? (
+        <Suspense fallback={secondaryFallback}>
+          <ProfileScreen profileName={workspace.profileName} onSaveName={saveProfileName} onOpenStates={() => setScreen('states')} onReset={resetPreview} />
+        </Suspense>
+      ) : null}
+      {screen === 'states' ? (
+        <Suspense fallback={secondaryFallback}>
+          <StatesScreen />
+        </Suspense>
+      ) : null}
+    </AppLayout>
   );
 }
