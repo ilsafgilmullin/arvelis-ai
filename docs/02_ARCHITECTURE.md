@@ -35,7 +35,7 @@
 - `src/components/` — переиспользуемые элементы интерфейса, навигация и бренд-компоненты;
 - `src/screens/` — основные экраны preview;
 - `src/data/` — только явно обозначенные preview/mock-данные;
-- `src/lib/` — локальная инфраструктура preview, валидация browser storage и Smart Entry preload orchestration;
+- `src/lib/` — локальная инфраструктура preview, валидация browser storage, Chat draft storage и Smart Entry preload orchestration;
 - `src/hooks/` — изолированные browser hooks;
 - `src/types.ts` — типы frontend-домена.
 
@@ -57,6 +57,32 @@ History, Profile и System States остаются secondary chunks и прог�
 
 Никакая из этих оптимизаций не считается production caching/offline architecture. Service Worker/CDN/cache policy требуют отдельного решения перед релизом.
 
+## Chat interaction model
+
+Chat разделён на три слоя ответственности:
+
+1. `ChatScreen` — UI, keyboard/scroll behavior, local draft UX и пользовательские действия;
+2. `App.tsx` — текущая preview domain-модель thread/message mutations;
+3. `demoStorage.ts` / `chatDraftStorage.ts` — изолированная browser persistence.
+
+Основной workspace state содержит threads, messages, активный thread и display name. Черновики намеренно хранятся **отдельным compact localStorage store**, чтобы набор каждого символа не заставлял сериализовать всю историю диалогов.
+
+Текущий local Chat поддерживает:
+
+- создание нового thread;
+- отправку пользовательского сообщения в local preview;
+- переименование thread;
+- редактирование только пользовательского сообщения с `editedAt`;
+- копирование текста через Clipboard API + fallback;
+- отдельный draft для каждого thread и для ещё не созданного нового диалога;
+- smart scroll через `IntersectionObserver` и `visualViewport` hardening;
+- quick-start prompts, которые только заполняют composer;
+- локальное ограничение 6000 символов на composer/edit.
+
+Эти операции не являются AI-операциями. Они должны оставаться пригодными после подключения provider-agnostic AI gateway.
+
+Будущий AI integration layer должен добавлять streaming/pending/error/cancel semantics через отдельный domain/provider слой. `Regenerate`, `Stop generation`, attachments, voice, web-search и model selector не должны встраиваться в `ChatScreen` как локальные фальшивые действия.
+
 ## CSS layers
 
 Чтобы не переписывать работающую дизайн-систему целиком, стили разделены по ответственности:
@@ -70,7 +96,8 @@ History, Profile и System States остаются secondary chunks и прог�
 7. `post-merge-mobile-qa.css` — подтверждённые iPhone/WebView corrections;
 8. `smart-entry.css` — Smart Entry, task/progress UI и lightweight screen transitions;
 9. `smart-entry-responsive.css` — short-screen/landscape hardening загрузочного экрана;
-10. `chat-experience.css` — conversation flow, mobile composer и visual cleanup чата после реального iPhone QA.
+10. `chat-experience.css` — основная conversational visual system;
+11. `chat-features.css` — функциональные Chat overrides: helper/warning/composer refinements.
 
 Последующие слои не должны самовольно менять утверждённую геометрию бренда.
 
@@ -88,6 +115,9 @@ Preview запускается на `0.0.0.0:3000`.
 
 - создавать локальные диалоги;
 - добавлять сообщения;
+- переименовывать диалоги;
+- редактировать пользовательские сообщения локально;
+- сохранять отдельные chat drafts;
 - искать и удалять историю;
 - сохранять отображаемое имя;
 - восстанавливать стартовые preview-данные;
@@ -97,6 +127,8 @@ Preview запускается на `0.0.0.0:3000`.
 - нормализовать только известные legacy preview-copy без изменения пользовательского текста;
 - схлопывать повторные известные preview-status до одного уведомления на диалог;
 - не перезаписывать последнюю корректную локальную версию заведомо слишком большим/некорректным состоянием.
+
+Draft store ограничен по количеству записей и длине. Удаление thread очищает его draft, а полный preview reset очищает весь draft store.
 
 Эти функции не являются backend-функциями. Если localStorage недоступен, интерфейс продолжает работать в текущей сессии и явно предупреждает, что изменения могут исчезнуть после перезагрузки.
 
@@ -111,6 +143,9 @@ QA candidate включает:
 - safe-area/keyboard hardening;
 - защиту от horizontal overflow длинных данных;
 - short-screen/landscape hardening Smart Entry;
+- smart Chat auto-scroll без принудительного ухода вниз во время чтения старых сообщений;
+- Clipboard failure feedback;
+- draft persistence failure feedback;
 - отказ от постоянного filled `transform` после screen entrance animation, чтобы не создавать лишний containing block для fixed/mobile UI.
 
 Это UX/runtime hardening, а не production security audit.
