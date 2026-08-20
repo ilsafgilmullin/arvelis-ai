@@ -1,27 +1,35 @@
-import { initialDemoThreads } from '../data/demo';
+import { DEMO_MOCK_RESPONSE, initialDemoThreads } from '../data/demo';
 import type { DemoMessage, DemoThread, DemoWorkspaceState } from '../types';
 
 const STORAGE_KEY = 'arvelis.demo.workspace.v1';
 const STORAGE_PROBE_KEY = 'arvelis.demo.storage.probe';
 const VALID_ROLES = new Set<DemoMessage['role']>(['user', 'assistant', 'system']);
-const COMPACT_PREVIEW_STATUS = 'Сохранено в локальном preview. AI пока не подключён.';
+export const DEMO_PREVIEW_NOTICE = 'Сообщение сохранено на этом устройстве. AI-ответы в этой версии пока недоступны.';
 
 const LEGACY_PREVIEW_COPY = new Map<string, string>([
   [
     'Запрос сохранён локально для тестирования интерфейса. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
-    COMPACT_PREVIEW_STATUS,
+    DEMO_PREVIEW_NOTICE,
   ],
   [
     'Запрос добавлен в локальный demo-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
-    COMPACT_PREVIEW_STATUS,
+    DEMO_PREVIEW_NOTICE,
   ],
   [
     'Запрос добавлен в локальный preview-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
-    COMPACT_PREVIEW_STATUS,
+    DEMO_PREVIEW_NOTICE,
+  ],
+  [
+    'Сохранено в локальном preview. AI пока не подключён.',
+    DEMO_PREVIEW_NOTICE,
   ],
   [
     'Это демонстрационный пример структуры ответа. Реальный AI не подключён. В production здесь появится проверяемый разбор цели, ограничений, рисков и последовательности действий.',
+    DEMO_MOCK_RESPONSE,
+  ],
+  [
     'Это предзаписанный пример структуры ответа. Реальный AI не подключён. В рабочей версии здесь должен появиться проверяемый разбор цели, ограничений, рисков и последовательности действий.',
+    DEMO_MOCK_RESPONSE,
   ],
 ]);
 
@@ -87,7 +95,7 @@ function normalizeKnownLegacyCopy(thread: DemoThread): DemoThread {
 
     if (normalizedContent !== message.content) changed = true;
 
-    if (normalizedMessage.role === 'system' && normalizedContent === COMPACT_PREVIEW_STATUS) {
+    if (normalizedMessage.role === 'system' && normalizedContent === DEMO_PREVIEW_NOTICE) {
       if (previewStatusSeen) {
         changed = true;
         continue;
