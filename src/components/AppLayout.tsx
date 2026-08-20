@@ -121,26 +121,39 @@ export function AppLayout({
   useLayoutEffect(() => {
     if (screen !== 'chat') return;
 
-    let firstFrame = 0;
-    let secondFrame = 0;
+    const media = window.matchMedia('(max-width: 780px)');
+    const body = document.body;
+    const root = document.documentElement;
+    const previousBodyOverflow = body.style.overflow;
+    const previousRootOverflow = root.style.overflow;
+    const previousBodyOverscroll = body.style.overscrollBehavior;
+    const previousRootOverscroll = root.style.overscrollBehavior;
 
-    firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-        const maxScroll = Math.max(0, document.documentElement.scrollHeight - viewportHeight);
+    const syncMobileScrollLock = () => {
+      if (media.matches) {
+        body.style.overflow = 'hidden';
+        root.style.overflow = 'hidden';
+        body.style.overscrollBehavior = 'none';
+        root.style.overscrollBehavior = 'none';
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        return;
+      }
 
-        // SPA navigation keeps the previous document scroll position. For a short
-        // chat this can leave the first message underneath the sticky header after
-        // History -> Chat. Long threads retain ChatScreen's own latest-message scroll.
-        if (maxScroll <= 280) {
-          window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-        }
-      });
-    });
+      body.style.overflow = previousBodyOverflow;
+      root.style.overflow = previousRootOverflow;
+      body.style.overscrollBehavior = previousBodyOverscroll;
+      root.style.overscrollBehavior = previousRootOverscroll;
+    };
+
+    syncMobileScrollLock();
+    media.addEventListener('change', syncMobileScrollLock);
 
     return () => {
-      window.cancelAnimationFrame(firstFrame);
-      window.cancelAnimationFrame(secondFrame);
+      media.removeEventListener('change', syncMobileScrollLock);
+      body.style.overflow = previousBodyOverflow;
+      root.style.overflow = previousRootOverflow;
+      body.style.overscrollBehavior = previousBodyOverscroll;
+      root.style.overscrollBehavior = previousRootOverscroll;
     };
   }, [screen]);
 
