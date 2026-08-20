@@ -110,8 +110,10 @@
   width: min(420px, 100%);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 15px;
+  gap: 10px;
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, .045);
 }
 
 .app-boot__task {
@@ -120,14 +122,12 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 34px;
-  padding: 7px 8px;
-  border: 1px solid rgba(255, 255, 255, .06);
-  background: rgba(255, 255, 255, .015);
+  min-height: 26px;
+  padding: 3px 2px;
   color: var(--muted-2);
   font-size: 8px;
   letter-spacing: .055em;
-  transition: color .18s ease, border-color .18s ease, background .18s ease;
+  transition: color .18s ease, opacity .18s ease;
 }
 
 .app-boot__task-dot {
@@ -145,8 +145,6 @@
 }
 
 .app-boot__task--done {
-  border-color: rgba(214, 170, 70, .18);
-  background: rgba(214, 170, 70, .025);
   color: #b7b1a5;
 }
 
@@ -287,12 +285,13 @@
 
   .app-boot__tasks {
     gap: 5px;
-    margin-top: 12px;
+    margin-top: 10px;
+    padding-top: 9px;
   }
 
   .app-boot__task {
-    min-height: 32px;
-    padding: 6px 5px;
+    min-height: 24px;
+    padding: 2px 1px;
     gap: 4px;
     font-size: 7px;
   }
