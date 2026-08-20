@@ -1,10 +1,10 @@
 # ARVELIS AI — Chat Refactor v2 QA
 
-Статус: рабочий candidate. Документ фиксирует проверки только для chat-scope после рефактора `feat/chat-refactor-v2`.
+Статус: рабочий candidate. Документ фиксирует проверки только для chat-domain после рефактора `feat/chat-refactor-v2`.
 
 ## Цель
 
-Сделать чат самостоятельным профессиональным mobile-first интерфейсом без изменения AI/backend/auth, production data model и утверждённого бренда.
+Сделать чат и связанную локальную историю самостоятельным профессиональным mobile-first контуром без изменения AI/backend/auth, production data model и утверждённого бренда.
 
 ## Проверки iPhone / mobile
 
@@ -24,7 +24,7 @@
 14. Quick-start только заполняет composer и не отправляет текст автоматически.
 15. Кнопка `К последнему` появляется при уходе вверх по длинной переписке и возвращает к последнему сообщению.
 
-## Search
+## Search внутри диалога
 
 1. Открыть search из header.
 2. Search input не сталкивается с header и не выходит за viewport.
@@ -42,10 +42,11 @@
 4. Edit доступен только пользовательскому сообщению.
 5. Edit открывается отдельным sheet, а не раздвигает message stream.
 6. Keyboard при edit не перекрывает input/actions.
-7. Cancel не изменяет сообщение.
-8. Save обновляет сообщение и помечает его как `изменено`.
-9. Пустое сообщение сохранить нельзя.
-10. Максимальная длина сообщения соблюдается.
+7. При вводе в edit caret не должен принудительно прыгать в конец текста.
+8. Cancel не изменяет сообщение.
+9. Save обновляет сообщение и помечает его как `изменено`.
+10. Пустое сообщение сохранить нельзя.
+11. Максимальная длина сообщения соблюдается.
 
 ## Thread actions
 
@@ -54,10 +55,23 @@
 3. При достигнутом thread limit действие нового диалога недоступно.
 4. Rename открывается отдельным sheet.
 5. Rename input не выходит за viewport при keyboard.
-6. Save переименовывает только текущий thread.
-7. Cancel сохраняет исходное название.
-8. Delete использует confirm-dialog и не выполняется без подтверждения.
-9. После delete удалённый draft не восстанавливается.
+6. Enter в rename сохраняет непустое название.
+7. Save переименовывает только текущий thread.
+8. Cancel сохраняет исходное название.
+9. Delete использует confirm-dialog и не выполняется без подтверждения.
+10. После delete удалённый draft не восстанавливается.
+
+## История диалогов
+
+1. History показывает локальные threads без изменения порядка данных.
+2. В каждой строке видны title, краткий preview последнего не-system сообщения, количество сообщений и относительное время.
+3. Длинный title и preview обрезаются без horizontal overflow.
+4. Поиск ищет и по title, и по содержимому сообщений.
+5. Clear-кнопка полностью очищает search и восстанавливает список.
+6. Пустой результат показывает понятный empty state.
+7. Открытие строки переводит именно в выбранный thread.
+8. Delete требует confirm-dialog и удаляет только выбранный локальный thread.
+9. На ширинах 320–390 px search/list/delete controls не сталкиваются друг с другом.
 
 ## Desktop
 
@@ -65,16 +79,21 @@
 2. Enter отправляет сообщение.
 3. Shift+Enter создаёт новую строку.
 4. Hover/focus actions доступны и не вызывают layout shift.
-5. Sidebar и остальные экраны не меняют поведение из-за chat-only CSS.
+5. History остаётся читаемой на широком экране и не растягивает строки на всю ширину без ограничения.
+6. Sidebar и остальные экраны не меняют поведение из-за chat-only CSS.
 
 ## Accessibility
 
 1. Header/search/composer/action-sheet controls имеют видимый focus state.
 2. Touch-target основных действий не меньше примерно 40–44 px на mobile.
-3. Dialog/sheet имеют `role=dialog` и `aria-modal=true`.
-4. Copy feedback доступен через `aria-live`.
-5. Search result count доступен через `aria-live`.
-6. Reduced motion не требует анимаций для понимания состояния.
+3. Chat sheets имеют `role=dialog` и `aria-modal=true`.
+4. При открытии chat sheet фокус переводится внутрь; Tab/Shift+Tab не уходят за пределы sheet.
+5. Escape закрывает chat sheet, после закрытия фокус возвращается к предыдущему элементу, если он ещё существует.
+6. Пока chat sheet открыт, background body scroll блокируется.
+7. ConfirmDialog сохраняет собственный focus trap и destructive confirmation.
+8. Copy feedback доступен через `aria-live`.
+9. Search result count доступен через `aria-live`.
+10. Reduced motion не требует анимаций для понимания состояния.
 
 ## Regression guard
 
