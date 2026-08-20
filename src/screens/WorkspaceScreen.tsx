@@ -14,6 +14,14 @@ function relativeTime(timestamp: number): string {
   return `${days} дн назад`;
 }
 
+function dialogCount(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} диалог`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} диалога`;
+  return `${count} диалогов`;
+}
+
 export function WorkspaceScreen({
   profileName,
   threads,
@@ -36,26 +44,26 @@ export function WorkspaceScreen({
 
   return (
     <div className="content-page">
-      <Topbar title="Рабочее пространство" subtitle={`Добро пожаловать, ${profileName}.`} />
+      <Topbar title="Рабочее пространство" subtitle={`${profileName} · frontend preview`} />
 
       <section className="workspace-hero">
         <div className="workspace-hero__copy">
           <p className="section-kicker">ARVELIS WORKSPACE</p>
-          <h2>Какую задачу нужно решить?</h2>
-          <p>Опишите цель, контекст и ограничения. Запрос открывает локальный тестовый диалог без обращения к AI; при доступном хранилище браузера demo-состояние сохраняется на этом устройстве.</p>
+          <h2>Сформулируйте задачу.</h2>
+          <p>Укажите цель, контекст, ограничения и критерий результата. В preview запрос создаёт локальный тестовый диалог без обращения к AI.</p>
         </div>
         <div className="composer composer--hero">
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder="Например: сравнить два решения, разобрать документ или построить план…"
+            placeholder="Например: сравнить решения, разобрать документ или построить план действий…"
             aria-label="Описание задачи"
             rows={5}
             maxLength={6000}
           />
           <div className="composer__footer">
-            <span>{draft.length.toLocaleString('ru-RU')} / 6 000 · LOCAL DEMO</span>
-            <button className="send-button" type="button" disabled={!draft.trim()} onClick={submit} aria-label="Создать локальный demo-диалог"><SendIcon /></button>
+            <span>{draft.length.toLocaleString('ru-RU')} / 6 000 · LOCAL PREVIEW</span>
+            <button className="send-button" type="button" disabled={!draft.trim()} onClick={submit} aria-label="Создать локальный preview-диалог"><SendIcon /></button>
           </div>
         </div>
       </section>
@@ -74,7 +82,7 @@ export function WorkspaceScreen({
       </section>
 
       <section className="section-block">
-        <div className="section-heading section-heading--inline"><div><p className="section-kicker">ИСТОРИЯ</p><h2>Последние диалоги</h2></div><span>{threads.length} локально</span></div>
+        <div className="section-heading section-heading--inline"><div><p className="section-kicker">ИСТОРИЯ</p><h2>Последние диалоги</h2></div><span>{dialogCount(threads.length)}</span></div>
         {threads.length ? (
           <div className="history-list">
             {threads.slice(0, 4).map((thread) => (
@@ -84,7 +92,7 @@ export function WorkspaceScreen({
               </button>
             ))}
           </div>
-        ) : <div className="empty-inline">Локальная история пуста.</div>}
+        ) : <div className="empty-inline">История пока пуста. Создайте первый локальный диалог.</div>}
       </section>
     </div>
   );
