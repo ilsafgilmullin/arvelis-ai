@@ -20,6 +20,13 @@
   .chat-page.chat-experience-v2 {
     overscroll-behavior-y: contain;
   }
+
+  /* Search is an explicit mode on mobile. Keep the message composer out of that
+     mode even after the software keyboard is dismissed. */
+  .app-shell--chat:has(.chat-v2-search) .chat-v2-composer-wrap {
+    visibility: hidden;
+    pointer-events: none;
+  }
 }
 
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
