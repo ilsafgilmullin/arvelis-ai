@@ -10,7 +10,7 @@ export function Topbar({ title, subtitle, demo = true }: { title: string; subtit
           {subtitle ? <p>{subtitle}</p> : null}
         </div>
       </div>
-      {demo ? <span className="demo-chip" title="Реальный AI/backend не подключён">DEMO</span> : null}
+      {demo ? <span className="demo-chip" title="Frontend preview: реальный AI и backend пока не подключены">PREVIEW</span> : null}
     </header>
   );
 }

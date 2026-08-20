@@ -3,24 +3,24 @@ import { BrandLockup } from '../components/Brand';
 export function WelcomeScreen({ onDemo, onAuth }: { onDemo: () => void; onAuth: () => void }) {
   return (
     <main className="entry-shell">
-      <div className="entry-status"><span>PRODUCT PREVIEW</span><i />AI/backend пока не подключены</div>
+      <div className="entry-status"><span>PRODUCT PREVIEW</span><i />AI и backend пока не подключены</div>
       <section className="welcome-layout">
         <div className="welcome-brand"><BrandLockup /></div>
         <div className="welcome-copy">
-          <p className="section-kicker">ПРОФЕССИОНАЛЬНЫЙ ИИ-АССИСТЕНТ</p>
-          <h1>Сложная задача.<br />Точный результат.</h1>
-          <p>ARVELIS AI создаётся как единое рабочее пространство для анализа, учёбы, планирования и повседневных решений.</p>
+          <p className="section-kicker">ARVELIS AI · ПРОФЕССИОНАЛЬНЫЙ ИИ-АССИСТЕНТ</p>
+          <h1>Интеллектуальная работа.<br />Структурированный результат.</h1>
+          <p>ARVELIS AI проектируется как профессиональная среда для анализа, работы, учёбы и решения сложных повседневных задач. Сейчас доступен проверяемый frontend-preview без подключённой модели.</p>
           <div className="welcome-actions">
             <button className="button button--primary" type="button" onClick={onDemo}>Открыть рабочее пространство</button>
-            <button className="button button--secondary" type="button" onClick={onAuth}>Посмотреть вход</button>
+            <button className="button button--secondary" type="button" onClick={onAuth}>Посмотреть экран доступа</button>
           </div>
-          <p className="entry-note">Текущая версия — frontend preview. Данные сохраняются только локально в браузере.</p>
+          <p className="entry-note">Реальный AI-запрос не выполняется. При доступном localStorage demo-состояние хранится только в этом браузере.</p>
         </div>
       </section>
       <section className="principles-strip" aria-label="Принципы ARVELIS AI">
-        <div><span>01</span><strong>Точность</strong><p>Факты отдельно от предположений.</p></div>
-        <div><span>02</span><strong>Структура</strong><p>Сложное превращается в понятный план.</p></div>
-        <div><span>03</span><strong>Контроль</strong><p>Рискованные действия требуют подтверждения.</p></div>
+        <div><span>01</span><strong>Анализ</strong><p>Факты, допущения и риски разделяются явно.</p></div>
+        <div><span>02</span><strong>Структура</strong><p>Сложная задача приводится к понятной системе действий.</p></div>
+        <div><span>03</span><strong>Контроль</strong><p>Критические действия не выполняются без подтверждения.</p></div>
       </section>
     </main>
   );

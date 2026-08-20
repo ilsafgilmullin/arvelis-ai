@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AppLayout } from './components/AppLayout';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
-import { loadDemoWorkspace, resetDemoWorkspace, saveDemoWorkspace } from './lib/demoStorage';
+import {
+  canUseDemoStorage,
+  loadDemoWorkspace,
+  resetDemoWorkspace,
+  saveDemoWorkspace,
+} from './lib/demoStorage';
 import { AuthScreen } from './screens/AuthScreen';
 import { ChatScreen } from './screens/ChatScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
@@ -28,7 +33,7 @@ function createSystemMessage(): DemoMessage {
     id: makeId('sys'),
     role: 'system',
     createdAt: Date.now() + 1,
-    content: 'Запрос сохранён локально для тестирования интерфейса. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
+    content: 'Запрос добавлен в локальный demo-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
   };
 }
 
@@ -36,11 +41,16 @@ export default function App() {
   const [entry, setEntry] = useState<EntryScreen>('welcome');
   const [screen, setScreen] = useState<AppScreen>('workspace');
   const [workspace, setWorkspace] = useState<DemoWorkspaceState>(() => loadDemoWorkspace());
+  const [persistenceAvailable, setPersistenceAvailable] = useState(() => canUseDemoStorage());
   const online = useOnlineStatus();
 
   useEffect(() => {
-    saveDemoWorkspace(workspace);
+    setPersistenceAvailable(saveDemoWorkspace(workspace));
   }, [workspace]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [entry, screen]);
 
   const activeThread = useMemo(
     () => workspace.threads.find((thread) => thread.id === workspace.activeThreadId) ?? null,
@@ -67,7 +77,11 @@ export default function App() {
       messages: [createUserMessage(prompt), createSystemMessage()],
     };
 
-    setWorkspace((current) => ({ ...current, activeThreadId: thread.id, threads: [thread, ...current.threads] }));
+    setWorkspace((current) => ({
+      ...current,
+      activeThreadId: thread.id,
+      threads: [thread, ...current.threads],
+    }));
     setScreen('chat');
   };
 
@@ -103,6 +117,7 @@ export default function App() {
   const resetDemo = () => {
     const next = resetDemoWorkspace();
     setWorkspace(next);
+    setPersistenceAvailable(canUseDemoStorage());
     setScreen('workspace');
   };
 
@@ -115,7 +130,13 @@ export default function App() {
   }
 
   return (
-    <AppLayout screen={screen} onNavigate={setScreen} onNewChat={newChat} online={online}>
+    <AppLayout
+      screen={screen}
+      onNavigate={setScreen}
+      onNewChat={newChat}
+      online={online}
+      persistenceAvailable={persistenceAvailable}
+    >
       {screen === 'workspace' ? <WorkspaceScreen profileName={workspace.profileName} threads={workspace.threads} onSubmit={createThreadFromPrompt} onOpenThread={openThread} /> : null}
       {screen === 'chat' ? <ChatScreen thread={activeThread} onNewChat={newChat} onSend={sendMessage} /> : null}
       {screen === 'history' ? <HistoryScreen threads={workspace.threads} onOpen={openThread} onDelete={deleteThread} /> : null}

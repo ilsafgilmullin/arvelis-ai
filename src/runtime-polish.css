@@ -1,0 +1,60 @@
+.fatal-error-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: max(28px, env(safe-area-inset-top)) 22px max(28px, env(safe-area-inset-bottom));
+  background: #070809;
+}
+
+.fatal-error-card {
+  width: min(560px, 100%);
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: #0c0e10;
+}
+
+.fatal-error-card .section-kicker {
+  margin-top: 34px;
+}
+
+.fatal-error-card h1 {
+  margin: 12px 0 14px;
+  max-width: 12ch;
+  font-size: clamp(34px, 7vw, 52px);
+  line-height: 1.02;
+  letter-spacing: -.045em;
+  font-weight: 560;
+}
+
+.fatal-error-card > p:not(.section-kicker) {
+  max-width: 48ch;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.fatal-error-card .button {
+  margin-top: 24px;
+}
+
+@media (max-width: 780px) {
+  .fatal-error-card {
+    padding: 24px 20px;
+  }
+
+  .fatal-error-card h1 {
+    font-size: 34px;
+  }
+
+  @supports selector(.app-shell:has(input:focus)) {
+    .mobile-nav {
+      transition: opacity .16s ease, transform .16s ease;
+    }
+
+    .app-shell:has(input:focus, textarea:focus) .mobile-nav {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(calc(100% + 28px));
+    }
+  }
+}
