@@ -29,8 +29,10 @@ export function AppLayout({
   persistenceAvailable: boolean;
   children: ReactNode;
 }) {
+  const shellClassName = screen === 'chat' ? 'app-shell app-shell--chat' : 'app-shell';
+
   return (
-    <div className="app-shell">
+    <div className={shellClassName}>
       <aside className="sidebar">
         <div className="sidebar__top">
           <BrandLockup compact />
