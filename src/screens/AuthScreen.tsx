@@ -24,23 +24,23 @@ export function AuthScreen({
         <BrandLockup compact />
         <div className="auth-heading">
           <p className="section-kicker">PREVIEW ACCESS</p>
-          <h1>Доступ к рабочему пространству</h1>
-          <p>Настоящая авторизация ещё не подключена. Для проверки интерфейса достаточно указать отображаемое имя — реальная учётная запись не создаётся.</p>
+          <h1>Давайте познакомимся.</h1>
+          <p>Укажите, как ARVELIS AI может к вам обращаться. После подготовки интерфейса стартовый экран поприветствует вас по имени.</p>
         </div>
         <form className="auth-form" onSubmit={submit}>
           <label>
-            Отображаемое имя
+            Как к вам обращаться
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Как к вам обращаться"
+              placeholder="Например: Ильсаф"
               maxLength={80}
               autoComplete="nickname"
             />
           </label>
-          <button className="button button--primary" type="submit">Открыть рабочее пространство</button>
+          <button className="button button--primary" type="submit">Продолжить в ARVELIS AI</button>
         </form>
-        <p className="demo-safety-note">Email, пароль, токены и другие секреты в этой версии не запрашиваются и не нужны.</p>
+        <p className="demo-safety-note">Настоящая авторизация пока не подключена. Email, пароль, токены и другие секреты здесь не нужны.</p>
         <p className="auth-footnote">При доступном localStorage имя сохраняется только в этом браузере.</p>
       </section>
     </main>
