@@ -1,0 +1,304 @@
+/* Product-level visual polish. Loaded last so the base design remains easy to audit and revert. */
+
+body {
+  background:
+    radial-gradient(circle at 78% 6%, rgba(214, 170, 70, .035), transparent 24rem),
+    var(--bg);
+}
+
+.button {
+  letter-spacing: -.01em;
+}
+
+.button--primary {
+  box-shadow: 0 8px 26px rgba(166, 119, 37, .12), inset 0 1px 0 rgba(255, 255, 255, .16);
+}
+
+.button--secondary {
+  background: rgba(17, 19, 24, .88);
+}
+
+.entry-status {
+  min-height: 32px;
+}
+
+.welcome-copy h1 {
+  max-width: 13ch;
+  text-wrap: balance;
+}
+
+.welcome-copy > p:not(.section-kicker):not(.entry-note) {
+  max-width: 62ch;
+}
+
+.welcome-actions .button {
+  min-height: 49px;
+}
+
+.principles-strip {
+  border-bottom: 1px solid var(--line);
+}
+
+.principles-strip strong {
+  letter-spacing: -.01em;
+}
+
+.auth-panel {
+  border-radius: var(--radius-lg);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .28);
+}
+
+.auth-heading h1 {
+  max-width: 12ch;
+  text-wrap: balance;
+}
+
+.auth-form input,
+.inline-form input,
+.search-field input {
+  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+
+.auth-form input:focus,
+.inline-form input:focus,
+.search-field input:focus {
+  border-color: rgba(214, 170, 70, .34);
+  background: #0b0d10;
+  box-shadow: 0 0 0 3px rgba(214, 170, 70, .045);
+}
+
+.sidebar {
+  background: linear-gradient(180deg, #0c0e11 0%, #090b0e 100%);
+}
+
+.new-chat {
+  font-weight: 620;
+}
+
+.nav-item {
+  position: relative;
+}
+
+.nav-item--active {
+  box-shadow: inset 2px 0 0 rgba(214, 170, 70, .62);
+}
+
+.sidebar__status strong {
+  letter-spacing: -.005em;
+}
+
+.topbar {
+  min-height: 108px;
+}
+
+.topbar h1 {
+  max-width: 28ch;
+  text-wrap: balance;
+}
+
+.topbar p {
+  max-width: 64ch;
+}
+
+.demo-chip {
+  background: rgba(214, 170, 70, .025);
+  letter-spacing: .12em;
+}
+
+.workspace-hero__copy h2 {
+  max-width: 10ch;
+  text-wrap: balance;
+}
+
+.composer {
+  border-color: rgba(255, 255, 255, .095);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .018), 0 20px 52px rgba(0, 0, 0, .16);
+}
+
+.composer textarea,
+.chat-composer textarea {
+  caret-color: var(--gold-light);
+}
+
+.scenario-row,
+.history-row,
+.history-row__open,
+.setting-action {
+  transition: border-color .16s ease, background .16s ease, color .16s ease;
+}
+
+.scenario-row:hover,
+.history-row:hover,
+.history-row__open:hover,
+.setting-action:hover {
+  background: rgba(255, 255, 255, .018);
+}
+
+.scenario-row strong,
+.history-row strong,
+.history-row__open strong {
+  letter-spacing: -.012em;
+}
+
+.section-heading--inline > span,
+.history-summary small {
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.chat-thread {
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.message {
+  line-height: 1.68;
+}
+
+.message > p {
+  white-space: pre-wrap;
+}
+
+.message--user {
+  border-color: rgba(214, 170, 70, .13);
+  background: rgba(214, 170, 70, .035);
+}
+
+.message--assistant {
+  border-color: rgba(255, 255, 255, .075);
+  background: rgba(255, 255, 255, .012);
+}
+
+.message--system {
+  opacity: .82;
+}
+
+.chat-composer-wrap {
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.chat-composer {
+  border-color: rgba(255, 255, 255, .11);
+  box-shadow: 0 18px 52px rgba(0, 0, 0, .26);
+}
+
+.chat-composer-wrap > p {
+  letter-spacing: .03em;
+}
+
+.empty-state,
+.chat-empty {
+  text-wrap: balance;
+}
+
+.profile-overview {
+  border-bottom-color: rgba(255, 255, 255, .095);
+}
+
+.profile-avatar {
+  box-shadow: inset 0 0 0 1px rgba(240, 210, 125, .12);
+}
+
+.settings-panel {
+  border-top: 1px solid var(--line);
+}
+
+.settings-group__heading h3,
+.security-note h3 {
+  letter-spacing: -.015em;
+}
+
+.state-tabs {
+  scrollbar-width: none;
+}
+
+.state-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.state-tab {
+  white-space: nowrap;
+}
+
+.state-preview {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .018);
+}
+
+.storage-banner,
+.offline-banner {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+@media (max-width: 780px) {
+  .topbar {
+    min-height: 102px;
+  }
+
+  .topbar h1 {
+    max-width: 19ch;
+  }
+
+  .demo-chip {
+    padding: 6px 7px;
+    font-size: 8px;
+  }
+
+  .workspace-hero__copy h2 {
+    max-width: 12ch;
+  }
+
+  .scenario-row,
+  .history-row,
+  .history-row__open {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .chat-thread,
+  .chat-composer-wrap {
+    max-width: 100%;
+  }
+
+  .message--user {
+    max-width: 90%;
+  }
+
+  .auth-panel {
+    border-radius: 14px;
+  }
+}
+
+@media (max-width: 520px) {
+  .welcome-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .welcome-actions .button {
+    width: 100%;
+  }
+
+  .welcome-copy h1 {
+    max-width: 11ch;
+  }
+
+  .entry-note {
+    max-width: 38ch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .auth-form input,
+  .inline-form input,
+  .search-field input,
+  .scenario-row,
+  .history-row,
+  .history-row__open,
+  .setting-action {
+    transition: none;
+  }
+}
