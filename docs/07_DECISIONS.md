@@ -87,8 +87,9 @@
 ## 2026-08-20 — Preview QA
 
 - `main` фактически запускался в Replit на iPhone после PR №6, №7 и №8.
-- Реальный iPhone/WebView тест подтвердил Smart Entry, персональный greeting, локальный chat/history/profile flow и один preview-status на диалог.
-- Текущий глобальный Chat candidate развивается в Draft PR №9 и не считается runtime-подтверждённым, пока отдельно не разрешён, не слит и не проверен через `Pull → Run`.
+- PR №9 (`feat: build ARVELIS AI conversational chat experience`) слит в `main`; после фактического iPhone запуска подтверждена работоспособность local chat/history flow, одновременно выявлены существенные UX-проблемы Chat на mobile: вертикальный ритм, тяжёлый header, keyboard interactions, rename/search/edit modes, composer/navigation composition и presentation локальной истории.
+- Текущий исправляющий candidate развивается отдельно в `feat/chat-refactor-v2` / Draft PR №10. Он не считается runtime-подтверждённым и не должен сливаться в `main` до фактических `typecheck/build`, ручного `Pull → Run` без Replit Agent и iPhone smoke-test по `docs/13_CHAT_REFACTOR_V2_QA.md`.
+- `main` остаётся источником стабильного состояния до отдельного подтверждения merge PR №10.
 
 ## Не утверждено для production
 
