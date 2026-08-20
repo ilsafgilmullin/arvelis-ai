@@ -14,10 +14,15 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* Preview disclosure already exists in the conversation content and empty state.
-   Keep the sticky header focused on identity + thread title + actions. */
+/* Prefer one disclosure location. Most threads already have a system notice,
+   a MOCK/PREVIEW assistant tag, or the empty-state note. Legacy/demo threads
+   that contain only user content still need an explicit explanation in header. */
 .chat-v2-header__status {
   display: none;
+}
+
+.chat-page.chat-experience-v2:not(:has(.chat-v2-preview-notice)):not(:has(.chat-v2-preview-tag)):not(:has(.chat-v2-empty__note)) .chat-v2-header__status {
+  display: block;
 }
 
 .chat-v2-header {
