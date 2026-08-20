@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AppLayout } from './components/AppLayout';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
-import { loadDemoWorkspace, resetDemoWorkspace, saveDemoWorkspace } from './lib/demoStorage';
+import {
+  canUseDemoStorage,
+  DEMO_MAX_MESSAGES_PER_THREAD,
+  DEMO_MAX_THREADS,
+  loadDemoWorkspace,
+  resetDemoWorkspace,
+  saveDemoWorkspace,
+} from './lib/demoStorage';
 import { AuthScreen } from './screens/AuthScreen';
 import { ChatScreen } from './screens/ChatScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
@@ -36,10 +43,11 @@ export default function App() {
   const [entry, setEntry] = useState<EntryScreen>('welcome');
   const [screen, setScreen] = useState<AppScreen>('workspace');
   const [workspace, setWorkspace] = useState<DemoWorkspaceState>(() => loadDemoWorkspace());
+  const [persistenceAvailable, setPersistenceAvailable] = useState(() => canUseDemoStorage());
   const online = useOnlineStatus();
 
   useEffect(() => {
-    saveDemoWorkspace(workspace);
+    setPersistenceAvailable(saveDemoWorkspace(workspace));
   }, [workspace]);
 
   useEffect(() => {
@@ -71,7 +79,11 @@ export default function App() {
       messages: [createUserMessage(prompt), createSystemMessage()],
     };
 
-    setWorkspace((current) => ({ ...current, activeThreadId: thread.id, threads: [thread, ...current.threads] }));
+    setWorkspace((current) => ({
+      ...current,
+      activeThreadId: thread.id,
+      threads: [thread, ...current.threads].slice(0, DEMO_MAX_THREADS),
+    }));
     setScreen('chat');
   };
 
@@ -90,7 +102,7 @@ export default function App() {
       threads: current.threads.map((thread) => thread.id === activeThread.id ? {
         ...thread,
         updatedAt: timestamp,
-        messages: [...thread.messages, userMessage, systemMessage],
+        messages: [...thread.messages, userMessage, systemMessage].slice(-DEMO_MAX_MESSAGES_PER_THREAD),
       } : thread).sort((a, b) => b.updatedAt - a.updatedAt),
     }));
   };
@@ -107,6 +119,7 @@ export default function App() {
   const resetDemo = () => {
     const next = resetDemoWorkspace();
     setWorkspace(next);
+    setPersistenceAvailable(canUseDemoStorage());
     setScreen('workspace');
   };
 
@@ -119,7 +132,13 @@ export default function App() {
   }
 
   return (
-    <AppLayout screen={screen} onNavigate={setScreen} onNewChat={newChat} online={online}>
+    <AppLayout
+      screen={screen}
+      onNavigate={setScreen}
+      onNewChat={newChat}
+      online={online}
+      persistenceAvailable={persistenceAvailable}
+    >
       {screen === 'workspace' ? <WorkspaceScreen profileName={workspace.profileName} threads={workspace.threads} onSubmit={createThreadFromPrompt} onOpenThread={openThread} /> : null}
       {screen === 'chat' ? <ChatScreen thread={activeThread} onNewChat={newChat} onSend={sendMessage} /> : null}
       {screen === 'history' ? <HistoryScreen threads={workspace.threads} onOpen={openThread} onDelete={deleteThread} /> : null}
