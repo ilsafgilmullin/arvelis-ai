@@ -1,10 +1,43 @@
 # ARVELIS AI — Chat Refactor v2 QA
 
-Статус: рабочий candidate. Документ фиксирует проверки только для chat-domain после рефактора `feat/chat-refactor-v2`.
+Статус: рабочий candidate. Документ фиксирует проверки только для chat-domain после рефакторинга `feat/chat-refactor-v2`.
 
 ## Цель
 
 Сделать чат и связанную локальную историю самостоятельным профессиональным mobile-first контуром без изменения AI/backend/auth, production data model и утверждённого бренда.
+
+## Реальные iPhone smoke-проходы
+
+Проведено четыре видео-прохода на iPhone через Replit preview без Replit Agent.
+
+Подтверждено фактически:
+
+- существующие threads открываются;
+- отправка сообщений и локальное сохранение работают;
+- несколько сообщений подряд остаются доступными над composer;
+- черновик переживает rotation;
+- `•••` action sheet открывается и закрывается корректно;
+- rename sheet работает с software keyboard и сохраняет title;
+- History открывается, локальные metadata отображаются, переход в другой thread работает;
+- portrait message stream после viewport-shell перехода больше не прокручивается вместе с document;
+- message stream в portrait не проходит под composer/mobile navigation;
+- compact PREVIEW/MOCK disclosure остаётся честным;
+- Replit Agent не использовался.
+
+Четвёртый видео-проход выявил два блокирующих Safari edge-case:
+
+1. при software keyboard Safari менял не только `visualViewport.height`, но и `offsetTop`; shell учитывал только высоту, поэтому header уходил под status bar;
+2. iPhone landscape имеет CSS-width около 844 px, поэтому старый `max-width: 780px` выключал mobile viewport-shell и document-scroll lock именно в landscape. Это возвращало старую layout-модель и могло уводить composer из видимой области при keyboard.
+
+Исправление candidate после четвёртого прохода:
+
+- AppLayout публикует полный visual viewport rectangle: `top / left / width / height`;
+- mobile Chat shell фиксируется внутри этого rectangle;
+- mobile contract применяется не только при `max-width: 780px`, но и для touch-landscape с малой высотой независимо от ширины;
+- тот же media contract используется для body/root scroll lock;
+- landscape navigation становится compact/icon-only, сохраняя >=44 px touch targets;
+- при landscape keyboard header временно скрывается, чтобы composer гарантированно помещался в реально доступный viewport;
+- background message stream остаётся единственной scrollable областью.
 
 ## Проверки iPhone / mobile
 
@@ -18,27 +51,42 @@
 8. Проверить несколько сообщений подряд — между сообщениями нет избыточных вертикальных провалов.
 9. Открыть composer — клавиатура не перекрывает поле и кнопку отправки.
 10. При открытой клавиатуре mobile navigation скрывается, после закрытия восстанавливается.
-11. Return на touch-устройстве создаёт новую строку; отправка выполняется кнопкой.
-12. Desktop-only подсказка `Enter — отправить` не показывается на touch-устройстве и не противоречит фактической Return-логике.
-13. Composer растёт по высоте до ограниченного максимума и затем скроллится внутри.
-14. Черновик сохраняется после перехода назад/в History и после возврата восстанавливается.
-15. Отправка сообщения очищает только черновик текущего thread.
-16. Новый диалог показывает компактный empty state и быстрые заготовки без большого hero-экрана.
-17. Quick-start только заполняет composer и не отправляет текст автоматически.
-18. Кнопка `К последнему` появляется при уходе вверх по длинной переписке и возвращает к последнему сообщению.
-19. Под нижней mobile navigation нет второго пустого вертикального резерва/лишнего хвоста прокрутки.
-20. Portrait → landscape → portrait не создаёт horizontal overflow и не теряет composer.
-21. На touch-устройствах sticky/fixed chat surfaces не требуют нескольких backdrop-blur слоёв; scrolling и ввод остаются плавными.
-22. Header/search/message action touch-targets имеют не менее 44 px, включая ширины 320–370 px.
-23. Перевести устройство offline — runtime banner не перекрывает chat header.
-24. Одновременно показать offline + storage banner — header и search остаются ниже фактической суммарной высоты banners.
-25. Изменить ориентацию при активном runtime banner — offset пересчитывается без ручной перезагрузки.
+11. При открытой portrait keyboard header остаётся полностью ниже iOS status bar и не уходит под него.
+12. Return на touch-устройстве создаёт новую строку; отправка выполняется кнопкой.
+13. Desktop-only подсказка `Enter — отправить` не показывается на touch-устройстве и не противоречит фактической Return-логике.
+14. Composer растёт по высоте до ограниченного максимума и затем скроллится внутри.
+15. Черновик сохраняется после перехода назад/в History и после возврата восстанавливается.
+16. Отправка сообщения очищает только черновик текущего thread.
+17. Новый диалог показывает компактный empty state и быстрые заготовки без большого hero-экрана.
+18. Quick-start только заполняет composer и не отправляет текст автоматически.
+19. Кнопка `К последнему` появляется при уходе вверх по длинной переписке и возвращает к последнему сообщению.
+20. Под нижней mobile navigation нет второго пустого вертикального резерва/лишнего хвоста прокрутки.
+21. Portrait → landscape → portrait не создаёт horizontal overflow и не теряет composer.
+22. В landscape Chat остаётся внутри mobile viewport-shell даже при CSS-width >780 px.
+23. В landscape без keyboard message stream, composer и compact navigation не пересекаются.
+24. В landscape с keyboard header может скрываться, но composer и кнопка отправки обязаны оставаться видимыми.
+25. На touch-устройствах sticky/fixed chat surfaces не требуют нескольких backdrop-blur слоёв; scrolling и ввод остаются плавными.
+26. Header/search/message action touch-targets имеют не менее 44 px, включая ширины 320–370 px и landscape compact navigation.
+27. Перевести устройство offline — runtime banner не перекрывает chat header.
+28. Одновременно показать offline + storage banner — header и search остаются ниже фактической суммарной высоты banners.
+29. Изменить ориентацию при активном runtime banner — offset пересчитывается без ручной перезагрузки.
+
+## Mobile viewport-shell contract
+
+1. Пока открыт Chat на mobile/touch-landscape, document/root scroll заблокирован.
+2. Прокручивается только `.chat-v2-thread`.
+3. `app-shell--chat` совпадает с текущим `visualViewport` по top/left/width/height.
+4. Safari browser chrome или keyboard resize не должен сдвигать header под status bar.
+5. Composer не использует цепочку sticky/fixed keyboard offsets — он является нижним flex child chat-page.
+6. Mobile navigation находится внутри bounded shell и не должна показывать message content под собой.
+7. При переходе Chat → History/Home/Profile обычный document scroll полностью восстанавливается.
+8. При возврате History → Chat старый document scroll не влияет на позицию thread.
 
 ## Search внутри диалога
 
 1. Открыть search из header.
 2. Search input не сталкивается с header и не выходит за viewport.
-3. При наличии runtime banner search располагается ниже `banner + header`, а не под ними.
+3. При наличии runtime banner search располагается ниже banner/header, а не под ними.
 4. При фокусе search клавиатура не конфликтует с composer/mobile navigation.
 5. Пока search-mode открыт на mobile, основной composer скрыт даже после ручного закрытия клавиатуры.
 6. `↑ / ↓` циклически переходят между найденными сообщениями.
@@ -148,5 +196,9 @@
 - `npm run build` успешно;
 - branch не отстаёт от `main`;
 - PR mergeable;
-- затем фактический ручной `Pull → Run` в Replit и iPhone smoke-test по ключевым пунктам выше;
+- повторный `Pull → Run` последних viewport/breakpoint commits;
+- portrait keyboard: header ниже status bar, composer видим;
+- landscape keyboard: mobile shell остаётся активным, composer видим, header при необходимости скрыт;
+- History → Chat не создаёт document-scroll jump;
+- New Chat/empty state не пересекается с composer/nav;
 - Replit Agent для этого gate не требуется и не должен использоваться без отдельного запроса пользователя.
