@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { BrandMark } from '../components/Brand';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -8,6 +9,7 @@ import {
   EditIcon,
   PlusIcon,
   SendIcon,
+  TrashIcon,
 } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
 import {
@@ -70,16 +72,22 @@ type CopyFeedback = {
 
 export function ChatScreen({
   thread,
+  threadLimitReached,
+  messageLimitReached,
   onNewChat,
   onSend,
   onEditMessage,
   onRenameThread,
+  onDeleteThread,
 }: {
   thread: DemoThread | null;
+  threadLimitReached: boolean;
+  messageLimitReached: boolean;
   onNewChat: () => void;
   onSend: (content: string) => void;
   onEditMessage: (threadId: string, messageId: string, content: string) => void;
   onRenameThread: (threadId: string, title: string) => void;
+  onDeleteThread: (threadId: string) => void;
 }) {
   const [message, setMessage] = useState('');
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -89,6 +97,7 @@ export function ChatScreen({
   const [copyFeedback, setCopyFeedback] = useState<CopyFeedback | null>(null);
   const [isAtEnd, setIsAtEnd] = useState(true);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -102,6 +111,7 @@ export function ChatScreen({
 
   const title = useMemo(() => thread?.title ?? 'Новый диалог', [thread]);
   const draftKey = useMemo(() => chatDraftKey(thread?.id ?? null), [thread?.id]);
+  const sendLimitReached = thread ? messageLimitReached : threadLimitReached;
 
   const scheduleDraftSave = (nextMessage: string) => {
     if (draftSaveTimerRef.current !== null) {
@@ -149,6 +159,7 @@ export function ChatScreen({
     setEditingMessageId(null);
     setEditingMessage('');
     setRenaming(false);
+    setDeleteOpen(false);
 
     return () => {
       if (draftSaveTimerRef.current !== null) {
@@ -247,6 +258,7 @@ export function ChatScreen({
   };
 
   const focusComposerWith = (content: string) => {
+    if (sendLimitReached) return;
     updateComposerMessage(content);
     window.requestAnimationFrame(() => {
       textareaRef.current?.focus();
@@ -257,7 +269,7 @@ export function ChatScreen({
 
   const submit = () => {
     const content = message.trim();
-    if (!content) return;
+    if (!content || sendLimitReached) return;
 
     if (draftSaveTimerRef.current !== null) {
       window.clearTimeout(draftSaveTimerRef.current);
@@ -353,12 +365,23 @@ export function ChatScreen({
     return copyFeedback.status === 'copied' ? 'Скопировано' : 'Не удалось';
   };
 
+  const confirmDelete = () => {
+    if (!thread) return;
+    onDeleteThread(thread.id);
+    setDeleteOpen(false);
+  };
+
   const headerActions = (
     <div className="chat-header-actions">
       {thread ? (
-        <button className="chat-header-action" type="button" onClick={startRenaming} aria-label="Переименовать диалог" title="Переименовать диалог">
-          <EditIcon />
-        </button>
+        <>
+          <button className="chat-header-action" type="button" onClick={startRenaming} aria-label="Переименовать диалог" title="Переименовать диалог">
+            <EditIcon />
+          </button>
+          <button className="chat-header-action chat-header-action--danger" type="button" onClick={() => setDeleteOpen(true)} aria-label="Удалить диалог" title="Удалить диалог">
+            <TrashIcon />
+          </button>
+        </>
       ) : null}
       <button className="chat-header-action" type="button" onClick={onNewChat} aria-label="Новый диалог" title="Новый диалог">
         <PlusIcon />
@@ -458,13 +481,15 @@ export function ChatScreen({
           <section className="chat-empty">
             <BrandMark size="default" />
             <p className="section-kicker">НОВЫЙ ДИАЛОГ</p>
-            <h2>Что хотите решить?</h2>
-            <p>Начните своими словами или выберите заготовку. Сейчас это локальный preview: сообщение сохранится на устройстве, но запрос к AI не отправляется.</p>
-            <div className="chat-quick-starts" aria-label="Быстрые заготовки">
-              {QUICK_STARTS.map((item) => (
-                <button key={item.label} type="button" onClick={() => focusComposerWith(item.prompt)}>{item.label}</button>
-              ))}
-            </div>
+            <h2>{threadLimitReached ? 'Освободите место для нового диалога' : 'Что хотите решить?'}</h2>
+            <p>{threadLimitReached ? 'Локальный preview достиг лимита диалогов. Удалите ненужный диалог в «Истории», затем вернитесь сюда.' : 'Начните своими словами или выберите заготовку. Сейчас это локальный preview: сообщение сохранится на устройстве, но запрос к AI не отправляется.'}</p>
+            {!threadLimitReached ? (
+              <div className="chat-quick-starts" aria-label="Быстрые заготовки">
+                {QUICK_STARTS.map((item) => (
+                  <button key={item.label} type="button" onClick={() => focusComposerWith(item.prompt)}>{item.label}</button>
+                ))}
+              </div>
+            ) : null}
           </section>
         )}
         <div ref={endRef} className="chat-thread__end" aria-hidden="true" />
@@ -476,6 +501,13 @@ export function ChatScreen({
             <ChevronDownIcon /><span>К последнему</span>
           </button>
         ) : null}
+        {messageLimitReached && thread ? (
+          <div className="chat-limit-notice" role="status">
+            <strong>Локальный лимит диалога достигнут.</strong>
+            <span>Начните новый диалог, чтобы продолжить.</span>
+            <button type="button" onClick={onNewChat}>Новый диалог</button>
+          </div>
+        ) : null}
         <div className="chat-composer">
           <textarea
             ref={textareaRef}
@@ -484,13 +516,14 @@ export function ChatScreen({
             onKeyDown={handleKeyDown}
             onFocus={focusComposer}
             onBlur={flushDraft}
-            placeholder="Сообщение ARVELIS AI…"
+            placeholder={sendLimitReached ? 'Отправка временно недоступна' : 'Сообщение ARVELIS AI…'}
             aria-label="Сообщение"
             rows={1}
             maxLength={MAX_MESSAGE_LENGTH}
+            disabled={sendLimitReached}
           />
           {message.length >= 4800 ? <span className="chat-char-count">{message.length.toLocaleString('ru-RU')} / 6 000</span> : null}
-          <button className="send-button" type="button" disabled={!message.trim()} onClick={submit} aria-label="Добавить сообщение в локальный preview-диалог"><SendIcon /></button>
+          <button className="send-button" type="button" disabled={!message.trim() || sendLimitReached} onClick={submit} aria-label="Добавить сообщение в локальный preview-диалог"><SendIcon /></button>
         </div>
         {draftSaveFailed ? (
           <p className="chat-draft-warning" role="status">Черновик не удалось сохранить на устройстве.</p>
@@ -498,6 +531,16 @@ export function ChatScreen({
           <p className="chat-composer-helper">PREVIEW · Enter — отправить на компьютере · Shift+Enter — новая строка</p>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Удалить локальный диалог?"
+        description={thread ? `«${thread.title}» будет удалён из локальной истории вместе с черновиком. После подтверждения отменить действие нельзя.` : ''}
+        confirmLabel="Удалить"
+        danger
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteOpen(false)}
+      />
     </div>
   );
 }
