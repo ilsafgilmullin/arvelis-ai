@@ -1,6 +1,17 @@
+import type { ReactNode } from 'react';
 import { BrandLockup } from './Brand';
 
-export function Topbar({ title, subtitle, demo = true }: { title: string; subtitle?: string; demo?: boolean }) {
+export function Topbar({
+  title,
+  subtitle,
+  demo = true,
+  actions,
+}: {
+  title: string;
+  subtitle?: string;
+  demo?: boolean;
+  actions?: ReactNode;
+}) {
   return (
     <header className="topbar">
       <div className="topbar__identity">
@@ -10,7 +21,10 @@ export function Topbar({ title, subtitle, demo = true }: { title: string; subtit
           {subtitle ? <p>{subtitle}</p> : null}
         </div>
       </div>
-      {demo ? <span className="demo-chip" title="Frontend preview: реальный AI и backend пока не подключены">PREVIEW</span> : null}
+      <div className="topbar__actions">
+        {actions}
+        {demo ? <span className="demo-chip" title="Frontend preview: реальный AI и backend пока не подключены">PREVIEW</span> : null}
+      </div>
     </header>
   );
 }
