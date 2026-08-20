@@ -96,7 +96,7 @@ export function ChatSheet({
     <div
       className="chat-v2-overlay"
       role="presentation"
-      onPointerDown={(event) => {
+      onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
