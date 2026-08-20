@@ -75,12 +75,27 @@ function isThread(value: unknown): value is DemoThread {
 
 function normalizeKnownLegacyCopy(thread: DemoThread): DemoThread {
   let changed = false;
-  const messages = thread.messages.map((message) => {
-    const content = LEGACY_PREVIEW_COPY.get(message.content);
-    if (!content) return message;
-    changed = true;
-    return { ...message, content };
-  });
+  let previewStatusSeen = false;
+  const messages: DemoMessage[] = [];
+
+  for (const message of thread.messages) {
+    const normalizedContent = LEGACY_PREVIEW_COPY.get(message.content) ?? message.content;
+    const normalizedMessage = normalizedContent === message.content
+      ? message
+      : { ...message, content: normalizedContent };
+
+    if (normalizedContent !== message.content) changed = true;
+
+    if (normalizedMessage.role === 'system' && normalizedContent === COMPACT_PREVIEW_STATUS) {
+      if (previewStatusSeen) {
+        changed = true;
+        continue;
+      }
+      previewStatusSeen = true;
+    }
+
+    messages.push(normalizedMessage);
+  }
 
   return changed ? { ...thread, messages } : thread;
 }
