@@ -4,7 +4,7 @@ import { ChatIcon, HistoryIcon, HomeIcon, PlusIcon, ProfileIcon } from './Icons'
 import type { AppScreen } from '../types';
 
 const navigation = [
-  { id: 'workspace' as const, label: 'Главная', desktopLabel: 'Рабочее пространство', icon: <HomeIcon /> },
+  { id: 'workspace' as const, label: 'Главная', desktopLabel: 'ARVELIS AI', icon: <HomeIcon /> },
   { id: 'chat' as const, label: 'Чат', desktopLabel: 'Чат', icon: <ChatIcon /> },
   { id: 'history' as const, label: 'История', desktopLabel: 'История', icon: <HistoryIcon /> },
   { id: 'profile' as const, label: 'Профиль', desktopLabel: 'Профиль', icon: <ProfileIcon /> },
