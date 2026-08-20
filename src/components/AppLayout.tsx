@@ -10,6 +10,10 @@ const navigation = [
   { id: 'profile' as const, label: 'Профиль', desktopLabel: 'Профиль', icon: <ProfileIcon /> },
 ];
 
+function isNavigationItemActive(screen: AppScreen, itemId: (typeof navigation)[number]['id']): boolean {
+  return screen === itemId || (screen === 'states' && itemId === 'profile');
+}
+
 export function AppLayout({
   screen,
   onNavigate,
@@ -33,7 +37,7 @@ export function AppLayout({
           <button className="new-chat" type="button" onClick={onNewChat}><PlusIcon />Новый диалог</button>
           <nav className="sidebar__nav" aria-label="Основная навигация">
             {navigation.map((item) => {
-              const active = screen === item.id;
+              const active = isNavigationItemActive(screen, item.id);
               return (
                 <button
                   type="button"
@@ -66,7 +70,7 @@ export function AppLayout({
 
       <nav className="mobile-nav" aria-label="Мобильная навигация">
         {navigation.map((item) => {
-          const active = screen === item.id;
+          const active = isNavigationItemActive(screen, item.id);
           return (
             <button
               type="button"
