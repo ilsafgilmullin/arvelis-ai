@@ -40,7 +40,7 @@ export function ProfileScreen({
 
       <section className="settings-panel">
         <div className="settings-group">
-          <div className="settings-group__heading"><div><h3>Отображаемое имя</h3><p>Сохраняется только в localStorage браузера.</p></div></div>
+          <div className="settings-group__heading"><div><h3>Отображаемое имя</h3><p>При доступном localStorage сохраняется только в этом браузере.</p></div></div>
           <div className="inline-form">
             <input aria-label="Отображаемое имя" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
             <button className="button button--secondary" type="button" onClick={save}>{saved ? 'Сохранено' : 'Сохранить'}</button>
