@@ -25,7 +25,7 @@ export function AuthScreen({
         <div className="auth-heading">
           <p className="section-kicker">PREVIEW ACCESS</p>
           <h1>Давайте познакомимся.</h1>
-          <p>Укажите, как ARVELIS AI может к вам обращаться. После подготовки интерфейса стартовый экран поприветствует вас по имени.</p>
+          <p>Скажите, как к вам обращаться. ARVELIS AI использует это имя в приветствии и сохранит его только в локальном preview этого браузера.</p>
         </div>
         <form className="auth-form" onSubmit={submit}>
           <label>
@@ -40,8 +40,8 @@ export function AuthScreen({
           </label>
           <button className="button button--primary" type="submit">Продолжить в ARVELIS AI</button>
         </form>
-        <p className="demo-safety-note">Настоящая авторизация пока не подключена. Email, пароль, токены и другие секреты здесь не нужны.</p>
-        <p className="auth-footnote">При доступном localStorage имя сохраняется только в этом браузере.</p>
+        <p className="demo-safety-note">В этом preview мы не просим email, пароль, токены или другие секреты.</p>
+        <p className="auth-footnote">Настоящая авторизация пока не подключена.</p>
       </section>
     </main>
   );
