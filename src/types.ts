@@ -9,6 +9,7 @@ export type DemoMessage = {
   role: DemoMessageRole;
   content: string;
   createdAt: number;
+  editedAt?: number;
   mock?: boolean;
 };
 
