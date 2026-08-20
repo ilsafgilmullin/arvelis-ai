@@ -40,7 +40,7 @@ function waitForBootPaint(): Promise<void> {
     return Promise.resolve();
   }
 
-  return new Promise((resolve) => {
+  return new Promise<void>((resolve) => {
     window.requestAnimationFrame(() => resolve());
   });
 }
