@@ -47,6 +47,13 @@
     top: 64px;
   }
 
+  /* ChatSheet syncs its fixed overlay to window.visualViewport. Bound the sheet
+     to that already-synchronized box too, so a tall keyboard can never leave
+     rename/edit/actions taller than the actually visible Safari viewport. */
+  .chat-v2-sheet {
+    max-height: calc(100% - 12px);
+  }
+
   /* Search is an explicit mode on mobile. Keep the message composer out of that
      mode even after the software keyboard is dismissed. */
   .app-shell--chat:has(.chat-v2-search) .chat-v2-composer-wrap {
