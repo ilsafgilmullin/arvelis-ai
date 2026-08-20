@@ -23,9 +23,9 @@ export function AuthScreen({
         <button className="text-button" type="button" onClick={onBack}>← Назад</button>
         <BrandLockup compact />
         <div className="auth-heading">
-          <p className="section-kicker">DEMO ACCESS</p>
-          <h1>Вход в ARVELIS AI</h1>
-          <p>Настоящая авторизация пока не подключена. Для UX-проверки достаточно указать только отображаемое имя.</p>
+          <p className="section-kicker">PREVIEW ACCESS</p>
+          <h1>Доступ к рабочему пространству</h1>
+          <p>Настоящая авторизация ещё не подключена. Для проверки интерфейса достаточно указать отображаемое имя — реальная учётная запись не создаётся.</p>
         </div>
         <form className="auth-form" onSubmit={submit}>
           <label>
@@ -38,10 +38,10 @@ export function AuthScreen({
               autoComplete="nickname"
             />
           </label>
-          <button className="button button--primary" type="submit">Продолжить в локальный демо</button>
+          <button className="button button--primary" type="submit">Открыть рабочее пространство</button>
         </form>
         <p className="demo-safety-note">Email, пароль, токены и другие секреты в этой версии не запрашиваются и не нужны.</p>
-        <p className="auth-footnote">Учётная запись не создаётся. Имя сохраняется только в localStorage этого браузера.</p>
+        <p className="auth-footnote">При доступном localStorage имя сохраняется только в этом браузере.</p>
       </section>
     </main>
   );
