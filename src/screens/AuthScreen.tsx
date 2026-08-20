@@ -11,7 +11,6 @@ export function AuthScreen({
   onContinue: (name: string) => void;
 }) {
   const [name, setName] = useState(initialName === 'Пользователь ARVELIS' ? '' : initialName);
-  const [email, setEmail] = useState('');
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -24,26 +23,25 @@ export function AuthScreen({
         <button className="text-button" type="button" onClick={onBack}>← Назад</button>
         <BrandLockup compact />
         <div className="auth-heading">
-          <p className="section-kicker">DEMO AUTH</p>
+          <p className="section-kicker">DEMO ACCESS</p>
           <h1>Вход в ARVELIS AI</h1>
-          <p>Авторизация пока не подключена. Форма нужна для проверки UX и сохраняет только имя в локальном demo-состоянии.</p>
+          <p>Настоящая авторизация пока не подключена. Для UX-проверки достаточно указать только отображаемое имя.</p>
         </div>
         <form className="auth-form" onSubmit={submit}>
           <label>
-            Имя
-            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Как к вам обращаться" maxLength={80} />
+            Отображаемое имя
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Как к вам обращаться"
+              maxLength={80}
+              autoComplete="nickname"
+            />
           </label>
-          <label>
-            Email
-            <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" placeholder="name@example.com" autoComplete="email" required />
-          </label>
-          <label>
-            Пароль
-            <input type="password" placeholder="Не менее 8 символов" minLength={8} autoComplete="current-password" required />
-          </label>
-          <button className="button button--primary" type="submit">Продолжить в демо</button>
+          <button className="button button--primary" type="submit">Продолжить в локальный демо</button>
         </form>
-        <p className="auth-footnote">Никакая учётная запись при этом не создаётся.</p>
+        <p className="demo-safety-note">Email, пароль, токены и другие секреты в этой версии не запрашиваются и не нужны.</p>
+        <p className="auth-footnote">Учётная запись не создаётся. Имя сохраняется только в localStorage этого браузера.</p>
       </section>
     </main>
   );
