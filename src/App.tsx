@@ -181,7 +181,6 @@ export default function App() {
     }
 
     const userMessage = createUserMessage(content);
-    const systemMessage = createSystemMessage();
     const timestamp = Date.now();
 
     setWorkspace((current) => current ? {
@@ -189,7 +188,7 @@ export default function App() {
       threads: current.threads.map((thread) => thread.id === activeThread.id ? {
         ...thread,
         updatedAt: timestamp,
-        messages: [...thread.messages, userMessage, systemMessage],
+        messages: [...thread.messages, userMessage],
       } : thread).sort((a, b) => b.updatedAt - a.updatedAt),
     } : current);
   };
