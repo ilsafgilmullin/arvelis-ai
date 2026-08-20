@@ -9,6 +9,7 @@ import './runtime-polish.css';
 import './layout-hardening.css';
 import './product-polish.css';
 import './post-merge-mobile-qa.css';
+import './smart-entry.css';
 
 const root = document.getElementById('root');
 
