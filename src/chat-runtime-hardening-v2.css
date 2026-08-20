@@ -25,14 +25,18 @@
   display: block;
 }
 
+/* Runtime banners are measured by AppLayout and published as a CSS variable.
+   Stack the sticky chat chrome below the real measured banner height instead of
+   assuming a single fixed 34px row. */
 .chat-v2-header {
+  top: var(--status-banners-height, 0px);
   min-height: 68px;
   padding-top: 10px;
   padding-bottom: 9px;
 }
 
 .chat-v2-search {
-  top: 68px;
+  top: calc(var(--status-banners-height, 0px) + 68px);
 }
 
 @media (max-width: 780px) {
@@ -53,7 +57,7 @@
   }
 
   .chat-v2-search {
-    top: 64px;
+    top: calc(var(--status-banners-height, 0px) + 64px);
   }
 
   .chat-v2-icon-button {
@@ -124,6 +128,7 @@
   }
 
   .chat-v2-header {
+    top: 0;
     min-height: 58px;
   }
 
