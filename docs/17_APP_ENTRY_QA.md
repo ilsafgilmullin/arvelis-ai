@@ -70,16 +70,19 @@
 
 1. `src/auth/contracts.ts` не зависит от конкретного provider SDK.
 2. Production auth-state не должен храниться в localStorage.
-3. UI обязан иметь session-expired / offline / rate-limit / error states до backend integration.
+3. UI обязан иметь session-expired / offline / rate-limit / challenge-retry / logout-error states до backend integration.
 4. Executable v1 contract поддерживает только `identifier` и `external`; challenge — `code` и `external_redirect`.
 5. Passkey/WebAuthn остаётся OPEN-кандидатом и не считается реализованным до отдельного контракта/ceremony implementation.
-6. Raw transport payload проходит runtime guard до application state.
-7. Session restore не зависит от method catalog.
-8. ARVELIS CONTROL не делит user session с ARVELIS AI.
+6. `code` завершается через guarded `complete()`; external OAuth callback завершается ARVELIS backend/BFF, после чего frontend делает `restoreSession()`.
+7. Raw transport payload проходит runtime guard до application state.
+8. Session restore не зависит от method catalog.
+9. Failed server logout не выдаётся за успешный выход и сохраняет live-session state.
+10. Recoverable code error сохраняет активное подтверждение для повторной попытки.
+11. ARVELIS CONTROL не делит user session с ARVELIS AI.
 
 ## Protocol negative checks
 
-До real backend integration contract должен отказывать для:
+До real backend integration contract должен fail closed для:
 
 - malformed method/session/challenge/failure payload;
 - duplicate ids;
@@ -87,15 +90,43 @@
 - больше одной `current` session;
 - `emailVerified=true` без email;
 - `phoneVerified=true` без phone;
-- unsafe `external_redirect` (`http`, `javascript:`, `data:`, malformed URL);
+- session с `expiresAt <= createdAt`;
+- control characters в server-provided protocol strings;
+- unsafe `external_redirect` (`http`, `javascript:`, `data:`, credentials, fragment, malformed URL);
 - пустого/слишком длинного method/challenge/session id;
-- oversized challenge response.
+- пустого/oversized code response;
+- oversized `retryAfterSeconds`.
 
 Server-side validation остаётся обязательной даже при frontend guard.
 
+## Auth Core automated smoke
+
+В PR добавлена no-dependency команда `npm run test:auth`.
+
+Она использует отдельный `tsconfig.auth-smoke.json` и компилирует pure Auth Core с:
+
+- `strict`;
+- `noUncheckedIndexedAccess`;
+- дополнительно `exactOptionalPropertyTypes`.
+
+Behavioral assertions покрывают:
+
+- unsafe external URLs;
+- mixed `code`/`external_redirect` fields;
+- malformed session/account state;
+- verified identifier inconsistency;
+- retry metadata ceiling;
+- duplicate method ids;
+- multiple current sessions;
+- empty code response;
+- recoverable challenge preservation;
+- failed logout live-session preservation.
+
+Аналогичный isolated smoke фактически выполнен локально на Node 22 / TypeScript 5.8.3 и прошёл. Это **не заменяет** project TypeScript 6.0.3 build.
+
 ## Known gates
 
-- repository `npm run typecheck` / `npm run build` должны быть выполнены фактически перед merge, если runner доступен;
+- repository `npm run typecheck`, `npm run test:auth` и `npm run build` должны быть выполнены фактически в проектном окружении перед merge, если runner доступен;
 - текущий GitHub Actions job завершается до первого step и не создаёт step logs — это отдельный infrastructure gate, а не подтверждённая ошибка TypeScript/build;
 - dependency lockfile debt из `docs/14_PRE_MERGE_AUDIT.md` остаётся отдельной infrastructure task;
 - реальный auth/backend/AI не входит в этот PR.
