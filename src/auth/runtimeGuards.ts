@@ -7,6 +7,7 @@ import type {
   AuthSession,
   AuthSessionSummary,
 } from './contracts';
+import { AUTH_PROTOCOL_LIMITS } from './protocolLimits';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -26,20 +27,21 @@ function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
+function isBoundedString(value: unknown, maxLength: number, allowEmpty = false): value is string {
+  if (typeof value !== 'string' || value.length > maxLength) return false;
+  return allowEmpty || value.trim().length > 0;
 }
 
-function isOptionalString(value: unknown): value is string | undefined {
-  return value === undefined || typeof value === 'string';
+function isOptionalBoundedString(value: unknown, maxLength: number): value is string | undefined {
+  return value === undefined || isBoundedString(value, maxLength, true);
 }
 
 function isIsoLikeDate(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0 && Number.isFinite(Date.parse(value));
+  return typeof value === 'string' && value.length > 0 && value.length <= 64 && Number.isFinite(Date.parse(value));
 }
 
 export function isSecureAuthorizationUrl(value: unknown): value is string {
-  if (!isNonEmptyString(value)) return false;
+  if (!isBoundedString(value, AUTH_PROTOCOL_LIMITS.redirectUrlLength)) return false;
 
   try {
     const url = new URL(value);
@@ -51,7 +53,8 @@ export function isSecureAuthorizationUrl(value: unknown): value is string {
 
 export function isAuthMethodDescriptor(value: unknown): value is AuthMethodDescriptor {
   if (!isRecord(value)) return false;
-  if (!isNonEmptyString(value.id) || !isNonEmptyString(value.label) || typeof value.enabled !== 'boolean') return false;
+  if (!isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.methodIdLength)) return false;
+  if (!isBoundedString(value.label, AUTH_PROTOCOL_LIMITS.labelLength) || typeof value.enabled !== 'boolean') return false;
   if (value.kind !== 'identifier' && value.kind !== 'external' && value.kind !== 'passkey') return false;
 
   if (value.identifierType !== undefined && value.identifierType !== 'email' && value.identifierType !== 'phone') {
@@ -65,7 +68,7 @@ export function isAuthMethodDescriptor(value: unknown): value is AuthMethodDescr
 }
 
 export function normalizeAuthMethodCatalog(value: unknown): AuthMethodDescriptor[] {
-  if (!Array.isArray(value)) return [];
+  if (!Array.isArray(value) || value.length > AUTH_PROTOCOL_LIMITS.methods) return [];
 
   const seenIds = new Set<string>();
   const methods: AuthMethodDescriptor[] = [];
@@ -82,10 +85,10 @@ export function normalizeAuthMethodCatalog(value: unknown): AuthMethodDescriptor
 export function isAuthAccount(value: unknown): value is AuthAccount {
   if (!isRecord(value)) return false;
 
-  return isNonEmptyString(value.id)
-    && typeof value.displayName === 'string'
-    && isOptionalString(value.primaryEmail)
-    && isOptionalString(value.primaryPhone)
+  return isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)
+    && isBoundedString(value.displayName, AUTH_PROTOCOL_LIMITS.displayNameLength, true)
+    && isOptionalBoundedString(value.primaryEmail, AUTH_PROTOCOL_LIMITS.emailLength)
+    && isOptionalBoundedString(value.primaryPhone, AUTH_PROTOCOL_LIMITS.phoneLength)
     && typeof value.emailVerified === 'boolean'
     && typeof value.phoneVerified === 'boolean';
 }
@@ -93,7 +96,7 @@ export function isAuthAccount(value: unknown): value is AuthAccount {
 export function isAuthSession(value: unknown): value is AuthSession {
   if (!isRecord(value)) return false;
 
-  return isNonEmptyString(value.id)
+  return isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)
     && isAuthAccount(value.account)
     && isIsoLikeDate(value.createdAt)
     && isIsoLikeDate(value.expiresAt);
@@ -102,17 +105,17 @@ export function isAuthSession(value: unknown): value is AuthSession {
 export function isAuthSessionSummary(value: unknown): value is AuthSessionSummary {
   if (!isRecord(value)) return false;
 
-  return isNonEmptyString(value.id)
+  return isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)
     && typeof value.current === 'boolean'
     && isIsoLikeDate(value.createdAt)
     && isIsoLikeDate(value.expiresAt)
     && (value.lastSeenAt === undefined || isIsoLikeDate(value.lastSeenAt))
-    && isOptionalString(value.deviceLabel)
-    && isOptionalString(value.browserLabel);
+    && isOptionalBoundedString(value.deviceLabel, AUTH_PROTOCOL_LIMITS.deviceLabelLength)
+    && isOptionalBoundedString(value.browserLabel, AUTH_PROTOCOL_LIMITS.browserLabelLength);
 }
 
 export function normalizeAuthSessionSummaries(value: unknown): AuthSessionSummary[] {
-  if (!Array.isArray(value)) return [];
+  if (!Array.isArray(value) || value.length > AUTH_PROTOCOL_LIMITS.sessions) return [];
 
   const seenIds = new Set<string>();
   const sessions: AuthSessionSummary[] = [];
@@ -128,9 +131,11 @@ export function normalizeAuthSessionSummaries(value: unknown): AuthSessionSummar
 
 export function isAuthChallenge(value: unknown): value is AuthChallenge {
   if (!isRecord(value)) return false;
-  if (!isNonEmptyString(value.id) || !isNonEmptyString(value.methodId)) return false;
+  if (!isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)) return false;
+  if (!isBoundedString(value.methodId, AUTH_PROTOCOL_LIMITS.methodIdLength)) return false;
   if (value.kind !== 'code' && value.kind !== 'external_redirect' && value.kind !== 'passkey') return false;
-  if (!isOptionalString(value.maskedDestination) || !isOptionalString(value.redirectUrl)) return false;
+  if (!isOptionalBoundedString(value.maskedDestination, AUTH_PROTOCOL_LIMITS.maskedDestinationLength)) return false;
+  if (!isOptionalBoundedString(value.redirectUrl, AUTH_PROTOCOL_LIMITS.redirectUrlLength)) return false;
   if (value.expiresAt !== undefined && !isIsoLikeDate(value.expiresAt)) return false;
   if (value.kind === 'external_redirect' && !isSecureAuthorizationUrl(value.redirectUrl)) return false;
 
@@ -140,7 +145,7 @@ export function isAuthChallenge(value: unknown): value is AuthChallenge {
 export function isAuthFailure(value: unknown): value is AuthFailure {
   if (!isRecord(value)) return false;
   if (typeof value.code !== 'string' || !failureCodes.has(value.code as AuthFailureCode)) return false;
-  if (typeof value.message !== 'string') return false;
+  if (!isBoundedString(value.message, AUTH_PROTOCOL_LIMITS.failureMessageLength, true)) return false;
 
   return value.retryAfterSeconds === undefined
     || (typeof value.retryAfterSeconds === 'number' && Number.isFinite(value.retryAfterSeconds) && value.retryAfterSeconds >= 0);
