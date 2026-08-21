@@ -166,8 +166,7 @@ export class EmailOtpService {
         try {
           await this.store.delete(challengeId);
         } catch {
-          // Best-effort cleanup. A pending challenge is never verifiable and
-          // expires even when cleanup cannot complete immediately.
+          // Best-effort cleanup. Pending challenge remains non-verifiable.
         }
         return { ok: false, error: failure('delivery_unavailable') };
       }
@@ -218,13 +217,14 @@ export class EmailOtpService {
         return { ok: false, error: failure('invalid_challenge') };
       }
 
-      const candidateMac = await this.security.macCode({
+      const validCode = await this.security.verifyCodeMac({
         challengeId: attempt.record.id,
         email: attempt.record.email,
         code: request.code,
+        expectedMac: attempt.record.codeMac,
       });
 
-      if (!this.security.equalsMac(candidateMac, attempt.record.codeMac)) {
+      if (!validCode) {
         return {
           ok: false,
           error: failure(attempt.attemptNumber >= attempt.record.maxAttempts ? 'too_many_attempts' : 'invalid_code'),
