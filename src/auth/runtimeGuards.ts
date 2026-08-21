@@ -8,6 +8,7 @@ import type {
   AuthSessionSummary,
 } from './contracts';
 import { AUTH_PROTOCOL_LIMITS } from './protocolLimits';
+import { containsUnsafeProtocolCharacters } from './protocolText';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -23,14 +24,12 @@ const failureCodes = new Set<AuthFailureCode>([
   'unknown',
 ]);
 
-const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
-
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isBoundedString(value: unknown, maxLength: number, allowEmpty = false): value is string {
-  if (typeof value !== 'string' || value.length > maxLength || CONTROL_CHARACTER_PATTERN.test(value)) return false;
+  if (typeof value !== 'string' || value.length > maxLength || containsUnsafeProtocolCharacters(value)) return false;
   return allowEmpty || value.trim().length > 0;
 }
 
