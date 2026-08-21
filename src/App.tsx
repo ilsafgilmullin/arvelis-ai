@@ -99,7 +99,7 @@ export default function App() {
   const [signOutPending, setSignOutPending] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
   const launchSequenceRef = useRef(0);
-  const storageScopeRef = useRef<string | undefined>();
+  const storageScopeRef = useRef<string | undefined>(undefined);
   const online = useOnlineStatus();
 
   useEffect(() => {
