@@ -42,7 +42,7 @@ export function AuthStatusPanel({ state }: { state: AuthUiState }) {
           <span className="auth-status-panel__signal" aria-hidden="true" />
           <div>
             <strong>{presentation.title}</strong>
-            <p>{presentation.description} Активное подтверждение сохранено, если сервер не сообщил, что challenge истёк.</p>
+            <p>{presentation.description} Текущее подтверждение можно повторить, пока сервер не сообщил, что время его действия истекло.</p>
           </div>
         </section>
       );
