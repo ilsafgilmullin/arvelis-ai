@@ -52,6 +52,33 @@ function assertUniqueIds(items: ReadonlyArray<{ id: string }>, operation: string
   }
 }
 
+function assertStartRequest(request: AuthStartRequest): AuthStartRequest {
+  const methodId = request.methodId.trim();
+  const identifier = request.identifier;
+
+  if ((request.intent !== 'sign_in' && request.intent !== 'sign_up')
+    || !methodId
+    || methodId.length > AUTH_PROTOCOL_LIMITS.methodIdLength
+    || (identifier !== undefined && identifier.length > AUTH_PROTOCOL_LIMITS.identifierLength)) {
+    throw new AuthProtocolError('start-request');
+  }
+
+  return { ...request, methodId };
+}
+
+function assertCompleteRequest(request: AuthCompleteRequest): AuthCompleteRequest {
+  const challengeId = request.challengeId.trim();
+  const response = request.response;
+
+  if (!challengeId
+    || challengeId.length > AUTH_PROTOCOL_LIMITS.idLength
+    || (response !== undefined && response.length > AUTH_PROTOCOL_LIMITS.challengeResponseLength)) {
+    throw new AuthProtocolError('complete-request');
+  }
+
+  return { ...request, challengeId };
+}
+
 function parseStartResult(value: unknown): AuthStartResult {
   if (!isRecord(value) || typeof value.ok !== 'boolean') {
     throw new AuthProtocolError('start');
@@ -129,11 +156,13 @@ export function createGuardedAuthGateway(transport: AuthTransport): AuthGateway 
     },
 
     async start(request) {
-      return parseStartResult(await transport.start(request));
+      const safeRequest = assertStartRequest(request);
+      return parseStartResult(await transport.start(safeRequest));
     },
 
     async complete(request) {
-      return parseCompleteResult(await transport.complete(request));
+      const safeRequest = assertCompleteRequest(request);
+      return parseCompleteResult(await transport.complete(safeRequest));
     },
 
     async signOut() {
