@@ -31,6 +31,7 @@ class MemoryAccountReader implements AccountAuthenticationReader {
 class MemorySessionStore implements SessionStore {
   readonly records = new Map<string, SessionRecord>();
   failList = false;
+  failRevoke = false;
 
   async create(record: SessionRecord): Promise<void> {
     if (this.records.has(record.id)) throw new Error('duplicate session id');
@@ -55,6 +56,7 @@ class MemorySessionStore implements SessionStore {
     revokedAt: number,
     reason: SessionRevokeReason,
   ): Promise<boolean> {
+    if (this.failRevoke) throw new Error('simulated revoke failure');
     const record = this.records.get(sessionId);
     if (!record || record.accountId !== accountId || record.revokedAt !== null) return false;
     this.records.set(sessionId, { ...record, revokedAt, revokeReason: reason });
@@ -66,6 +68,7 @@ class MemorySessionStore implements SessionStore {
     revokedAt: number,
     reason: SessionRevokeReason,
   ): Promise<number> {
+    if (this.failRevoke) throw new Error('simulated revoke-all failure');
     let count = 0;
     for (const [id, record] of this.records) {
       if (record.accountId === accountId && record.revokedAt === null) {
@@ -153,10 +156,17 @@ async function main(): Promise<void> {
   };
   accounts.accounts.set(otherAccount.id, { ...otherAccount });
   const foreignRevoke = await service.revokeOwned(otherAccount.id, issued.session.sessionId);
-  assert(!foreignRevoke, 'session could be revoked through another account id');
+  assert(foreignRevoke.ok && !foreignRevoke.revoked, 'session could be revoked through another account id');
+
+  store.failRevoke = true;
+  const revokeFailure = await service.revokeOwned(account.id, issued.session.sessionId);
+  assert(!revokeFailure.ok && revokeFailure.error === 'service_unavailable', 'revoke database failure was masked');
+  const revokeAllFailure = await service.revokeAllForAccount(account.id);
+  assert(!revokeAllFailure.ok && revokeAllFailure.error === 'service_unavailable', 'revoke-all database failure was masked');
+  store.failRevoke = false;
 
   const revoked = await service.revokeOwned(account.id, issued.session.sessionId, 'user_sign_out');
-  assert(revoked, 'owned session was not revoked');
+  assert(revoked.ok && revoked.revoked, 'owned session was not revoked');
   const afterRevoke = await service.authenticate({
     sessionId: issued.session.sessionId,
     secret: issued.session.secret,
