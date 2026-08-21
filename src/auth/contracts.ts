@@ -128,6 +128,6 @@ export type AuthUiState =
   | { status: 'signing_out'; session: AuthSession }
   | { status: 'sign_out_error'; session: AuthSession; error: AuthFailure }
   | { status: 'session_expired' }
-  | { status: 'offline' }
-  | { status: 'rate_limited'; retryAfterSeconds?: number }
-  | { status: 'error'; error: AuthFailure };
+  | { status: 'offline'; intent: AuthIntent }
+  | { status: 'rate_limited'; intent: AuthIntent; retryAfterSeconds?: number }
+  | { status: 'error'; intent: AuthIntent; error: AuthFailure };
