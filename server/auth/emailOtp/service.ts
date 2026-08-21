@@ -1,5 +1,6 @@
 import type {
   EmailOtpChallengeRecord,
+  EmailOtpChallengeStore,
   EmailOtpClock,
   EmailOtpDeliveryPort,
   EmailOtpFailure,
@@ -14,7 +15,6 @@ import type {
 } from './contracts';
 import { emailOtpRateIdentity, maskEmailOtpAddress, normalizeEmailOtpAddress } from './emailAddress';
 import { EMAIL_OTP_POLICY_CANDIDATE, type EmailOtpPolicy } from './policy';
-import type { EmailOtpChallengeStore } from './contracts';
 
 const CHALLENGE_ID_PATTERN = /^[a-f0-9]{32}$/;
 const MAX_CLIENT_KEY_LENGTH = 256;
@@ -145,6 +145,7 @@ export class EmailOtpService {
         email,
         codeMac,
         createdAt: now,
+        activatedAt: null,
         expiresAt,
         attempts: 0,
         maxAttempts: this.policy.maxAttempts,
@@ -152,7 +153,7 @@ export class EmailOtpService {
         supersededAt: null,
       };
 
-      await this.store.createReplacingActive(record);
+      await this.store.createPending(record);
 
       try {
         await this.delivery.sendCode({
@@ -165,10 +166,21 @@ export class EmailOtpService {
         try {
           await this.store.delete(challengeId);
         } catch {
-          // Best-effort rollback. An undelivered challenge still expires and
-          // cannot reveal its code because only the HMAC is persisted.
+          // Best-effort cleanup. A pending challenge is never verifiable and
+          // expires even when cleanup cannot complete immediately.
         }
         return { ok: false, error: failure('delivery_unavailable') };
+      }
+
+      const activated = await this.store.activateReplacingActive(challengeId, this.now());
+      if (!activated) {
+        try {
+          await this.store.delete(challengeId);
+        } catch {
+          // Best-effort cleanup. Existing active challenge remains untouched
+          // when activation is implemented atomically by the persistence port.
+        }
+        return { ok: false, error: failure('service_unavailable') };
       }
 
       return {
