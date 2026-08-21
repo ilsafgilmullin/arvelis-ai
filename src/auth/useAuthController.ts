@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type {
+  AuthChallenge,
   AuthCompleteRequest,
   AuthFailure,
   AuthGateway,
@@ -104,10 +105,10 @@ export function useAuthController(gateway: AuthGateway | null) {
     dispatch({ type: 'SET_INTENT', intent });
   }, []);
 
-  const start = useCallback(async (request: AuthStartRequest) => {
+  const start = useCallback(async (request: AuthStartRequest): Promise<AuthChallenge | null> => {
     if (!gateway) {
       dispatch({ type: 'FAILURE', error: { code: 'service_unavailable', message: 'Auth backend is not connected' } });
-      return false;
+      return null;
     }
 
     const sequence = ++authSequenceRef.current;
@@ -115,19 +116,19 @@ export function useAuthController(gateway: AuthGateway | null) {
 
     try {
       const result = await gateway.start(request);
-      if (sequence !== authSequenceRef.current) return false;
+      if (sequence !== authSequenceRef.current) return null;
 
       if (!result.ok) {
         dispatch({ type: 'FAILURE', error: result.error });
-        return false;
+        return null;
       }
 
       dispatch({ type: 'CHALLENGE', intent: request.intent, challenge: result.challenge });
-      return true;
+      return result.challenge;
     } catch {
-      if (sequence !== authSequenceRef.current) return false;
+      if (sequence !== authSequenceRef.current) return null;
       dispatch({ type: 'FAILURE', error: unexpectedFailure() });
-      return false;
+      return null;
     }
   }, [gateway]);
 
