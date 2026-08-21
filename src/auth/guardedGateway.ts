@@ -20,6 +20,8 @@ import {
 
 type UnknownRecord = Record<string, unknown>;
 
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
+
 export interface AuthTransport {
   getMethods(): Promise<unknown>;
   restoreSession(): Promise<unknown>;
@@ -44,6 +46,10 @@ function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function containsControlCharacters(value: string): boolean {
+  return CONTROL_CHARACTER_PATTERN.test(value);
+}
+
 function assertUniqueIds(items: ReadonlyArray<{ id: string }>, operation: string): void {
   const ids = new Set<string>();
   for (const item of items) {
@@ -54,16 +60,23 @@ function assertUniqueIds(items: ReadonlyArray<{ id: string }>, operation: string
 
 function assertStartRequest(request: AuthStartRequest): AuthStartRequest {
   const methodId = request.methodId.trim();
-  const identifier = request.identifier;
+  const identifier = request.identifier?.trim();
 
   if ((request.intent !== 'sign_in' && request.intent !== 'sign_up')
     || !methodId
     || methodId.length > AUTH_PROTOCOL_LIMITS.methodIdLength
-    || (identifier !== undefined && identifier.length > AUTH_PROTOCOL_LIMITS.identifierLength)) {
+    || containsControlCharacters(methodId)
+    || (identifier !== undefined && (
+      !identifier
+      || identifier.length > AUTH_PROTOCOL_LIMITS.identifierLength
+      || containsControlCharacters(identifier)
+    ))) {
     throw new AuthProtocolError('start-request');
   }
 
-  return { ...request, methodId };
+  return identifier === undefined
+    ? { intent: request.intent, methodId }
+    : { intent: request.intent, methodId, identifier };
 }
 
 function assertCompleteRequest(request: AuthCompleteRequest): AuthCompleteRequest {
@@ -72,8 +85,10 @@ function assertCompleteRequest(request: AuthCompleteRequest): AuthCompleteReques
 
   if (!challengeId
     || challengeId.length > AUTH_PROTOCOL_LIMITS.idLength
+    || containsControlCharacters(challengeId)
     || !response
-    || response.length > AUTH_PROTOCOL_LIMITS.challengeResponseLength) {
+    || response.length > AUTH_PROTOCOL_LIMITS.challengeResponseLength
+    || containsControlCharacters(response)) {
     throw new AuthProtocolError('complete-request');
   }
 
@@ -180,7 +195,9 @@ export function createGuardedAuthGateway(transport: AuthTransport): AuthGateway 
 
     async revokeSession(sessionId) {
       const normalizedId = sessionId.trim();
-      if (!normalizedId || normalizedId.length > AUTH_PROTOCOL_LIMITS.idLength) {
+      if (!normalizedId
+        || normalizedId.length > AUTH_PROTOCOL_LIMITS.idLength
+        || containsControlCharacters(normalizedId)) {
         throw new AuthProtocolError('revoke-session');
       }
       await transport.revokeSession(normalizedId);
