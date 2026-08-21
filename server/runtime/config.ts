@@ -1,10 +1,13 @@
 import type { SmtpEmailOtpDeliveryConfig } from '../auth/emailOtp/smtpDelivery';
 
 export type CookieSecureMode = 'auto' | 'always' | 'never';
+export type AuthDatabaseConfig =
+  | { provider: 'sqlite'; path: string }
+  | { provider: 'postgres'; url: string };
 
 export type AuthRuntimeConfig = {
   port: number;
-  databaseUrl: string;
+  database: AuthDatabaseConfig;
   otpPepper: Uint8Array;
   sessionPepper: Uint8Array;
   smtp: SmtpEmailOtpDeliveryConfig;
@@ -51,6 +54,17 @@ function parseHexSecret(name: string): Uint8Array {
   return bytes;
 }
 
+function loadDatabaseConfig(): AuthDatabaseConfig {
+  const provider = process.env.AUTH_DB_PROVIDER?.trim() || 'sqlite';
+  if (provider === 'sqlite') {
+    const path = process.env.AUTH_SQLITE_PATH?.trim() || '.data/arvelis-auth.sqlite';
+    if (!path) throw new Error('Invalid AUTH_SQLITE_PATH');
+    return { provider: 'sqlite', path };
+  }
+  if (provider === 'postgres') return { provider: 'postgres', url: required('DATABASE_URL') };
+  throw new Error('Invalid AUTH_DB_PROVIDER');
+}
+
 function loadSmtpConfig(): SmtpEmailOtpDeliveryConfig {
   const port = parsePort(process.env.SMTP_PORT, 465);
   return {
@@ -66,7 +80,7 @@ function loadSmtpConfig(): SmtpEmailOtpDeliveryConfig {
 export function loadAuthRuntimeConfig(): AuthRuntimeConfig {
   return {
     port: parsePort(process.env.AUTH_API_PORT, 3001),
-    databaseUrl: required('DATABASE_URL'),
+    database: loadDatabaseConfig(),
     otpPepper: parseHexSecret('AUTH_OTP_PEPPER_HEX'),
     sessionPepper: parseHexSecret('AUTH_SESSION_PEPPER_HEX'),
     smtp: loadSmtpConfig(),
