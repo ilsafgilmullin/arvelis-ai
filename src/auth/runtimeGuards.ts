@@ -38,7 +38,12 @@ function isOptionalNonEmptyBoundedString(value: unknown, maxLength: number): val
 }
 
 function parseTimestamp(value: unknown): number | null {
-  if (typeof value !== 'string' || value.length === 0 || value.length > 64) return null;
+  if (typeof value !== 'string'
+    || value.length === 0
+    || value.length > 64
+    || containsUnsafeProtocolCharacters(value)) {
+    return null;
+  }
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? timestamp : null;
 }
