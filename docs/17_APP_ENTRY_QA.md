@@ -57,6 +57,16 @@
 7. Ошибка session-list API не должна отображаться как «сессий нет».
 8. Session-management actions имеют mobile touch target не меньше 44px.
 
+## Local preview profile integrity
+
+1. Системное имя `Пользователь ARVELIS` имеет один source of truth в `src/auth/previewProfile.ts`.
+2. Registration, Profile, App entry, Home greeting и browser storage используют общую preview-profile policy.
+3. Control/format characters отклоняются **до** whitespace normalization; `\n`, `\t`, zero-width/format characters не могут незаметно превратиться в валидное пользовательское имя.
+4. Допустимое legacy whitespace нормализуется к canonical форме перед попаданием в application state.
+5. Повреждённый/невалидный `profileName` из localStorage сбрасывает только имя к системному default и не уничтожает иначе валидные локальные диалоги.
+6. Persistence принимает только canonical пользовательское имя либо системный default reset-state; raw non-canonical/control-character value не записывается.
+7. `AuthScreen` повторно guard-ит входящий existing-profile value и не показывает повреждённое имя как найденный локальный профиль.
+
 ## PWA / iPhone
 
 1. `viewport-fit=cover` сохранён.
@@ -103,7 +113,7 @@ Server-side validation остаётся обязательной даже при
 
 В PR добавлена no-dependency команда `npm run test:auth`.
 
-Она использует отдельный `tsconfig.auth-smoke.json` и компилирует pure Auth Core с:
+Она использует отдельный `tsconfig.auth-smoke.json` и компилирует Auth Core + local preview profile/storage boundary с:
 
 - `strict`;
 - `noUncheckedIndexedAccess`;
@@ -120,9 +130,14 @@ Behavioral assertions покрывают:
 - multiple current sessions;
 - empty code response;
 - recoverable challenge preservation;
-- failed logout live-session preservation.
+- failed logout live-session preservation;
+- preview-profile control/format characters;
+- reserved/default name semantics;
+- canonical legacy whitespace normalization;
+- corrupt localStorage profile recovery без потери healthy threads;
+- отказ persistence для non-canonical/corrupt profile name.
 
-Аналогичный isolated smoke фактически выполнен локально на Node 22 / TypeScript 5.8.3 и прошёл. Это **не заменяет** project TypeScript 6.0.3 build.
+Isolated smoke фактически выполнялся локально на Node 22 / TypeScript 5.8.3 и прошёл. Это **не заменяет** project TypeScript 6.0.3 build.
 
 ## Known gates
 
