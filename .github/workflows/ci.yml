@@ -59,6 +59,9 @@ jobs:
       - name: Server email OTP smoke
         run: npm run test:server-auth
 
+      - name: Auth server runtime build
+        run: npm run build:auth-server
+
       - name: Auth database migration
         run: npm run db:migrate
 
