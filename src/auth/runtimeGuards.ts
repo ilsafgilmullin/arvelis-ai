@@ -55,7 +55,7 @@ export function isAuthMethodDescriptor(value: unknown): value is AuthMethodDescr
   if (!isRecord(value)) return false;
   if (!isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.methodIdLength)) return false;
   if (!isBoundedString(value.label, AUTH_PROTOCOL_LIMITS.labelLength) || typeof value.enabled !== 'boolean') return false;
-  if (value.kind !== 'identifier' && value.kind !== 'external' && value.kind !== 'passkey') return false;
+  if (value.kind !== 'identifier' && value.kind !== 'external') return false;
 
   if (value.identifierType !== undefined && value.identifierType !== 'email' && value.identifierType !== 'phone') {
     return false;
@@ -137,7 +137,7 @@ export function isAuthChallenge(value: unknown): value is AuthChallenge {
   if (!isRecord(value)) return false;
   if (!isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)) return false;
   if (!isBoundedString(value.methodId, AUTH_PROTOCOL_LIMITS.methodIdLength)) return false;
-  if (value.kind !== 'code' && value.kind !== 'external_redirect' && value.kind !== 'passkey') return false;
+  if (value.kind !== 'code' && value.kind !== 'external_redirect') return false;
   if (!isOptionalBoundedString(value.maskedDestination, AUTH_PROTOCOL_LIMITS.maskedDestinationLength)) return false;
   if (!isOptionalBoundedString(value.redirectUrl, AUTH_PROTOCOL_LIMITS.redirectUrlLength)) return false;
   if (value.expiresAt !== undefined && !isIsoLikeDate(value.expiresAt)) return false;
