@@ -1,0 +1,73 @@
+/* ARVELIS AI real email OTP auth rollout layer. */
+
+.auth-preview-badge--secure {
+  border-color: rgba(214, 170, 70, .28);
+  background: rgba(214, 170, 70, .055);
+  color: var(--gold-light);
+}
+
+.auth-form--v2 + .auth-status-panel,
+.auth-mode-switch + .auth-status-panel,
+.auth-conflict-action + .auth-security-note {
+  margin-top: 16px;
+}
+
+.auth-secondary-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.auth-secondary-actions .button {
+  min-height: 44px;
+}
+
+.auth-link-button {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.auth-link-button:hover,
+.auth-link-button:focus-visible {
+  color: var(--gold-light);
+}
+
+.auth-link-button:focus-visible {
+  outline: 1px solid rgba(214, 170, 70, .45);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.auth-link-button:disabled,
+.auth-secondary-actions .button:disabled,
+.auth-mode-switch__item:disabled {
+  cursor: default;
+  opacity: .52;
+}
+
+.auth-conflict-action {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 12px;
+}
+
+.auth-form--v2 input[readonly] {
+  opacity: .82;
+}
+
+@media (max-width: 520px) {
+  .auth-secondary-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-link-button {
+    width: 100%;
+  }
+}
