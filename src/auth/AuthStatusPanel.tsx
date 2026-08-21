@@ -35,6 +35,19 @@ export function AuthStatusPanel({ state }: { state: AuthUiState }) {
       );
     }
 
+    if (state.error) {
+      const presentation = presentAuthFailure(state.error);
+      return (
+        <section className="auth-status-panel auth-status-panel--error" role="alert">
+          <span className="auth-status-panel__signal" aria-hidden="true" />
+          <div>
+            <strong>{presentation.title}</strong>
+            <p>{presentation.description} Активное подтверждение сохранено, если сервер не сообщил, что challenge истёк.</p>
+          </div>
+        </section>
+      );
+    }
+
     return (
       <section className="auth-status-panel" role="status" aria-live="polite">
         <span className="auth-status-panel__signal" aria-hidden="true" />
@@ -51,6 +64,28 @@ export function AuthStatusPanel({ state }: { state: AuthUiState }) {
       <section className="auth-status-panel auth-status-panel--loading" role="status" aria-live="polite">
         <span className="auth-status-panel__signal" aria-hidden="true" />
         <div><strong>Проверяем подтверждение</strong><p>ARVELIS AI завершает проверку и создаёт защищённую сессию.</p></div>
+      </section>
+    );
+  }
+
+  if (state.status === 'signing_out') {
+    return (
+      <section className="auth-status-panel auth-status-panel--loading" role="status" aria-live="polite">
+        <span className="auth-status-panel__signal" aria-hidden="true" />
+        <div><strong>Завершаем сессию</strong><p>Ждём подтверждения от сервера перед тем, как считать выход завершённым.</p></div>
+      </section>
+    );
+  }
+
+  if (state.status === 'sign_out_error') {
+    const presentation = presentAuthFailure(state.error);
+    return (
+      <section className="auth-status-panel auth-status-panel--error" role="alert">
+        <span className="auth-status-panel__signal" aria-hidden="true" />
+        <div>
+          <strong>Не удалось завершить сессию</strong>
+          <p>{presentation.description} В целях безопасности текущая сессия по-прежнему считается активной.</p>
+        </div>
       </section>
     );
   }
