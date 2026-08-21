@@ -1,0 +1,149 @@
+.account-security-panel {
+  margin-top: 24px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .008);
+  overflow: hidden;
+}
+
+.account-security-panel__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.account-security-panel__heading h3 {
+  margin: 8px 0 7px;
+  font-size: 18px;
+  font-weight: 560;
+  letter-spacing: -.025em;
+}
+
+.account-security-panel__heading > div > p:last-child {
+  max-width: 700px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.account-security-panel__status {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  border: 1px solid rgba(214, 170, 70, .18);
+  border-radius: 999px;
+  color: var(--gold);
+  font-size: 7px;
+  font-weight: 760;
+  letter-spacing: .12em;
+}
+
+.account-security-panel__rows {
+  display: grid;
+}
+
+.account-security-row {
+  min-height: 74px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.account-security-row:last-child {
+  border-bottom: 0;
+}
+
+.account-security-row > div {
+  min-width: 0;
+}
+
+.account-security-row strong {
+  display: block;
+  color: #d8d4cb;
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.account-security-row > div > span {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.account-security-row__state {
+  color: #6f757e;
+  font-size: 7px;
+  font-weight: 760;
+  letter-spacing: .09em;
+  white-space: nowrap;
+}
+
+.account-security-row__action {
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #101216;
+  color: #c8c4bb;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.account-security-row__action:hover {
+  border-color: rgba(214, 170, 70, .22);
+  color: var(--gold-light);
+}
+
+.account-security-row--empty {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 780px) {
+  .account-security-panel {
+    margin-top: 20px;
+    border-radius: 12px;
+  }
+
+  .account-security-panel__heading {
+    padding: 18px;
+  }
+
+  .account-security-panel__heading h3 {
+    font-size: 17px;
+  }
+
+  .account-security-row {
+    min-height: 82px;
+    align-items: start;
+    padding: 16px 18px;
+  }
+}
+
+@media (max-width: 420px) {
+  .account-security-panel__heading {
+    display: grid;
+    gap: 12px;
+  }
+
+  .account-security-panel__status {
+    justify-self: start;
+  }
+
+  .account-security-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .account-security-row__state,
+  .account-security-row__action {
+    justify-self: start;
+  }
+}
