@@ -31,6 +31,12 @@ function signedOut(intent: AuthIntent = 'sign_in'): AuthUiState {
   return { status: 'signed_out', intent };
 }
 
+function stateHasLiveSession(state: AuthUiState): boolean {
+  return state.status === 'authenticated'
+    || state.status === 'signing_out'
+    || state.status === 'sign_out_error';
+}
+
 function intentFromState(state: AuthUiState): AuthIntent {
   switch (state.status) {
     case 'signed_out':
@@ -57,7 +63,7 @@ export function authUiReducer(state: AuthUiState, event: AuthUiEvent): AuthUiSta
         : signedOut(event.intent ?? 'sign_in');
 
     case 'SET_INTENT':
-      return signedOut(event.intent);
+      return stateHasLiveSession(state) ? state : signedOut(event.intent);
 
     case 'SUBMIT':
       return { status: 'submitting', intent: event.intent, methodId: event.methodId };
@@ -89,7 +95,7 @@ export function authUiReducer(state: AuthUiState, event: AuthUiEvent): AuthUiSta
       return { status: 'session_expired' };
 
     case 'OFFLINE':
-      return { status: 'offline', intent: intentFromState(state) };
+      return stateHasLiveSession(state) ? state : { status: 'offline', intent: intentFromState(state) };
 
     case 'FAILURE': {
       const intent = intentFromState(state);
