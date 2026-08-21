@@ -77,27 +77,32 @@ Replit:
 
 ### 2. Локальное UI-событие могло забыть live server session
 
-`SET_INTENT` и будущий `OFFLINE` event не должны превращать authenticated user в signed-out только из-за клиентского UI-state.
+`SET_INTENT` и browser offline state не должны превращать authenticated user в signed-out только из-за клиентского UI-state.
 
 Исправлено:
 
 - authenticated/signing-out/sign-out-error state сохраняется при `SET_INTENT`;
-- offline event сам по себе не разлогинивает live session.
+- offline event сам по себе не разлогинивает live session;
+- controller не начинает новый `sign_in/sign_up` поверх live session;
+- `setIntent()` не инвалидирует pending auth sequence, когда session уже жива.
 
 ### 3. Failed logout мог выдавать ложное состояние
 
-Исправлено ранее в текущем PR:
+Исправлено:
 
 - `signing_out` хранит live session;
 - `sign_out_error` сохраняет session при server failure;
 - session list не маскируется как empty;
-- UI прямо сообщает, что сессия всё ещё считается активной.
+- UI прямо сообщает, что сессия всё ещё считается активной;
+- если `AuthGateway` недоступен, logout **не** считается успешным: server revoke не подтверждён.
 
 ### 4. Recoverable code error уничтожала challenge
 
 Исправлено:
 
-- invalid/recoverable code/network/service error может вернуть пользователя в тот же active code challenge;
+- invalid/recoverable code/network/service error возвращает пользователя в тот же active code challenge;
+- stale/mismatched `challengeId` не отправляется в transport и не уничтожает текущий валидный code challenge;
+- отсутствие gateway во время code completion сохраняет challenge с безопасной service-unavailable ошибкой;
 - expired/locked/denied state остаётся отдельным failure path.
 
 ### 5. OAuth и first-party code completion были слишком универсальны
@@ -106,6 +111,7 @@ Replit:
 
 - `complete()` — только first-party `code` challenge;
 - `external_redirect` ведёт на HTTPS authorization URL;
+- попытка вызвать first-party `complete()` для active external flow не разрушает redirect state;
 - provider callback завершается ARVELIS backend/BFF;
 - frontend после возврата делает `restoreSession()`;
 - provider authorization code/token не становится обычным React state.
@@ -137,6 +143,24 @@ Replit:
 `AuthTransport (unknown) → runtime guards → guarded AuthGateway → controller/UI`.
 
 Fail closed для malformed account/session/challenge/failure/method payload.
+
+### 9. Повторный restore мог разрушить уже подтверждённую session при transport failure
+
+Исправлено:
+
+- если session уже жива, `restore()` не переводит UI обратно в `checking_session`;
+- trusted `session=null` от backend остаётся авторитетным sign-out;
+- network/transport failure при revalidation сохраняет существующую live session;
+- method catalog refresh остаётся независимым;
+- `restore()` не стартует во время `signing_out`, чтобы не гоняться с server logout.
+
+### 10. Controller callbacks могли работать со stale render-state
+
+Исправлено:
+
+- актуальный auth state зеркалируется через `stateRef`;
+- start/setIntent/signOut/revoke/complete используют текущий lifecycle state для security gating;
+- code completion не зависит от stale React closure для проверки активного challenge.
 
 ## Фактические проверки
 
@@ -172,6 +196,13 @@ Fail closed для malformed account/session/challenge/failure/method payload.
 
 6. `tests/auth-core-smoke.ts` добавлен в репозиторий; `npm run test:auth` включён в `npm run check` и CI.
 
+7. После финального restore/challenge race-hardening отдельно повторён isolated controller strict compile-smoke:
+   - Node `22.16.0`;
+   - TypeScript `5.8.3`;
+   - `strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes`;
+   - typed React hook stubs;
+   - результат: PASS.
+
 ### Не заявляется как выполненное
 
 - repository TypeScript `6.0.3` `npm run typecheck`;
@@ -183,7 +214,7 @@ Fail closed для malformed account/session/challenge/failure/method payload.
 
 ## CI gate
 
-Последний проверенный GitHub Actions run текущего RC-прохода создаёт job `validate`, но GitHub возвращает:
+Последние проверенные GitHub Actions runs текущего RC-прохода создают job `validate`, но GitHub возвращает:
 
 - conclusion: failure;
 - `steps=null`;
@@ -197,7 +228,7 @@ Workflow YAML по видимой конфигурации обычный и с�
 
 `package-lock.json` отсутствует.
 
-В ходе RC-аудита повторно проверена возможность получить npm registry из изолированной среды — запрос завершился timeout. Поэтому lockfile не генерировался вручную и не фабриковался.
+В ходе RC-аудита повторно проверена возможность получить npm registry из изолированной среды — запрос завершился timeout, npm cache нужных зависимостей отсутствует. Поэтому lockfile не генерировался вручную и не фабриковался.
 
 До production foundation необходимо:
 
