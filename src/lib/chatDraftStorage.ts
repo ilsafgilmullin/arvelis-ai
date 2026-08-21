@@ -9,6 +9,8 @@ const MAX_DRAFT_STORE_CHARS = 1_000_000;
 
 type DraftStore = Record<string, string>;
 
+let activeAccountScopeId: string | undefined;
+
 function isValidThreadPart(value: string): boolean {
   if (value === 'new') return true;
   return value.length > 0 && value.length <= MAX_THREAD_ID_LENGTH && value.trim() === value;
@@ -78,7 +80,13 @@ function writeDraftStore(store: DraftStore): boolean {
   }
 }
 
-export function chatDraftKey(threadId: string | null, accountScopeId?: string): string {
+export function setChatDraftAccountScope(accountScopeId?: string): boolean {
+  if (accountScopeId !== undefined && !ACCOUNT_SCOPE_PATTERN.test(accountScopeId)) return false;
+  activeAccountScopeId = accountScopeId;
+  return true;
+}
+
+export function chatDraftKey(threadId: string | null, accountScopeId = activeAccountScopeId): string {
   const threadPart = threadId ?? 'new';
   if (!isValidThreadPart(threadPart)) return '';
   if (accountScopeId === undefined) return `${PREVIEW_DRAFT_PREFIX}${threadPart}`;
@@ -123,7 +131,7 @@ export function removeChatDraft(key: string): boolean {
   return writeDraftStore(store);
 }
 
-export function clearChatDrafts(accountScopeId?: string): boolean {
+export function clearChatDrafts(accountScopeId = activeAccountScopeId): boolean {
   if (typeof window === 'undefined') return false;
 
   try {
