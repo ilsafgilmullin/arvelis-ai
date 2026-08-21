@@ -38,6 +38,9 @@ jobs:
       - name: Auth core smoke
         run: npm run test:auth
 
+      - name: Server email OTP smoke
+        run: npm run test:server-auth
+
       - name: Build
         run: npm run build
 
