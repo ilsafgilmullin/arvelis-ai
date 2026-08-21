@@ -1,79 +1,89 @@
-# ARVELIS AI — бесплатная отправка auth email через Яндекс Почту
+# ARVELIS AI — бесплатная Яндекс Почта для auth test
 
 Дата: 2026-08-21.
-Статус: **test/auth provider candidate, без платного cloud billing**.
+Статус: **development / closed-test setup, не production email**.
 
-Этот setup предназначен для закрытого тестирования регистрации ARVELIS AI. Он не утверждает production email provider и не является production deploy approval.
+## Решение
 
-## Цель
+Для закрытого тестирования Email OTP используется обычный бесплатный ящик Яндекс Почты через generic SMTP adapter.
 
-Получить реальную доставку OTP без отдельного платного email-сервиса, billing account и собственного домена.
+Yandex Cloud Postbox не используется. Отдельный cloud billing account, Postbox resource и собственный домен для текущего test/auth не требуются.
 
-Для тестовой auth-среды используется обычный бесплатный ящик Яндекс Почты через стандартный SMTP. ARVELIS по-прежнему работает через generic `EmailOtpDeliveryPort` / SMTP adapter, поэтому provider можно заменить без изменения Account/Session/frontend.
+## Что нужно создать
 
-## Что требуется
+Отдельный тестовый mailbox для ARVELIS, не личный основной ящик пользователя.
 
-Нужен отдельный Яндекс ID/почтовый ящик для тестовой отправки, например технический ящик ARVELIS. Не используйте личный основной аккаунт владельца проекта.
+Фактический адрес не фиксируется в GitHub и задаётся только в protected environment.
 
-В Яндекс ID создаётся отдельный пароль приложения типа «Почта». Обычный пароль аккаунта в ARVELIS не используется.
+## Пароль приложения
 
-## SMTP параметры
+Для SMTP используется отдельный пароль приложения типа «Почта».
 
-Официальные параметры Яндекс Почты для отправки:
+Обычный пароль Yandex ID нельзя использовать как ARVELIS SMTP secret.
 
-- SMTP server: `smtp.yandex.ru`;
-- port: `465`;
-- SSL: enabled;
-- username: полный адрес/логин почтового ящика;
-- password: отдельный пароль приложения для Почты.
+Пароль приложения нельзя:
 
-ARVELIS transport дополнительно требует TLS `1.2+`.
+- отправлять в чат;
+- коммитить в GitHub;
+- вставлять в frontend code;
+- записывать в документацию;
+- показывать на screenshots.
 
-## Protected environment
+## SMTP configuration
 
-Тестовая среда должна хранить значения только в защищённых secrets/environment:
+Test preset:
 
 ```text
-DATABASE_URL=<protected PostgreSQL connection string>
-AUTH_OTP_PEPPER_HEX=<independent 32+ random bytes as hex>
-AUTH_SESSION_PEPPER_HEX=<different independent 32+ random bytes as hex>
-
 SMTP_HOST=smtp.yandex.ru
 SMTP_PORT=465
 SMTP_SECURE=true
-SMTP_USERNAME=<test Yandex Mail address/login>
-SMTP_PASSWORD=<mail app password>
-SMTP_FROM=<same test Yandex Mail address>
-
-AUTH_TRUST_PROXY=<environment-specific>
-AUTH_COOKIE_SECURE=auto
-VITE_REAL_AUTH_ENABLED=false
+SMTP_USERNAME=<test mailbox>
+SMTP_PASSWORD=<Mail app password>
+SMTP_FROM=<same test mailbox>
 ```
 
-Ни `SMTP_PASSWORD`, ни peppers, ни `DATABASE_URL` нельзя помещать в GitHub, screenshots, frontend env или документацию.
+Transport ARVELIS требует TLS `1.2+`.
 
-## Rollout gate
+## Бесплатная test БД
 
-До включения frontend real-auth:
+Закрытый auth test использует встроенный SQLite path:
 
-1. подготовить тестовую PostgreSQL instance;
-2. сохранить `DATABASE_URL` только в protected environment;
-3. выполнить `npm run db:migrate`;
-4. выполнить `npm run check:with-db`;
-5. запустить auth runtime;
-6. запросить OTP на тестовый email;
-7. подтвердить фактическую доставку письма;
-8. проверить, что raw OTP/secrets/session secret не попадают в логи;
-9. только после этого включать `VITE_REAL_AUTH_ENABLED=true` в тестовой среде;
-10. выполнить iPhone E2E: регистрация → OTP → Account → HttpOnly Session → refresh restore → logout → login.
+```text
+AUTH_DB_PROVIDER=sqlite
+AUTH_SQLITE_PATH=.data/arvelis-auth.sqlite
+```
 
-## Ограничение
+Внешний PostgreSQL/cloud DB для этого test flow не требуется.
 
-Обычная Яндекс Почта подходит для разработки и закрытого тестирования, но не фиксируется как production transactional-email provider. У неё могут действовать антиспам/суточные ограничения, и production sender/domain/reputation должны быть выбраны отдельно перед публичным запуском.
+SQLite используется только в development workspace; published Replit filesystem не является production-persistent storage.
 
-## Что было безопасно отменено
+## Остальные protected secrets
 
-Ранее выбранный Yandex Cloud Postbox отменён до активации инфраструктуры. Postbox resource, billing, domain sender и API credentials не создавались, поэтому rollback не требует удаления данных или cloud-ресурсов.
+Также нужны два независимых high-entropy server secrets:
+
+```text
+AUTH_OTP_PEPPER_HEX=<32+ random bytes in hex>
+AUTH_SESSION_PEPPER_HEX=<different 32+ random bytes in hex>
+```
+
+Они должны быть разными и храниться только в Replit Secrets/environment.
+
+## Rollout order
+
+1. Фактически пройти TypeScript/build + SQLite smoke.
+2. Создать отдельный бесплатный test mailbox.
+3. Создать Mail app password.
+4. Добавить SMTP credentials и два pepper только в protected Replit Secrets.
+5. Запустить `npm run dev:auth` в test environment.
+6. Проверить `/api/health` и `persistence=sqlite`.
+7. Запросить OTP на тестовый email и подтвердить реальную доставку.
+8. Проверить отсутствие raw OTP, session secret и SMTP password в логах.
+9. Только после этого включить `VITE_REAL_AUTH_ENABLED=true` в test Replit environment.
+10. Выполнить iPhone E2E: sign-up → OTP → session → refresh → logout → sign-in.
+
+## Production
+
+Обычная Яндекс Почта и локальный SQLite — только закрытый test stack. Перед публичным запуском отдельно утверждаются production transactional mail, persistent DB, регион хранения, backups, privacy/retention и эксплуатационные лимиты.
 
 ## Проверенные официальные источники на 2026-08-21
 
