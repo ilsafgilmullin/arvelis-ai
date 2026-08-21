@@ -22,6 +22,7 @@ import './real-auth-v1.css';
 import './account-security.css';
 import './home-foundation-v1.css';
 import './profile-foundation-v1.css';
+import './profile-auth-mobile-qa.css';
 import './history-foundation-v1.css';
 
 const root = document.getElementById('root');
