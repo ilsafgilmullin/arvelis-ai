@@ -1,3 +1,4 @@
+import { isDefaultPreviewProfileName, normalizePreviewProfileName } from '../auth/previewProfile';
 import { BrandMark } from '../components/Brand';
 import { ArrowIcon, ChatIcon } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
@@ -11,8 +12,8 @@ import type { DemoThread } from '../types';
 function greetingFor(profileName: string): string {
   const hour = new Date().getHours();
   const greeting = hour < 6 ? 'Доброй ночи' : hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
-  const normalized = profileName.trim();
-  if (!normalized || normalized === 'Пользователь ARVELIS') return greeting;
+  const normalized = normalizePreviewProfileName(profileName);
+  if (!normalized || isDefaultPreviewProfileName(normalized)) return greeting;
   const firstName = normalized.split(/\s+/)[0] ?? normalized;
   return `${greeting}, ${firstName}`;
 }
