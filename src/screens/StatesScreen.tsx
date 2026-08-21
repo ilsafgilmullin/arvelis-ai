@@ -12,17 +12,20 @@ const content: Record<SystemState, { label: string; kicker: string; title: strin
   limit: { label: 'Лимит', kicker: 'LIMIT', title: 'Достигнут лимит', copy: 'Это только UX-preview. Тарифы, квоты и биллинг ARVELIS AI ещё не утверждены.' },
 };
 
-type AuthPreviewState = 'checking' | 'submitting' | 'challenge' | 'expired' | 'offline' | 'rate' | 'error';
+type AuthPreviewState = 'checking' | 'submitting' | 'challenge' | 'verifying' | 'expired' | 'offline' | 'rate' | 'error';
 
 const authPreviewLabels: Record<AuthPreviewState, string> = {
   checking: 'Проверка',
   submitting: 'Вход',
   challenge: 'Подтверждение',
+  verifying: 'Проверка кода',
   expired: 'Сессия',
   offline: 'Офлайн',
   rate: 'Лимит',
   error: 'Ошибка',
 };
+
+const previewChallenge = { id: 'preview-challenge', methodId: 'preview-method', kind: 'code' as const };
 
 const authPreviewStates: Record<AuthPreviewState, AuthUiState> = {
   checking: { status: 'checking_session' },
@@ -30,7 +33,12 @@ const authPreviewStates: Record<AuthPreviewState, AuthUiState> = {
   challenge: {
     status: 'challenge',
     intent: 'sign_in',
-    challenge: { id: 'preview-challenge', methodId: 'preview-method', kind: 'code' },
+    challenge: previewChallenge,
+  },
+  verifying: {
+    status: 'verifying',
+    intent: 'sign_in',
+    challenge: previewChallenge,
   },
   expired: { status: 'session_expired' },
   offline: { status: 'offline' },
