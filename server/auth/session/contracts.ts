@@ -80,6 +80,14 @@ export type SessionListResult =
   | { ok: true; sessions: SessionSummary[] }
   | { ok: false; error: 'invalid_request' | 'service_unavailable' };
 
+export type SessionRevokeResult =
+  | { ok: true; revoked: boolean }
+  | { ok: false; error: 'invalid_request' | 'service_unavailable' };
+
+export type SessionRevokeAllResult =
+  | { ok: true; revoked: number }
+  | { ok: false; error: 'invalid_request' | 'service_unavailable' };
+
 export interface SessionStore {
   create(record: SessionRecord): Promise<void>;
   findById(sessionId: string): Promise<SessionRecord | null>;
