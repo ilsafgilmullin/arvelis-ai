@@ -13,7 +13,7 @@ export function ProfileScreen({
   profileName: string;
   onSaveName: (name: string) => void;
   onOpenStates: () => void;
-  onSignOut: () => void;
+  onSignOut?: () => void;
   onReset: () => void;
 }) {
   const [name, setName] = useState(profileName);
@@ -27,6 +27,14 @@ export function ProfileScreen({
     onSaveName(normalizedName);
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1400);
+  };
+
+  const signOutPreview = () => {
+    if (onSignOut) {
+      onSignOut();
+      return;
+    }
+    window.location.reload();
   };
 
   const reset = () => {
@@ -58,7 +66,7 @@ export function ProfileScreen({
           </div>
         </div>
 
-        <button className="setting-action" type="button" onClick={onSignOut}>
+        <button className="setting-action" type="button" onClick={signOutPreview}>
           <SignOutIcon /><div><strong>Выйти из preview-профиля</strong><span>Вернёт на экран входа. Локальные диалоги и настройки останутся на этом устройстве.</span></div><span>Выйти</span>
         </button>
 
