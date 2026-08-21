@@ -19,7 +19,7 @@
 - `external` с `identifierType`;
 - oversized id/label;
 - malformed enabled flag;
-- control characters в protocol strings.
+- Unicode control/format characters в protocol strings, включая bidi overrides и zero-width format controls.
 
 Временная ошибка method catalog **не инвалидирует уже восстановленную ARVELIS session**.
 
@@ -36,20 +36,22 @@ Fail closed:
 - `emailVerified=true` без email;
 - `phoneVerified=true` без phone;
 - oversized account/display fields;
-- control characters в server-provided account/session strings.
+- Unicode control/format characters в server-provided account/session strings.
 
 `null` означает обычный signed-out state и не считается protocol error.
 
 ## 3. Start auth
 
-Outgoing request блокируется до transport, если:
+Outgoing request блокируется **на raw value до trim/normalization**, если:
 
 - intent неизвестен;
 - method id пустой/oversized;
-- method id содержит control characters;
-- identifier присутствует, но пустой после trim;
+- raw method id содержит Unicode control/format character, в том числе leading/trailing `\n`/`\t`, bidi override или zero-width format control;
+- identifier присутствует, но пустой после обычного trim;
 - identifier превышает defensive ceiling;
-- identifier содержит control characters.
+- raw identifier содержит Unicode control/format character.
+
+Обычные пробелы могут нормализоваться после security reject. Control/format character не должен исчезать через normalization и затем попадать в transport.
 
 Backend всё равно повторно валидирует request и остаётся источником истины.
 
@@ -70,7 +72,7 @@ Backend всё равно повторно валидирует request и ос�
 - challenge kind = `code`;
 - request challenge id совпадает с активным challenge;
 - response непустой и находится в protocol ceiling;
-- challenge id/response не содержат control characters.
+- raw challenge id/response не содержат Unicode control/format characters до trim/normalization.
 
 Stale/чужой challenge id не отправляется в transport.
 
@@ -94,7 +96,7 @@ Fail closed:
 - oversized URL;
 - URL с embedded credentials;
 - URL fragment;
-- control characters;
+- Unicode control/format characters;
 - `maskedDestination` в external challenge.
 
 Frontend HTTPS guard **не заменяет** backend provider allowlist.
@@ -109,6 +111,7 @@ Fail closed:
 - success без валидной session;
 - error без поддерживаемого ARVELIS failure code;
 - malformed/oversized error fields;
+- Unicode control/format characters в UI-safe protocol text;
 - oversized `retryAfterSeconds`.
 
 Raw backend/provider error message не отображается напрямую пользователю.
@@ -126,6 +129,7 @@ Fail closed:
 - `expiresAt <= createdAt`;
 - `lastSeenAt` раньше `createdAt` или позже `expiresAt`;
 - пустой device/browser label, если поле присутствует;
+- Unicode control/format characters в id/device/browser labels;
 - malformed timestamps/labels.
 
 UI отдельно различает:
@@ -142,7 +146,7 @@ UI отдельно различает:
 
 - пустой session id;
 - oversized session id;
-- session id с control characters.
+- raw session id с Unicode control/format character, включая trailing/leading `\n`/`\t` до trim.
 
 Backend обязан:
 
@@ -195,7 +199,22 @@ Frontend не показывает подтверждённый logout, если
 - временный сбой method catalog не инвалидирует существующую session;
 - ошибка session-list не инвалидирует существующую session.
 
-## 12. OAuth/OIDC backend negative cases
+## 12. Unicode protocol-text safety
+
+Auth protocol boundary использует единый `containsUnsafeProtocolCharacters()` и должен отклонять Unicode general category `C*` до попадания security-sensitive текста в application state или transport.
+
+Особенно проверяются:
+
+- C0/DEL controls;
+- zero-width format controls;
+- bidi overrides/isolate controls;
+- raw leading/trailing newline/tab, которые могли бы исчезнуть после `.trim()`;
+- server method label/account display name/device label с невидимым format control;
+- outgoing method id/identifier/challenge id/code response/session id с такими символами.
+
+Обычный Unicode-текст без unsafe format/control character, например кириллица, не должен блокироваться.
+
+## 13. OAuth/OIDC backend negative cases
 
 До production внешний provider должен иметь отдельные tests:
 
@@ -214,7 +233,7 @@ Frontend не показывает подтверждённый logout, если
 
 Provider code/token не должен попадать в application logs или localStorage.
 
-## 13. Account linking / recovery
+## 14. Account linking / recovery
 
 До production обязательны negative tests:
 
@@ -225,7 +244,7 @@ Provider code/token не должен попадать в application logs ил�
 - linking без re-auth/verification policy;
 - critical identity change без session rotation/revoke policy.
 
-## 14. ARVELIS CONTROL
+## 15. ARVELIS CONTROL
 
 Обычная user session не даёт административных прав.
 
@@ -240,7 +259,7 @@ Fail closed:
 
 ## Automated smoke coverage
 
-`npm run test:auth` — no-dependency Auth Core smoke для pure contract слоя.
+`npm run test:auth` — no-dependency Auth Core/local-boundary smoke.
 
 На текущем этапе он покрывает, в том числе:
 
@@ -257,9 +276,12 @@ Fail closed:
 - sign-up intent preservation;
 - recoverable code challenge preservation;
 - live-session preservation при mode switch/offline;
-- live-session preservation при failed logout.
+- live-session preservation при failed logout;
+- preview-profile control/format characters и storage recovery;
+- Unicode zero-width/bidi controls в incoming protocol text;
+- raw-before-normalization reject для start/complete/revoke transport requests.
 
-Это не заменяет будущие backend/integration/e2e tests.
+Isolated strict/behavioral smoke для Unicode protocol boundary фактически выполнен локально на Node 22.16.0 / TypeScript 5.8.3 и прошёл. Это не заменяет repository TypeScript 6.0.3 / Vite build.
 
 ## Merge/backend spike gate
 
