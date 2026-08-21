@@ -1,4 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  DEFAULT_PREVIEW_PROFILE_NAME,
+  isDefaultPreviewProfileName,
+  normalizePreviewProfileName,
+  validatePreviewProfileName,
+} from './auth/previewProfile';
 import { AppBootScreen } from './components/AppBootScreen';
 import { normalizeChatMessage, normalizeThreadTitle } from './domain/chatPolicy';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
@@ -30,8 +36,6 @@ import type { AppScreen, DemoMessage, DemoThread, DemoWorkspaceState, EntryScree
 const HistoryScreen = lazy(() => loadHistoryModule().then((module) => ({ default: module.HistoryScreen })));
 const ProfileScreen = lazy(() => loadProfileModule().then((module) => ({ default: module.ProfileScreen })));
 const StatesScreen = lazy(() => loadStatesModule().then((module) => ({ default: module.StatesScreen })));
-
-const DEFAULT_PROFILE_NAME = 'Пользователь ARVELIS';
 
 const INITIAL_LOAD_PROGRESS: AppLoadProgress = {
   completed: 0,
@@ -101,8 +105,15 @@ export default function App() {
   const messageLimitReached = Boolean(activeThread && activeThread.messages.length >= DEMO_MAX_MESSAGES_PER_THREAD);
 
   const launchApp = async (profileName?: string) => {
+    if (profileName !== undefined && validatePreviewProfileName(profileName) !== null) {
+      setPendingProfileName(undefined);
+      setLoadError(false);
+      setEntry('auth');
+      return;
+    }
+
     const launchSequence = ++launchSequenceRef.current;
-    const normalizedName = profileName?.trim() || undefined;
+    const normalizedName = profileName === undefined ? undefined : normalizePreviewProfileName(profileName);
     setPendingProfileName(normalizedName);
     setLoadProgress(INITIAL_LOAD_PROGRESS);
     setLoadError(false);
@@ -125,7 +136,7 @@ export default function App() {
         : prepared.workspace;
       const nextWorkspace = { ...namedWorkspace, activeThreadId: null };
 
-      if (!normalizedName && nextWorkspace.profileName.trim() && nextWorkspace.profileName !== DEFAULT_PROFILE_NAME) {
+      if (!normalizedName && !isDefaultPreviewProfileName(nextWorkspace.profileName)) {
         setPendingProfileName(nextWorkspace.profileName);
       }
 
@@ -146,8 +157,8 @@ export default function App() {
   };
 
   const openAuth = () => {
-    const storedProfileName = loadDemoWorkspace().profileName.trim();
-    setPendingProfileName(storedProfileName && storedProfileName !== DEFAULT_PROFILE_NAME ? storedProfileName : undefined);
+    const storedProfileName = loadDemoWorkspace().profileName;
+    setPendingProfileName(isDefaultPreviewProfileName(storedProfileName) ? undefined : storedProfileName);
     setEntry('auth');
   };
 
@@ -263,13 +274,15 @@ export default function App() {
   };
 
   const saveProfileName = (profileName: string) => {
-    setWorkspace((current) => current ? { ...current, profileName } : current);
+    if (validatePreviewProfileName(profileName) !== null) return;
+    const normalizedName = normalizePreviewProfileName(profileName);
+    setWorkspace((current) => current ? { ...current, profileName: normalizedName } : current);
   };
 
   const signOutPreview = () => {
     ++launchSequenceRef.current;
-    const profileName = workspace?.profileName.trim();
-    setPendingProfileName(profileName && profileName !== DEFAULT_PROFILE_NAME ? profileName : undefined);
+    const profileName = workspace?.profileName;
+    setPendingProfileName(profileName && !isDefaultPreviewProfileName(profileName) ? profileName : undefined);
     setLoadError(false);
     setScreen('chat');
     setEntry('auth');
@@ -290,7 +303,7 @@ export default function App() {
   if (entry === 'auth') {
     return (
       <AuthScreen
-        initialName={pendingProfileName ?? workspace?.profileName ?? DEFAULT_PROFILE_NAME}
+        initialName={pendingProfileName ?? workspace?.profileName ?? DEFAULT_PREVIEW_PROFILE_NAME}
         onContinue={(name) => { void launchApp(name); }}
       />
     );
