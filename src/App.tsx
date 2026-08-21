@@ -377,6 +377,7 @@ export default function App() {
         <Suspense fallback={secondaryFallback}>
           <ProfileScreen
             profileName={workspace.profileName}
+            persistenceAvailable={persistenceAvailable}
             onSaveName={saveProfileName}
             onOpenStates={() => setScreen('states')}
             onSignOut={signOutPreview}
