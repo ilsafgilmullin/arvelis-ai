@@ -35,7 +35,7 @@ Migration `001_auth_foundation.sql` создаёт:
 
 Email не является primary key Account.
 
-`auth_accounts` теперь хранит `display_name`, потому что имя является частью уже утверждённого пользовательского onboarding и должно принадлежать server account, а не localStorage-профилю.
+`auth_accounts` хранит `display_name`, потому что имя является частью утверждённого пользовательского onboarding и должно принадлежать server account, а не localStorage-профилю.
 
 ## Atomic guarantees
 
@@ -64,29 +64,61 @@ PostgreSQL adapters реализуют:
 
 Миграция не запускается автоматически при `Run` и не применяется к production без отдельного решения.
 
+## Утверждённая account conflict policy — 2026-08-21
+
+После успешного подтверждения владения email одноразовым кодом действует следующая семантика:
+
+- `sign_up` + email уже связан с ARVELIS Account → `account_exists`;
+- `sign_in` + подтверждённый email ещё не связан с ARVELIS Account → `account_not_found`.
+
+Эти ответы появляются только после успешной OTP verification. `start` не раскрывает существование аккаунта и остаётся enumeration-resistant.
+
+## Trusted Account Auth Application Layer
+
+Добавлен отдельный слой:
+
+`server/auth/application/`
+
+Он потребляет только внутренний `VerifiedEmailOtpProof` и соединяет:
+
+`Verified Email → Account / Identity → Server Session`.
+
+Правила:
+
+- при регистрации отображаемое имя повторно валидируется server-side;
+- зарезервированное системное имя не принимается как пользовательское;
+- Account ID и Identity ID генерируются независимо от email;
+- создание Account + Identity остаётся атомарным на persistence layer;
+- гонка двух регистраций одного email закрывается DB uniqueness и возвращает `account_exists`;
+- suspended/deleted/pending-deletion Account не получает новую session;
+- disabled identity не может аутентифицироваться;
+- успешный вход обновляет `lastAuthenticatedAt`;
+- raw session secret остаётся только во внутреннем результате для будущего HTTP/BFF cookie adapter.
+
 ## Проверки
 
 Добавлен PostgreSQL integration smoke, который проверяет реальные SQL constraints/transactions на временной тестовой PostgreSQL БД.
 
 CI поднимает ephemeral PostgreSQL 18.4 service, выполняет migration, затем persistence smoke.
 
+Дополнительно `account-auth-application-smoke` проверяет утверждённую sign-up/sign-in policy, нормализацию имени, блокировку suspended/disabled identity и выдачу session только после успешного account resolution.
+
 ## Что не подключено этим этапом
 
 - реальный email/SMTP delivery;
 - HTTP `/api/auth/*` routes;
 - защищённая browser cookie;
-- orchestration verified OTP → Account/Session;
 - frontend real email/OTP flow;
 - production database provider/region;
 - account recovery;
-- roles/permissions;
+- роли/permissions;
 - ARVELIS CONTROL auth;
 - AI.
 
 ## Следующий этап
 
 1. generic SMTP delivery adapter с секретами только из environment;
-2. trusted auth application service: verified OTP → sign-in/sign-up Account → Session;
-3. same-origin BFF/HTTP adapter + HttpOnly cookie;
-4. подключение существующего `AuthGateway` frontend к реальному API;
+2. same-origin BFF/HTTP adapter + HttpOnly cookie;
+3. подключение существующего `AuthGateway` frontend к реальному API;
+4. account-scoped local demo workspace, чтобы локальная история одного аккаунта не показывалась другому пользователю на общем устройстве;
 5. iPhone end-to-end smoke: регистрация → email OTP → сессия → logout/login restore.
