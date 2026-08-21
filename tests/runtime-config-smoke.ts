@@ -5,6 +5,8 @@ function assert(value: unknown, message: string): asserts value {
 }
 
 const managedKeys = [
+  'AUTH_DB_PROVIDER',
+  'AUTH_SQLITE_PATH',
   'DATABASE_URL',
   'AUTH_OTP_PEPPER_HEX',
   'AUTH_SESSION_PEPPER_HEX',
@@ -21,7 +23,6 @@ for (const key of managedKeys) saved.set(key, process.env[key]);
 
 function resetBaseEnvironment(): void {
   for (const key of managedKeys) delete process.env[key];
-  process.env.DATABASE_URL = 'postgresql://test:test@127.0.0.1:5432/arvelis_test';
   process.env.AUTH_OTP_PEPPER_HEX = '11'.repeat(32);
   process.env.AUTH_SESSION_PEPPER_HEX = '22'.repeat(32);
   process.env.SMTP_HOST = 'smtp.yandex.ru';
@@ -32,12 +33,35 @@ function resetBaseEnvironment(): void {
 
 try {
   resetBaseEnvironment();
-  const defaultSmtp = loadAuthRuntimeConfig();
-  assert(defaultSmtp.smtp.host === 'smtp.yandex.ru', 'SMTP host must come from protected environment');
-  assert(defaultSmtp.smtp.port === 465, 'Default SMTP port must be 465');
-  assert(defaultSmtp.smtp.secure === true, 'Port 465 must default to secure SMTP');
-  assert(defaultSmtp.smtp.username === 'arvelis-test@yandex.ru', 'SMTP username must come from protected environment');
-  assert(defaultSmtp.smtp.password === 'test-app-password', 'SMTP app password must come from protected environment');
+  const defaults = loadAuthRuntimeConfig();
+  assert(defaults.database.provider === 'sqlite', 'Closed-test auth DB must default to SQLite');
+  if (defaults.database.provider === 'sqlite') {
+    assert(defaults.database.path === '.data/arvelis-auth.sqlite', 'SQLite must use the safe local default path');
+  }
+  assert(defaults.smtp.host === 'smtp.yandex.ru', 'SMTP host must come from protected environment');
+  assert(defaults.smtp.port === 465, 'Default SMTP port must be 465');
+  assert(defaults.smtp.secure === true, 'Port 465 must default to secure SMTP');
+  assert(defaults.smtp.username === 'arvelis-test@yandex.ru', 'SMTP username must come from protected environment');
+  assert(defaults.smtp.password === 'test-app-password', 'SMTP app password must come from protected environment');
+
+  resetBaseEnvironment();
+  process.env.AUTH_DB_PROVIDER = 'postgres';
+  process.env.DATABASE_URL = 'postgresql://test:test@127.0.0.1:5432/arvelis_test';
+  const postgres = loadAuthRuntimeConfig();
+  assert(postgres.database.provider === 'postgres', 'PostgreSQL must remain available as replaceable provider');
+  if (postgres.database.provider === 'postgres') {
+    assert(postgres.database.url.includes('arvelis_test'), 'PostgreSQL URL must come from protected environment');
+  }
+
+  resetBaseEnvironment();
+  process.env.AUTH_DB_PROVIDER = 'postgres';
+  let rejectedMissingPostgresUrl = false;
+  try {
+    loadAuthRuntimeConfig();
+  } catch {
+    rejectedMissingPostgresUrl = true;
+  }
+  assert(rejectedMissingPostgresUrl, 'PostgreSQL provider must fail closed without DATABASE_URL');
 
   resetBaseEnvironment();
   process.env.SMTP_PORT = '587';
