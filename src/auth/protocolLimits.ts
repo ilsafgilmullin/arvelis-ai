@@ -21,4 +21,5 @@ export const AUTH_PROTOCOL_LIMITS = {
   maskedDestinationLength: 320,
   redirectUrlLength: 2048,
   failureMessageLength: 2000,
+  retryAfterSeconds: 86_400,
 } as const;
