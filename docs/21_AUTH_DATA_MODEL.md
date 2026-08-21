@@ -17,13 +17,17 @@
 - created/updated timestamps;
 - deletion/retention state.
 
-Email/phone/provider id не должны использоваться как вечный внутренний primary key аккаунта.
+Email/provider id не используются как вечный внутренний primary key аккаунта.
 
 ## 2. Identity
 
 Связывает Account со способом входа.
 
-Нужно поддержать возможность нескольких identity без переписывания Account:
+Первый базовый identity method уже утверждён отдельно:
+
+`email_otp` — email + одноразовый код без постоянного пароля.
+
+Модель должна поддерживать возможность нескольких identity без переписывания Account:
 
 - provider/method id;
 - provider subject/external id или canonical identifier;
@@ -32,13 +36,22 @@ Email/phone/provider id не должны использоваться как в
 - last authentication timestamp;
 - disabled/unlinked state.
 
+Yandex ID / VK ID / Apple / Google могут позднее подключаться как дополнительные external identities, но не являются обязательным Account primary key.
+
 Provider access/refresh tokens, если когда-либо потребуются server-side, не возвращаются в frontend и хранятся по отдельной защищённой policy.
 
 ## 3. Session
 
 Отдельная серверная сессия устройства/браузера.
 
-Минимально:
+Текущий server foundation candidate использует:
+
+- отдельный random session id;
+- отдельный opaque session secret;
+- persistence хранит только verifier/MAC, а не raw secret;
+- account `securityVersion` для принудительной инвалидизации старых sessions.
+
+Минимально требуется:
 
 - session id;
 - account id;
@@ -51,19 +64,26 @@ Provider access/refresh tokens, если когда-либо потребуют�
 
 Frontend не хранит auth session secret в localStorage.
 
+Точный cookie format, session persistence backend, TTL/retention и CSRF topology остаются OPEN.
+
 ## 4. Auth Challenge
 
-Короткоживущий объект для OTP/magic-link/passkey/external flow, если выбранный метод этого требует.
+Для утверждённого `email_otp` используется короткоживущий single-use challenge.
 
-Требования:
+Текущий server foundation требует:
 
 - короткий TTL;
 - single-use;
 - attempt limits;
 - rate limits;
 - replay protection;
-- привязка к intent/session context;
-- секретные значения не хранятся в открытом виде, если их можно проверить через hash/derived value.
+- двухфазную активацию после подтверждённой email-delivery;
+- HMAC verifier вместо хранения raw OTP;
+- привязку verifier к challenge id + email.
+
+Raw OTP не хранится и не возвращается frontend.
+
+Другие challenge types для external IdP/passkeys остаются отдельными будущими решениями.
 
 ## 5. Security Event
 
@@ -79,7 +99,7 @@ Frontend не хранит auth session secret в localStorage.
 - suspicious/rate-limit event;
 - critical account security change.
 
-Не логировать credential/challenge secrets и лишние персональные данные.
+Не логировать credential/challenge/session secrets и лишние персональные данные.
 
 ## 6. Consent / Policy Acceptance
 
@@ -89,18 +109,27 @@ Frontend не хранит auth session secret в localStorage.
 
 ARVELIS CONTROL требует отдельной authorization model.
 
-До утверждения ролей нельзя считать обычный `Account` owner/admin только по frontend-флагу.
+До утверждения ролей нельзя считать обычный Account owner/admin только по frontend-флагу.
 
 Возможные реализации server-side — отдельный admin identity realm или отдельные role/permission assignments — остаются OPEN.
 
-## Identifier normalization
+## Email identifier semantics
 
-Если будут выбраны email/phone identifiers:
+Для первого auth method email canonicalization выполняется server-side.
 
-- canonicalization выполняется сервером;
-- display form и canonical form разделяются;
-- уникальность и linking policy утверждаются отдельно;
-- изменение primary identifier требует re-auth/verification policy.
+Текущий foundation candidate:
+
+- поддерживает bounded ASCII mailbox identifiers;
+- lower-case только domain;
+- сохраняет local-part case;
+- отклоняет управляющие символы и внешние пробелы.
+
+Остаются OPEN:
+
+- exact uniqueness/case policy для local-part;
+- duplicate/linking semantics;
+- email-change flow;
+- internationalized email (SMTPUTF8/EAI).
 
 ## Recovery / deletion
 
@@ -116,10 +145,13 @@ ARVELIS CONTROL требует отдельной authorization model.
 ## Не утверждено
 
 - PostgreSQL / Firestore / другая DB;
-- auth provider;
 - конкретная схема таблиц/коллекций;
-- phone/email как primary method;
+- backend framework/runtime topology;
+- production email delivery provider;
+- exact sign_up/sign_in conflict UX;
+- external identity providers;
 - roles;
 - billing/customer linkage;
 - exact retention periods;
-- geographic storage region.
+- geographic storage region;
+- production cookie/CSRF topology.
