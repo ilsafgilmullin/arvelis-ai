@@ -1,5 +1,7 @@
 export type AuthIntent = 'sign_in' | 'sign_up';
 
+export type AuthResourceStatus = 'idle' | 'loading' | 'ready' | 'error';
+
 export type AuthMethodKind = 'identifier' | 'external' | 'passkey';
 
 export type AuthMethodDescriptor = {
