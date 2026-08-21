@@ -14,6 +14,7 @@
   "include": [
     "src/auth/contracts.ts",
     "src/auth/protocolLimits.ts",
+    "src/auth/protocolText.ts",
     "src/auth/reducer.ts",
     "src/auth/runtimeGuards.ts",
     "src/auth/guardedGateway.ts",
@@ -24,6 +25,7 @@
     "src/lib/demoStorage.ts",
     "tests/auth-core-smoke.ts",
     "tests/preview-profile-smoke.ts",
-    "tests/demo-storage-profile-smoke.ts"
+    "tests/demo-storage-profile-smoke.ts",
+    "tests/protocol-text-smoke.ts"
   ]
 }
