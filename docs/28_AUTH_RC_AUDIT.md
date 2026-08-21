@@ -62,6 +62,7 @@ Replit:
 - server-session/device list contracts;
 - Account Security UI foundation;
 - safe auth error presentation;
+- local preview profile/storage integrity boundary;
 - negative QA/threat model/API/data model/provider research.
 
 ## P0/P1/P2 findings исправлены в ходе RC-аудита
@@ -162,6 +163,20 @@ Fail closed для malformed account/session/challenge/failure/method payload.
 - start/setIntent/signOut/revoke/complete используют текущий lifecycle state для security gating;
 - code completion не зависит от stale React closure для проверки активного challenge.
 
+### 11. Legacy localStorage profile обходил новую auth-domain validation
+
+До исправления новый Registration/Profile валидировал имя через `previewProfile`, но старый `demoStorage` принимал `profileName` только по `trim/length`. Дополнительно control-character check выполнялся после whitespace normalization, поэтому `\n`/`\t` могли быть преобразованы в пробел раньше reject-проверки.
+
+Исправлено:
+
+- control/format characters проверяются до whitespace normalization;
+- `DEFAULT_PREVIEW_PROFILE_NAME` вынесен в один source of truth;
+- `resolveStoredPreviewProfileName()` обрабатывает untrusted/legacy storage value;
+- повреждённое имя сбрасывается к системному default, но здоровые threads не удаляются;
+- persistence принимает только canonical пользовательское имя либо internal default reset-state;
+- App/Auth/Home больше не сравнивают системное имя через локальные дубли строк;
+- `AuthScreen` guard-ит existing-profile prop до отображения найденного локального профиля.
+
 ## Фактические проверки
 
 ### Выполнено
@@ -173,6 +188,7 @@ Fail closed для malformed account/session/challenge/failure/method payload.
    - runtime guards/gateway;
    - OAuth external boundary;
    - Account Security states;
+   - local preview profile/storage boundary;
    - QA state fixtures;
    - CI/Replit/package configuration.
 
@@ -194,13 +210,32 @@ Fail closed для malformed account/session/challenge/failure/method payload.
 
 5. JSX/union compile smoke для AuthStatusPanel/StatesScreen после discriminated-state изменений: PASS в isolated typed-stub environment.
 
-6. `tests/auth-core-smoke.ts` добавлен в репозиторий; `npm run test:auth` включён в `npm run check` и CI.
+6. `npm run test:auth` включён в `npm run check` и CI. Текущий smoke-suite содержит:
+   - `tests/auth-core-smoke.ts`;
+   - `tests/preview-profile-smoke.ts`;
+   - `tests/demo-storage-profile-smoke.ts`.
 
-7. После финального restore/challenge race-hardening отдельно повторён isolated controller strict compile-smoke:
+7. После restore/challenge race-hardening отдельно повторён isolated controller strict compile-smoke:
    - Node `22.16.0`;
    - TypeScript `5.8.3`;
    - `strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes`;
    - typed React hook stubs;
+   - результат: PASS.
+
+8. Preview-profile policy regression smoke фактически выполнен локально:
+   - blank/control/tab/format/reserved/oversized cases;
+   - canonical whitespace normalization;
+   - stored-value fail-closed resolver;
+   - canonical persistence contract;
+   - результат: PASS.
+
+9. Local storage profile-boundary smoke фактически выполнен локально:
+   - валидная запись workspace;
+   - инъекция corrupt legacy `profileName`;
+   - recovery к system default;
+   - healthy threads сохраняются;
+   - corrupt/non-canonical persistence отклоняется;
+   - internal default reset-state сохраняется;
    - результат: PASS.
 
 ### Не заявляется как выполненное
@@ -210,7 +245,7 @@ Fail closed для malformed account/session/challenge/failure/method payload.
 - Vite `npm run build`;
 - Android runtime QA;
 - desktop runtime QA;
-- повторный iPhone runtime smoke после последних contract/state-machine изменений.
+- повторный iPhone runtime smoke после последних contract/state-machine/data-boundary изменений.
 
 ## CI gate
 
@@ -269,7 +304,7 @@ ARVELIS CONTROL остаётся отдельной owner/admin security boundar
 
 ## RC decision
 
-По source/security/contract состоянию подтверждённых P0/P1 Auth Core blockers после текущего аудита не осталось.
+По source/security/contract состоянию подтверждённых P0/P1 Auth Core/local-profile blockers после текущего аудита не осталось.
 
 PR #11 **не готов к автоматическому merge только по этому документу**, потому что остаются внешние/фактические gates:
 
