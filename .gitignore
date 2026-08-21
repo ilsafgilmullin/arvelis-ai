@@ -5,6 +5,7 @@ node_modules/
 .next/
 dist/
 build/
+server-dist/
 coverage/
 tests/.dist-auth/
 tests/.dist-server-auth/
