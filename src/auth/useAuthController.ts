@@ -39,6 +39,10 @@ function hasLiveSession(state: AuthUiState): boolean {
     || state.status === 'sign_out_error';
 }
 
+function canManageSessions(state: AuthUiState): boolean {
+  return state.status === 'authenticated' || state.status === 'sign_out_error';
+}
+
 export function useAuthController(gateway: AuthGateway | null) {
   const [state, dispatch] = useReducer(authUiReducer, initialAuthUiState);
   const [methods, setMethods] = useState<AuthMethodDescriptor[]>([]);
@@ -88,6 +92,10 @@ export function useAuthController(gateway: AuthGateway | null) {
 
   const restore = useCallback(async () => {
     const stateAtStart = stateRef.current;
+
+    // A restore request must not race a server-side logout already in flight.
+    if (stateAtStart.status === 'signing_out') return false;
+
     const preserveLiveSession = hasLiveSession(stateAtStart);
     const sequence = ++authSequenceRef.current;
 
@@ -168,20 +176,40 @@ export function useAuthController(gateway: AuthGateway | null) {
   }, [gateway]);
 
   const complete = useCallback(async (request: AuthCompleteRequest) => {
-    if (!gateway) {
-      dispatch({ type: 'FAILURE', error: { code: 'service_unavailable', message: 'Auth backend is not connected' } });
-      return false;
-    }
+    const currentState = stateRef.current;
 
-    if (state.status !== 'challenge'
-      || state.challenge.kind !== 'code'
-      || state.challenge.id !== request.challengeId) {
+    if (currentState.status !== 'challenge') {
       dispatch({ type: 'FAILURE', error: invalidChallengeFailure() });
       return false;
     }
 
-    const activeChallenge = state.challenge;
-    const activeIntent = state.intent;
+    // External OAuth/OIDC is completed by the trusted backend callback, not
+    // through the first-party code completion endpoint.
+    if (currentState.challenge.kind !== 'code') return false;
+
+    const activeChallenge = currentState.challenge;
+    const activeIntent = currentState.intent;
+
+    if (activeChallenge.id !== request.challengeId) {
+      dispatch({
+        type: 'CHALLENGE_FAILURE',
+        intent: activeIntent,
+        challenge: activeChallenge,
+        error: invalidChallengeFailure(),
+      });
+      return false;
+    }
+
+    if (!gateway) {
+      dispatch({
+        type: 'CHALLENGE_FAILURE',
+        intent: activeIntent,
+        challenge: activeChallenge,
+        error: { code: 'service_unavailable', message: 'Auth backend is not connected' },
+      });
+      return false;
+    }
+
     const sequence = ++authSequenceRef.current;
     dispatch({ type: 'VERIFY', intent: activeIntent, challenge: activeChallenge });
 
@@ -205,9 +233,9 @@ export function useAuthController(gateway: AuthGateway | null) {
       dispatch({ type: 'CHALLENGE_FAILURE', intent: activeIntent, challenge: activeChallenge, error: unexpectedFailure() });
       return false;
     }
-  }, [gateway, state]);
+  }, [gateway]);
 
-  const stateHasLiveSession = state.status === 'authenticated' || state.status === 'sign_out_error';
+  const stateHasLiveSession = canManageSessions(state);
 
   const loadSessions = useCallback(async () => {
     const sequence = ++sessionsSequenceRef.current;
@@ -289,7 +317,7 @@ export function useAuthController(gateway: AuthGateway | null) {
   }, [gateway]);
 
   const revokeSession = useCallback(async (sessionId: string) => {
-    if (!gateway || !sessionId || !hasLiveSession(stateRef.current)) return false;
+    if (!gateway || !sessionId || !canManageSessions(stateRef.current)) return false;
 
     try {
       await gateway.revokeSession(sessionId);
