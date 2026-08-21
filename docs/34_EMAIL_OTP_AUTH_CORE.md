@@ -4,7 +4,7 @@
 Статус: **APPROVED method + server foundation candidate**.
 Ветка: `feat/email-otp-auth-core-v1`.
 
-## Утверждённое продуктово решение
+## Утверждённое продуктовое решение
 
 Первый базовый способ регистрации и входа ARVELIS AI:
 
@@ -32,7 +32,7 @@
 
 - `contracts.ts` — server-side ports и challenge contracts;
 - `policy.ts` — централизованные security candidate defaults;
-- `emailAddress.ts` — bounded email normalization/validation;
+- `emailAddress.ts` — bounded email validation/canonicalization;
 - `webCryptoSecurity.ts` — Web Crypto OTP generation + HMAC/privacy keys;
 - `service.ts` — start/verify lifecycle.
 
@@ -56,23 +56,27 @@
 
 ### Start
 
-1. email проходит bounded normalization/validation;
+1. email проходит bounded validation/canonicalization;
 2. rate-limit применяется к privacy-preserving HMAC key, а не к raw email в limiter API;
 3. генерируется 128-bit challenge id;
 4. генерируется numeric OTP;
-5. в challenge storage сохраняется только HMAC кода, привязанный к challenge id + email;
-6. raw code передаётся только в `EmailOtpDeliveryPort`;
-7. новый challenge supersede'ит предыдущий активный challenge для того же email + intent;
-8. frontend получает только challenge id, masked email и expiry.
+5. вычисляется HMAC кода, привязанный к challenge id + email;
+6. challenge сохраняется как **pending / non-verifiable**;
+7. raw code передаётся только в `EmailOtpDeliveryPort`;
+8. только после успешной доставки challenge атомарно активируется через `activateReplacingActive()`;
+9. при активации предыдущий активный challenge того же email + intent supersede'ится;
+10. frontend получает только challenge id, masked email и expiry.
 
 На `start` Auth Core **не проверяет существование аккаунта**. Это уменьшает email-enumeration surface.
+
+Двухфазная схема `createPending → deliver → activateReplacingActive` обязательна: неуспешная повторная доставка не должна инвалидировать предыдущий рабочий код.
 
 ### Verify
 
 1. challenge id и code валидируются до storage;
 2. применяются verify rate-limits;
-3. persistence adapter атомарно увеличивает attempt counter через `beginAttempt()`;
-4. candidate code HMAC сравнивается с stored HMAC;
+3. persistence adapter атомарно увеличивает attempt counter через `beginAttempt()` только для активного challenge;
+4. candidate OTP проверяется против stored HMAC через `WebCrypto.subtle.verify()`;
 5. неправильный код расходует attempt;
 6. после max attempts challenge блокируется;
 7. правильный code должен атомарно `consume()` challenge;
@@ -85,13 +89,27 @@
 
 Production `EmailOtpChallengeStore` обязан реализовать атомарность:
 
-- `createReplacingActive()`;
-- `beginAttempt()`;
-- `consume()`.
+- `createPending()` сохраняет новый challenge как неактивный;
+- `activateReplacingActive()` атомарно активирует доставленный challenge и supersede'ит предыдущий active challenge для того же email + intent;
+- `beginAttempt()` атомарно увеличивает attempt counter только для active challenge;
+- `consume()` атомарно проверяет expected attempt version и single-use.
 
-Иначе concurrent verification может создать replay/race condition.
+Иначе concurrent verification/replacement может создать replay/race condition.
 
 Challenge records должны быть short-lived и очищаться после expiry/consumption по retention policy.
+
+## Delivery failure semantics
+
+Если email provider не принял отправку:
+
+- клиент получает generic `delivery_unavailable`;
+- новый pending challenge удаляется best-effort;
+- pending challenge никогда не становится verifiable;
+- предыдущий активный challenge остаётся действующим;
+- raw provider exception не возвращается пользователю;
+- неуспешная доставка не выдаётся за отправленный код.
+
+Это исправляет важный lifecycle race: новый код не должен лишать пользователя предыдущего рабочего кода до подтверждённой доставки.
 
 ## Raw code handling
 
@@ -109,7 +127,8 @@ Stored verifier:
 - domain-separated payload;
 - server pepper минимум 32 random bytes;
 - pepper приходит только из protected server environment/configuration;
-- pepper не добавляется в GitHub, frontend, docs screenshots или logs.
+- pepper не добавляется в GitHub, frontend, docs screenshots или logs;
+- verification выполняется `WebCrypto.subtle.verify()`, а не собственным JS equality-loop.
 
 Обычный SHA-256 от шестизначного OTP не используется, потому что такой hash легко перебрать offline.
 
@@ -133,6 +152,7 @@ Stored verifier:
 - total length <= 254;
 - local-part <= 64;
 - control/format characters запрещены;
+- leading/trailing whitespace отклоняется, а не исправляется молча;
 - invalid dot/local/domain patterns отклоняются;
 - domain переводится в lower-case;
 - local-part casing пока сохраняется.
@@ -164,15 +184,6 @@ Email OTP service **не создаёт ARVELIS Account и не устанавл
 
 После успешного proof пользователь уже подтвердил владение email; точная sign-in/sign-up conflict UX policy утверждается отдельно.
 
-## Delivery failure
-
-Если email provider не принял отправку:
-
-- клиент получает generic `delivery_unavailable`;
-- challenge удаляется best-effort;
-- raw provider exception не возвращается пользователю;
-- неуспешная доставка не выдаётся за отправленный код.
-
 ## Rate limiting
 
 Rate limiter получает HMAC-derived privacy keys.
@@ -194,16 +205,18 @@ HTTP/BFF adapter должен определить privacy-safe `clientKey` с �
 
 Проверяет:
 
-- email normalization/rejection;
+- email canonicalization/rejection, включая внешние пробелы/control chars;
 - 6-digit generator;
-- HMAC instead of raw OTP storage;
+- HMAC вместо raw OTP storage;
+- WebCrypto HMAC verification;
 - wrong code;
 - successful verification;
 - single-use/replay;
-- supersede old challenge;
+- supersede предыдущего challenge после успешной доставки replacement;
+- сохранение предыдущего active challenge при failed replacement delivery;
 - max attempts lock;
 - expiry;
-- email delivery rollback;
+- delivery rollback pending challenge;
 - rate-limit rejection;
 - challenge-bound MAC.
 
@@ -215,11 +228,27 @@ HTTP/BFF adapter должен определить privacy-safe `clientKey` с �
 
 `typecheck → test:auth → test:server-auth → build`.
 
+### Фактическая isolated проверка 2026-08-21
+
+Последняя версия текущего server-domain и smoke-теста фактически скомпилирована и выполнена в доступной изолированной среде:
+
+- Node `22.16.0`;
+- TypeScript `5.8.3`;
+- `strict`;
+- `noUncheckedIndexedAccess`;
+- `exactOptionalPropertyTypes`.
+
+Результат runtime:
+
+`ARVELIS email OTP auth core smoke: PASS`
+
+Это **не заменяет** repository TypeScript `6.0.3`, полный `npm run check` и hosted CI.
+
 ## Smoke runtime fix
 
 Найден старый tooling defect:
 
-- `tsconfig.auth-smoke.json` emit'ит CommonJS `.js`;
+- auth/server smoke tsconfig emit'ит CommonJS `.js`;
 - root package имеет `"type": "module"`;
 - без локальной package boundary Node 22 трактует emitted `.js` как ESM и CommonJS smoke может упасть до assertions.
 
@@ -268,6 +297,8 @@ Production output это не затрагивает.
 - server-side validation повторяется независимо от frontend;
 - rate-limits fail safely;
 - challenge operations atomic;
+- pending challenge не verifiable;
+- delivery подтверждается до supersede предыдущего active challenge;
 - session secret никогда не хранится frontend localStorage;
 - email provider secrets только environment/secret manager;
 - OTP code не логируется;
