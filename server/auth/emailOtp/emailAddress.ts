@@ -12,18 +12,19 @@ const MAX_LOCAL_PART_LENGTH = 64;
  * Internationalized email support remains a separate compatibility decision.
  * Domain casing is canonicalized; local-part casing is preserved because
  * account uniqueness semantics have not yet been approved.
+ *
+ * Leading/trailing whitespace is rejected rather than silently normalized at
+ * the server trust boundary.
  */
 export function normalizeEmailOtpAddress(value: string): string | null {
   if (!value || value.length > EMAIL_OTP_MAX_EMAIL_LENGTH || UNSAFE_TEXT_PATTERN.test(value)) return null;
+  if (value.trim() !== value) return null;
 
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > EMAIL_OTP_MAX_EMAIL_LENGTH || trimmed !== value) return null;
+  const at = value.lastIndexOf('@');
+  if (at <= 0 || at === value.length - 1 || value.indexOf('@') !== at) return null;
 
-  const at = trimmed.lastIndexOf('@');
-  if (at <= 0 || at === trimmed.length - 1 || trimmed.indexOf('@') !== at) return null;
-
-  const local = trimmed.slice(0, at);
-  const domain = trimmed.slice(at + 1);
+  const local = value.slice(0, at);
+  const domain = value.slice(at + 1);
   if (!local || local.length > MAX_LOCAL_PART_LENGTH || !ASCII_LOCAL_PATTERN.test(local)) return null;
   if (local.startsWith('.') || local.endsWith('.') || local.includes('..')) return null;
 
