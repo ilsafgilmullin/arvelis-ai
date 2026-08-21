@@ -34,8 +34,8 @@ function isBoundedString(value: unknown, maxLength: number, allowEmpty = false):
   return allowEmpty || value.trim().length > 0;
 }
 
-function isOptionalBoundedString(value: unknown, maxLength: number): value is string | undefined {
-  return value === undefined || isBoundedString(value, maxLength, true);
+function isOptionalNonEmptyBoundedString(value: unknown, maxLength: number): value is string | undefined {
+  return value === undefined || isBoundedString(value, maxLength);
 }
 
 function parseTimestamp(value: unknown): number | null {
@@ -52,6 +52,13 @@ function isForwardTimeWindow(createdAt: unknown, expiresAt: unknown): boolean {
   const created = parseTimestamp(createdAt);
   const expires = parseTimestamp(expiresAt);
   return created !== null && expires !== null && expires > created;
+}
+
+function isTimestampInsideWindow(value: unknown, createdAt: unknown, expiresAt: unknown): boolean {
+  const timestamp = parseTimestamp(value);
+  const created = parseTimestamp(createdAt);
+  const expires = parseTimestamp(expiresAt);
+  return timestamp !== null && created !== null && expires !== null && timestamp >= created && timestamp <= expires;
 }
 
 export function isSecureAuthorizationUrl(value: unknown): value is string {
@@ -103,15 +110,15 @@ export function normalizeAuthMethodCatalog(value: unknown): AuthMethodDescriptor
 export function isAuthAccount(value: unknown): value is AuthAccount {
   if (!isRecord(value)) return false;
 
-  const emailValid = isOptionalBoundedString(value.primaryEmail, AUTH_PROTOCOL_LIMITS.emailLength);
-  const phoneValid = isOptionalBoundedString(value.primaryPhone, AUTH_PROTOCOL_LIMITS.phoneLength);
+  const emailValid = isOptionalNonEmptyBoundedString(value.primaryEmail, AUTH_PROTOCOL_LIMITS.emailLength);
+  const phoneValid = isOptionalNonEmptyBoundedString(value.primaryPhone, AUTH_PROTOCOL_LIMITS.phoneLength);
   if (!emailValid || !phoneValid) return false;
   if (typeof value.emailVerified !== 'boolean' || typeof value.phoneVerified !== 'boolean') return false;
   if (value.emailVerified && !isBoundedString(value.primaryEmail, AUTH_PROTOCOL_LIMITS.emailLength)) return false;
   if (value.phoneVerified && !isBoundedString(value.primaryPhone, AUTH_PROTOCOL_LIMITS.phoneLength)) return false;
 
   return isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)
-    && isBoundedString(value.displayName, AUTH_PROTOCOL_LIMITS.displayNameLength, true);
+    && isBoundedString(value.displayName, AUTH_PROTOCOL_LIMITS.displayNameLength);
 }
 
 export function isAuthSession(value: unknown): value is AuthSession {
@@ -127,9 +134,9 @@ export function isAuthSessionSummary(value: unknown): value is AuthSessionSummar
   if (!isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)) return false;
   if (typeof value.current !== 'boolean') return false;
   if (!isForwardTimeWindow(value.createdAt, value.expiresAt)) return false;
-  if (value.lastSeenAt !== undefined && !isIsoLikeDate(value.lastSeenAt)) return false;
-  if (!isOptionalBoundedString(value.deviceLabel, AUTH_PROTOCOL_LIMITS.deviceLabelLength)) return false;
-  if (!isOptionalBoundedString(value.browserLabel, AUTH_PROTOCOL_LIMITS.browserLabelLength)) return false;
+  if (value.lastSeenAt !== undefined && !isTimestampInsideWindow(value.lastSeenAt, value.createdAt, value.expiresAt)) return false;
+  if (!isOptionalNonEmptyBoundedString(value.deviceLabel, AUTH_PROTOCOL_LIMITS.deviceLabelLength)) return false;
+  if (!isOptionalNonEmptyBoundedString(value.browserLabel, AUTH_PROTOCOL_LIMITS.browserLabelLength)) return false;
 
   return true;
 }
@@ -158,7 +165,7 @@ export function isAuthChallenge(value: unknown): value is AuthChallenge {
 
   if (value.kind === 'code') {
     return value.redirectUrl === undefined
-      && isOptionalBoundedString(value.maskedDestination, AUTH_PROTOCOL_LIMITS.maskedDestinationLength);
+      && isOptionalNonEmptyBoundedString(value.maskedDestination, AUTH_PROTOCOL_LIMITS.maskedDestinationLength);
   }
 
   if (value.kind === 'external_redirect') {
