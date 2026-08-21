@@ -16,6 +16,7 @@
 9. Boot error по-прежнему имеет Retry.
 10. После успешной Smart Entry открывается новый пустой Chat.
 11. Старый active thread не должен автоматически открываться после auth.
+12. Logout из Профиля возвращает прямо к Auth без повторного Splash и не удаляет локальные диалоги.
 
 ## Video QA — 2026-08-21
 
@@ -52,6 +53,9 @@
 3. Internal system states явно называются `Диагностика preview`.
 4. Reset остаётся destructive action с confirm-dialog.
 5. Production account/security не имитируются как работающие до backend.
+6. Account Security не показывает fake device/session data.
+7. Ошибка session-list API не должна отображаться как «сессий нет».
+8. Session-management actions имеют mobile touch target не меньше 44px.
 
 ## PWA / iPhone
 
@@ -67,11 +71,31 @@
 1. `src/auth/contracts.ts` не зависит от конкретного provider SDK.
 2. Production auth-state не должен храниться в localStorage.
 3. UI обязан иметь session-expired / offline / rate-limit / error states до backend integration.
-4. Конкретные email/phone/external/passkey methods остаются server-configurable.
-5. ARVELIS CONTROL не делит user session с ARVELIS AI.
+4. Executable v1 contract поддерживает только `identifier` и `external`; challenge — `code` и `external_redirect`.
+5. Passkey/WebAuthn остаётся OPEN-кандидатом и не считается реализованным до отдельного контракта/ceremony implementation.
+6. Raw transport payload проходит runtime guard до application state.
+7. Session restore не зависит от method catalog.
+8. ARVELIS CONTROL не делит user session с ARVELIS AI.
+
+## Protocol negative checks
+
+До real backend integration contract должен отказывать для:
+
+- malformed method/session/challenge/failure payload;
+- duplicate ids;
+- oversized collection/field payload;
+- больше одной `current` session;
+- `emailVerified=true` без email;
+- `phoneVerified=true` без phone;
+- unsafe `external_redirect` (`http`, `javascript:`, `data:`, malformed URL);
+- пустого/слишком длинного method/challenge/session id;
+- oversized challenge response.
+
+Server-side validation остаётся обязательной даже при frontend guard.
 
 ## Known gates
 
 - repository `npm run typecheck` / `npm run build` должны быть выполнены фактически перед merge, если runner доступен;
+- текущий GitHub Actions job завершается до первого step и не создаёт step logs — это отдельный infrastructure gate, а не подтверждённая ошибка TypeScript/build;
 - dependency lockfile debt из `docs/14_PRE_MERGE_AUDIT.md` остаётся отдельной infrastructure task;
 - реальный auth/backend/AI не входит в этот PR.
