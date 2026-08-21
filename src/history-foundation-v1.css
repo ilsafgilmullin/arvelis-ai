@@ -1,0 +1,346 @@
+/* ARVELIS AI History foundation.
+   Stacked after Profile and isolated from stable Chat v2 geometry. */
+
+.history-v3 {
+  --history-v3-width: 900px;
+  padding-bottom: 108px;
+}
+
+.history-v3__section {
+  width: min(var(--history-v3-width), 100%);
+  margin: 30px auto 0;
+}
+
+.history-v3__heading {
+  min-height: 58px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.history-v3__heading h2 {
+  margin: 8px 0 0;
+  font-size: 22px;
+  line-height: 1.15;
+  letter-spacing: -.025em;
+  font-weight: 560;
+}
+
+.history-v3__heading > span {
+  flex: 0 0 auto;
+  padding: 5px 7px;
+  border: 1px solid rgba(214,170,70,.15);
+  border-radius: 999px;
+  color: var(--gold);
+  font-size: 7px;
+  font-weight: 760;
+  letter-spacing: .11em;
+}
+
+.history-v3__search {
+  width: 100%;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #0d0f12;
+  color: #747a83;
+  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+
+.history-v3__search:focus-within {
+  border-color: rgba(214,170,70,.32);
+  background: #0f1115;
+  box-shadow: 0 0 0 3px rgba(214,170,70,.045);
+}
+
+.history-v3__search > .icon {
+  width: 19px;
+  height: 19px;
+}
+
+.history-v3__search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 50px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.history-v3__search input::placeholder {
+  color: #666c75;
+}
+
+.history-v3__clear {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #737982;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.history-v3__clear:hover,
+.history-v3__clear:focus-visible {
+  background: rgba(255,255,255,.035);
+  color: #d8d4cb;
+}
+
+.history-v3__summary {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 0 2px;
+  color: var(--muted-2);
+}
+
+.history-v3__summary span {
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-v3__summary small {
+  color: #8c7440;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.history-v3__list {
+  border-top: 1px solid var(--line);
+}
+
+.history-v3__row {
+  min-width: 0;
+  min-height: 88px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 50px;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-v3__open {
+  min-width: 0;
+  min-height: 87px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 8px 12px 3px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-v3__open:hover,
+.history-v3__open:focus-visible {
+  background: rgba(255,255,255,.018);
+}
+
+.history-v3__open > .icon {
+  width: 18px;
+  height: 18px;
+  color: #656b74;
+}
+
+.history-v3__copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.history-v3__copy strong,
+.history-v3__copy > span,
+.history-v3__copy small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-v3__copy strong {
+  color: #ece9e2;
+  font-size: 13px;
+  font-weight: 630;
+  line-height: 1.35;
+}
+
+.history-v3__copy > span {
+  color: #858a93;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.history-v3__copy small {
+  color: #60666f;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.history-v3__delete {
+  width: 44px;
+  height: 44px;
+  justify-self: end;
+  border-color: transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: #6e747d;
+}
+
+.history-v3__delete:hover,
+.history-v3__delete:focus-visible {
+  border-color: rgba(217,106,99,.16);
+  background: rgba(217,106,99,.045);
+  color: #d6837d;
+}
+
+.history-v3__empty {
+  min-height: 270px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  padding: 44px 16px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+}
+
+.history-v3__empty h2 {
+  margin: 10px 0 8px;
+  font-size: 24px;
+  line-height: 1.15;
+  letter-spacing: -.03em;
+  font-weight: 540;
+}
+
+.history-v3__empty > p:not(.section-kicker) {
+  max-width: 440px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.history-v3__empty .button {
+  margin-top: 18px;
+}
+
+@media (max-width: 780px) {
+  .history-v3 {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: 30px;
+  }
+
+  .history-v3__section {
+    margin-top: 18px;
+  }
+
+  .history-v3__heading {
+    min-height: 48px;
+    margin-bottom: 14px;
+  }
+
+  .history-v3__heading h2 {
+    font-size: 20px;
+  }
+
+  .history-v3__search {
+    min-height: 54px;
+    border-radius: 15px;
+    padding-left: 13px;
+  }
+
+  .history-v3__search input {
+    min-height: 52px;
+    font-size: 16px;
+  }
+
+  .history-v3__summary {
+    min-height: 40px;
+  }
+
+  .history-v3__row {
+    min-height: 84px;
+    grid-template-columns: minmax(0, 1fr) 48px;
+  }
+
+  .history-v3__open {
+    min-height: 83px;
+    gap: 10px;
+    padding: 10px 4px 10px 1px;
+  }
+
+  .history-v3__copy > span {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .history-v3__delete {
+    width: 44px;
+    height: 44px;
+  }
+
+  .history-v3__empty {
+    min-height: 240px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
+@media (max-width: 380px) {
+  .history-v3 {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .history-v3__heading {
+    align-items: center;
+  }
+
+  .history-v3__summary {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .history-v3__open:hover,
+  .history-v3__delete:hover,
+  .history-v3__clear:hover {
+    background: transparent;
+    color: inherit;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .history-v3__search {
+    transition: none !important;
+  }
+}
