@@ -62,7 +62,7 @@ export function AuthScreen({
         {!online ? (
           <div className="auth-network-note" role="status" aria-live="polite">
             <span aria-hidden="true" />
-            <p><strong>Вы офлайн.</strong> Локальный preview можно открыть, но production-авторизация будет требовать соединение.</p>
+            <p><strong>Вы офлайн.</strong> Локальную тестовую версию можно открыть, но настоящий вход будет требовать соединение.</p>
           </div>
         ) : null}
 
@@ -72,11 +72,11 @@ export function AuthScreen({
           <p>
             {isSignIn
               ? hasLocalProfile
-                ? 'На этом устройстве найден локальный профиль. Продолжите работу с сохранёнными preview-диалогами.'
+                ? 'На этом устройстве найден локальный профиль. Продолжите работу с сохранёнными диалогами.'
                 : 'Локальный профиль на этом устройстве ещё не создан.'
               : hasLocalProfile
-                ? 'Текущая preview-версия поддерживает один локальный профиль на устройство.'
-                : 'Укажите имя для локального preview. Настоящий аккаунт и защищённая серверная сессия появятся на backend-этапе.'}
+                ? 'В текущей тестовой версии доступен один локальный профиль на устройство.'
+                : 'Укажите имя для тестового профиля. Настоящий аккаунт и защищённая сессия появятся после подключения серверной авторизации.'}
           </p>
         </div>
 
@@ -108,7 +108,7 @@ export function AuthScreen({
               <div className="auth-local-profile__copy">
                 <span>Профиль на этом устройстве</span>
                 <strong>{initialProfileName}</strong>
-                <p>История и настройки хранятся только в локальном preview-хранилище этого браузера.</p>
+                <p>История и настройки этого профиля пока хранятся только в браузере на этом устройстве.</p>
               </div>
               <button className="button button--primary auth-submit" type="button" onClick={continueExistingProfile}>
                 Продолжить
@@ -117,7 +117,7 @@ export function AuthScreen({
           ) : (
             <section className="auth-empty-profile" role="status">
               <span className="auth-empty-profile__mark" aria-hidden="true">A</span>
-              <div><strong>Профиль не найден</strong><p>Создайте локальный профиль, чтобы открыть preview ARVELIS AI.</p></div>
+              <div><strong>Профиль не найден</strong><p>Создайте локальный профиль, чтобы открыть тестовую версию ARVELIS AI.</p></div>
               <button className="button button--primary" type="button" onClick={() => selectMode('signup')}>
                 Создать профиль
               </button>
@@ -126,7 +126,7 @@ export function AuthScreen({
         ) : hasLocalProfile ? (
           <section className="auth-single-profile-note" role="status">
             <strong>Новый локальный профиль сейчас не создаётся поверх существующего.</strong>
-            <p>Так preview не смешивает два аккаунта в одном browser-хранилище. Позже реальные аккаунты и переключение между ними будут работать через серверную авторизацию.</p>
+            <p>Так тестовая версия не смешивает два профиля в одном хранилище браузера. Позже реальные аккаунты и переключение между ними будут работать через серверную авторизацию.</p>
             <button className="button button--secondary" type="button" onClick={() => selectMode('signin')}>
               Вернуться ко входу
             </button>
@@ -163,13 +163,13 @@ export function AuthScreen({
         <section className="auth-security-note" aria-label="Статус авторизации">
           <span className="auth-security-note__signal" aria-hidden="true" />
           <div>
-            <strong>Локальный preview-доступ</strong>
-            <p>Реальная авторизация и server session ещё не подключены. Email, пароль, OTP и внешние способы входа интерфейс не имитирует как работающие.</p>
+            <strong>Локальный тестовый доступ</strong>
+            <p>Настоящая авторизация и серверная сессия ещё не подключены. Email, пароль, коды подтверждения и внешние способы входа не выдаются за работающие.</p>
           </div>
         </section>
 
         <p className="auth-legal-note">
-          Production-условия, privacy policy и способы входа будут утверждены до подключения реальных аккаунтов.
+          Условия использования, политика конфиденциальности и способы входа будут утверждены до подключения реальных аккаунтов.
         </p>
       </section>
     </main>
