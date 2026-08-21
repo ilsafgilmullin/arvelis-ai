@@ -114,7 +114,24 @@
 - Первый paint должен быть брендированным до загрузки JavaScript; пустой чёрный экран после refresh не является допустимым app experience.
 - В текущем frontend-preview вход/регистрация не выдаются за production account: email/password/OTP/social provider не имитируются как работающие.
 - Реальный auth должен оставаться provider-independent и server-authoritative.
-- Конкретный основной идентификатор, provider, session backend и production DB остаются `OPEN` до отдельного решения.
+
+## 2026-08-21 — Первый production auth method
+
+Утверждён первый базовый способ регистрации и входа пользователя:
+
+**email + одноразовый код, без постоянного пароля (passwordless OTP).**
+
+- Email является первым базовым identifier для auth-flow.
+- Постоянный пароль не требуется в первом auth release.
+- OTP является short-lived, single-use и проверяется только trusted server-side.
+- Raw OTP не хранится и не логируется; server challenge хранит только защищённый verifier/HMAC.
+- `start` не должен раскрывать, существует ли аккаунт для конкретного email.
+- ARVELIS Account ID и server session остаются собственными и не зависят от email provider.
+- Yandex ID / VK ID / Apple / Google могут быть добавлены позже как заменяемые external identity adapters, но не являются обязательной базой первого входа.
+- ARVELIS CONTROL не использует пользовательский email OTP realm как достаточную owner/admin authorization boundary.
+- Server foundation зафиксирован в `docs/34_EMAIL_OTP_AUTH_CORE.md`.
+
+Остаются `OPEN`: конкретный email delivery provider, production DB, challenge/rate-limit persistence, backend framework/topology, account duplicate/linking semantics, session backend/cookie topology, роли и уровни доступа.
 
 ## 2026-08-21 — ARVELIS CONTROL
 
@@ -134,8 +151,10 @@
 - AI-провайдер и модель;
 - production technical stack;
 - production database/data model;
-- настоящий способ авторизации, роли и уровни доступа;
+- роли и уровни доступа;
 - конкретный auth provider / identity core;
+- email delivery provider;
+- production session backend/cookie topology;
 - финальные требования по персональным данным;
 - биллинг и тарифы;
 - production-хостинг;
