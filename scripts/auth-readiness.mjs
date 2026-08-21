@@ -1,5 +1,8 @@
 const checks = [];
 
+const CLOSED_TEST_SMTP_HOST = 'smtp.yandex.ru';
+const CLOSED_TEST_SMTP_MAILBOX = 'arvelis.auth@yandex.ru';
+
 function add(name, ok, detail) {
   checks.push({ name, ok, detail });
 }
@@ -45,17 +48,16 @@ add(
   'Secrets must be different',
 );
 
-add('SMTP host', process.env.SMTP_HOST === 'smtp.yandex.ru', process.env.SMTP_HOST === 'smtp.yandex.ru' ? 'Yandex Mail test SMTP selected' : 'Expected smtp.yandex.ru');
-add('SMTP port', (process.env.SMTP_PORT ?? '465') === '465', 'Closed-test preset uses 465');
-add('SMTP secure', (process.env.SMTP_SECURE ?? 'true') === 'true', 'Closed-test preset requires SSL/SMTPS');
-add('SMTP username', present('SMTP_USERNAME'), present('SMTP_USERNAME') ? 'Configured' : 'Missing');
+const smtpHost = plainValue('SMTP_HOST', CLOSED_TEST_SMTP_HOST);
+const smtpUsername = plainValue('SMTP_USERNAME', CLOSED_TEST_SMTP_MAILBOX);
+const smtpFrom = plainValue('SMTP_FROM', CLOSED_TEST_SMTP_MAILBOX);
+add('SMTP host', smtpHost === CLOSED_TEST_SMTP_HOST, smtpHost === CLOSED_TEST_SMTP_HOST ? 'Yandex Mail test SMTP selected' : 'Expected smtp.yandex.ru');
+add('SMTP port', plainValue('SMTP_PORT', '465') === '465', 'Closed-test preset uses 465');
+add('SMTP secure', plainValue('SMTP_SECURE', 'true') === 'true', 'Closed-test preset requires SSL/SMTPS');
+add('SMTP username', smtpUsername === CLOSED_TEST_SMTP_MAILBOX, smtpUsername === CLOSED_TEST_SMTP_MAILBOX ? 'Closed-test mailbox selected' : 'Unexpected test mailbox');
 add('SMTP password', present('SMTP_PASSWORD'), present('SMTP_PASSWORD') ? 'Configured' : 'Missing');
-add('SMTP sender', present('SMTP_FROM'), present('SMTP_FROM') ? 'Configured' : 'Missing');
-add(
-  'SMTP identity',
-  present('SMTP_USERNAME') && present('SMTP_FROM') && process.env.SMTP_USERNAME === process.env.SMTP_FROM,
-  'Yandex test sender must match the authenticated mailbox',
-);
+add('SMTP sender', smtpFrom === CLOSED_TEST_SMTP_MAILBOX, smtpFrom === CLOSED_TEST_SMTP_MAILBOX ? 'Closed-test sender selected' : 'Unexpected test sender');
+add('SMTP identity', smtpUsername === smtpFrom, 'Yandex test sender must match the authenticated mailbox');
 
 const rolloutEnabled = process.env.VITE_REAL_AUTH_ENABLED === 'true';
 add('Rollout flag', !rolloutEnabled, rolloutEnabled ? 'Disable until E2E gate passes' : 'Safely disabled');
