@@ -85,12 +85,15 @@ export function normalizeAuthMethodCatalog(value: unknown): AuthMethodDescriptor
 export function isAuthAccount(value: unknown): value is AuthAccount {
   if (!isRecord(value)) return false;
 
+  const emailValid = isOptionalBoundedString(value.primaryEmail, AUTH_PROTOCOL_LIMITS.emailLength);
+  const phoneValid = isOptionalBoundedString(value.primaryPhone, AUTH_PROTOCOL_LIMITS.phoneLength);
+  if (!emailValid || !phoneValid) return false;
+  if (typeof value.emailVerified !== 'boolean' || typeof value.phoneVerified !== 'boolean') return false;
+  if (value.emailVerified && !isBoundedString(value.primaryEmail, AUTH_PROTOCOL_LIMITS.emailLength)) return false;
+  if (value.phoneVerified && !isBoundedString(value.primaryPhone, AUTH_PROTOCOL_LIMITS.phoneLength)) return false;
+
   return isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)
-    && isBoundedString(value.displayName, AUTH_PROTOCOL_LIMITS.displayNameLength, true)
-    && isOptionalBoundedString(value.primaryEmail, AUTH_PROTOCOL_LIMITS.emailLength)
-    && isOptionalBoundedString(value.primaryPhone, AUTH_PROTOCOL_LIMITS.phoneLength)
-    && typeof value.emailVerified === 'boolean'
-    && typeof value.phoneVerified === 'boolean';
+    && isBoundedString(value.displayName, AUTH_PROTOCOL_LIMITS.displayNameLength, true);
 }
 
 export function isAuthSession(value: unknown): value is AuthSession {
@@ -126,6 +129,7 @@ export function normalizeAuthSessionSummaries(value: unknown): AuthSessionSummar
     sessions.push(candidate);
   }
 
+  if (sessions.filter((session) => session.current).length > 1) return [];
   return sessions;
 }
 
