@@ -60,6 +60,7 @@ export type EmailOtpChallengeRecord = {
   email: string;
   codeMac: string;
   createdAt: number;
+  activatedAt: number | null;
   expiresAt: number;
   attempts: number;
   maxAttempts: number;
@@ -74,16 +75,23 @@ export type EmailOtpAttemptResult =
       attemptNumber: number;
     }
   | {
-      status: 'missing' | 'expired' | 'consumed' | 'superseded' | 'locked';
+      status: 'missing' | 'pending' | 'expired' | 'consumed' | 'superseded' | 'locked';
     };
 
 /**
- * Production adapter must make createReplacingActive, beginAttempt and consume
- * atomic at the persistence layer. The domain service intentionally does not
- * assume SQL/NoSQL/Redis or any specific vendor.
+ * Production adapter requirements:
+ *
+ * - createPending() persists a challenge without making it verifiable;
+ * - activateReplacingActive() atomically activates the delivered challenge and
+ *   supersedes previous active challenge(s) for the same email + intent;
+ * - beginAttempt() atomically increments attempts only for active challenges;
+ * - consume() atomically enforces single-use and expected attempt version.
+ *
+ * The domain service intentionally does not assume SQL/NoSQL/Redis or vendor.
  */
 export interface EmailOtpChallengeStore {
-  createReplacingActive(record: EmailOtpChallengeRecord): Promise<void>;
+  createPending(record: EmailOtpChallengeRecord): Promise<void>;
+  activateReplacingActive(challengeId: string, activatedAt: number): Promise<boolean>;
   delete(challengeId: string): Promise<void>;
   beginAttempt(challengeId: string, now: number): Promise<EmailOtpAttemptResult>;
   consume(challengeId: string, expectedAttemptNumber: number, consumedAt: number): Promise<boolean>;
