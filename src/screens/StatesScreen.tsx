@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { AuthStatusPanel } from '../auth/AuthStatusPanel';
+import type { AuthUiState } from '../auth/contracts';
 import { Topbar } from '../components/Topbar';
 import type { SystemState } from '../types';
 
@@ -10,32 +12,86 @@ const content: Record<SystemState, { label: string; kicker: string; title: strin
   limit: { label: 'Лимит', kicker: 'LIMIT', title: 'Достигнут лимит', copy: 'Это только UX-preview. Тарифы, квоты и биллинг ARVELIS AI ещё не утверждены.' },
 };
 
+type AuthPreviewState = 'checking' | 'submitting' | 'challenge' | 'expired' | 'offline' | 'rate' | 'error';
+
+const authPreviewLabels: Record<AuthPreviewState, string> = {
+  checking: 'Проверка',
+  submitting: 'Вход',
+  challenge: 'Подтверждение',
+  expired: 'Сессия',
+  offline: 'Офлайн',
+  rate: 'Лимит',
+  error: 'Ошибка',
+};
+
+const authPreviewStates: Record<AuthPreviewState, AuthUiState> = {
+  checking: { status: 'checking_session' },
+  submitting: { status: 'submitting', intent: 'sign_in', methodId: 'preview-method' },
+  challenge: {
+    status: 'challenge',
+    intent: 'sign_in',
+    challenge: { id: 'preview-challenge', methodId: 'preview-method', kind: 'code' },
+  },
+  expired: { status: 'session_expired' },
+  offline: { status: 'offline' },
+  rate: { status: 'rate_limited', retryAfterSeconds: 30 },
+  error: {
+    status: 'error',
+    error: { code: 'service_unavailable', message: 'Internal preview error' },
+  },
+};
+
 export function StatesScreen() {
   const [state, setState] = useState<SystemState>('loading');
+  const [authState, setAuthState] = useState<AuthPreviewState>('checking');
   const selected = content[state];
 
   return (
     <div className="content-page">
       <Topbar title="Системные состояния" subtitle="Внутренний QA-экран frontend preview" />
-      <div className="state-tabs" role="tablist" aria-label="Системные состояния">
-        {(Object.keys(content) as SystemState[]).map((item) => (
-          <button
-            type="button"
-            role="tab"
-            aria-selected={state === item}
-            key={item}
-            className={state === item ? 'state-tab state-tab--active' : 'state-tab'}
-            onClick={() => setState(item)}
-          >
-            {content[item].label}
-          </button>
-        ))}
-      </div>
-      <section className={`state-preview state-preview--${state}`}>
-        <div className="state-preview__signal" aria-hidden="true" />
-        <p className="section-kicker">{selected.kicker} · PREVIEW</p>
-        <h2>{selected.title}</h2>
-        <p>{selected.copy}</p>
+
+      <section aria-labelledby="system-state-heading">
+        <p className="section-kicker">ОБЩИЕ СОСТОЯНИЯ</p>
+        <h2 className="state-section-title" id="system-state-heading">Интерфейс</h2>
+        <div className="state-tabs" role="group" aria-label="Системные состояния">
+          {(Object.keys(content) as SystemState[]).map((item) => (
+            <button
+              type="button"
+              aria-pressed={state === item}
+              key={item}
+              className={state === item ? 'state-tab state-tab--active' : 'state-tab'}
+              onClick={() => setState(item)}
+            >
+              {content[item].label}
+            </button>
+          ))}
+        </div>
+        <section className={`state-preview state-preview--${state}`} aria-live="polite">
+          <div className="state-preview__signal" aria-hidden="true" />
+          <p className="section-kicker">{selected.kicker} · PREVIEW</p>
+          <h2>{selected.title}</h2>
+          <p>{selected.copy}</p>
+        </section>
+      </section>
+
+      <section className="auth-state-qa" aria-labelledby="auth-state-heading">
+        <p className="section-kicker">AUTH UI · PREVIEW</p>
+        <h2 className="state-section-title" id="auth-state-heading">Авторизация и сессия</h2>
+        <p className="auth-state-qa__copy">Компоненты ниже показывают только будущие UX-состояния. Реальный backend, OTP, provider redirect и server session не подключены.</p>
+        <div className="state-tabs" role="group" aria-label="Состояния авторизации">
+          {(Object.keys(authPreviewStates) as AuthPreviewState[]).map((item) => (
+            <button
+              type="button"
+              aria-pressed={authState === item}
+              key={item}
+              className={authState === item ? 'state-tab state-tab--active' : 'state-tab'}
+              onClick={() => setAuthState(item)}
+            >
+              {authPreviewLabels[item]}
+            </button>
+          ))}
+        </div>
+        <AuthStatusPanel state={authPreviewStates[authState]} />
       </section>
     </div>
   );
