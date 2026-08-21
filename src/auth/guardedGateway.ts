@@ -21,6 +21,11 @@ import {
 
 type UnknownRecord = Record<string, unknown>;
 
+const START_SUCCESS_KEYS = new Set(['ok', 'challenge']);
+const START_FAILURE_KEYS = new Set(['ok', 'error']);
+const COMPLETE_SUCCESS_KEYS = new Set(['ok', 'session']);
+const COMPLETE_FAILURE_KEYS = new Set(['ok', 'error']);
+
 export interface AuthTransport {
   getMethods(): Promise<unknown>;
   restoreSession(): Promise<unknown>;
@@ -43,6 +48,10 @@ export class AuthProtocolError extends Error {
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasOnlyKeys(value: UnknownRecord, allowedKeys: ReadonlySet<string>): boolean {
+  return Object.keys(value).every((key) => allowedKeys.has(key));
 }
 
 function assertUniqueIds(items: ReadonlyArray<{ id: string }>, operation: string): void {
@@ -104,11 +113,15 @@ function parseStartResult(value: unknown): AuthStartResult {
     throw new AuthProtocolError('start');
   }
 
-  if (value.ok === true && isAuthChallenge(value.challenge)) {
+  if (value.ok === true
+    && hasOnlyKeys(value, START_SUCCESS_KEYS)
+    && isAuthChallenge(value.challenge)) {
     return { ok: true, challenge: value.challenge };
   }
 
-  if (value.ok === false && isAuthFailure(value.error)) {
+  if (value.ok === false
+    && hasOnlyKeys(value, START_FAILURE_KEYS)
+    && isAuthFailure(value.error)) {
     return { ok: false, error: value.error };
   }
 
@@ -120,11 +133,15 @@ function parseCompleteResult(value: unknown): AuthCompleteResult {
     throw new AuthProtocolError('complete');
   }
 
-  if (value.ok === true && isAuthSession(value.session)) {
+  if (value.ok === true
+    && hasOnlyKeys(value, COMPLETE_SUCCESS_KEYS)
+    && isAuthSession(value.session)) {
     return { ok: true, session: value.session };
   }
 
-  if (value.ok === false && isAuthFailure(value.error)) {
+  if (value.ok === false
+    && hasOnlyKeys(value, COMPLETE_FAILURE_KEYS)
+    && isAuthFailure(value.error)) {
     return { ok: false, error: value.error };
   }
 
