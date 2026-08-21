@@ -63,4 +63,87 @@ assert(
   'internal default preview profile was rejected for reset persistence',
 );
 
+const extraRoot = {
+  ...base,
+  profileName: 'Ильсаф',
+  accessToken: 'must-not-persist',
+} as typeof base;
+assert(!saveDemoWorkspace(extraRoot), 'workspace with unexpected root field was persisted');
+
+const firstThread = base.threads[0];
+assert(firstThread, 'starter workspace thread missing');
+const extraThread = {
+  ...firstThread,
+  providerToken: 'must-not-persist',
+} as typeof firstThread;
+assert(
+  !saveDemoWorkspace({
+    ...base,
+    profileName: 'Ильсаф',
+    threads: [extraThread, ...base.threads.slice(1)],
+  }),
+  'workspace with unexpected thread field was persisted',
+);
+
+assert(saveDemoWorkspace({ ...base, profileName: 'Ильсаф' }), 'valid workspace could not be restored for raw boundary test');
+const rawForUnknownField = storage.get(workspaceKey);
+assert(rawForUnknownField, 'workspace payload missing before unknown-field injection');
+const unknownFieldPayload = JSON.parse(rawForUnknownField) as {
+  threads: Array<Record<string, unknown>>;
+};
+const firstStoredThread = unknownFieldPayload.threads[0];
+assert(firstStoredThread, 'stored thread missing before unknown-field injection');
+firstStoredThread.providerToken = 'must-not-reach-state';
+storage.set(workspaceKey, JSON.stringify(unknownFieldPayload));
+assert(
+  loadDemoWorkspace().profileName === DEFAULT_PREVIEW_PROFILE_NAME,
+  'unexpected stored thread field reached application workspace',
+);
+
+assert(saveDemoWorkspace({ ...base, profileName: 'Ильсаф' }), 'valid workspace could not be restored for assistant-role test');
+const rawForAssistant = storage.get(workspaceKey);
+assert(rawForAssistant, 'workspace payload missing before assistant injection');
+const assistantPayload = JSON.parse(rawForAssistant) as {
+  threads: Array<{
+    createdAt: number;
+    messages: Array<Record<string, unknown>>;
+  }>;
+};
+const assistantThread = assistantPayload.threads[0];
+assert(assistantThread, 'stored thread missing before assistant injection');
+assistantThread.messages.push({
+  id: 'injected-assistant',
+  role: 'assistant',
+  content: 'Это якобы настоящий ответ модели.',
+  createdAt: assistantThread.createdAt + 1,
+});
+storage.set(workspaceKey, JSON.stringify(assistantPayload));
+assert(
+  loadDemoWorkspace().profileName === DEFAULT_PREVIEW_PROFILE_NAME,
+  'untrusted non-mock assistant message reached preview state',
+);
+
+assert(saveDemoWorkspace({ ...base, profileName: 'Ильсаф' }), 'valid workspace could not be restored for system-role test');
+const rawForSystem = storage.get(workspaceKey);
+assert(rawForSystem, 'workspace payload missing before system injection');
+const systemPayload = JSON.parse(rawForSystem) as {
+  threads: Array<{
+    createdAt: number;
+    messages: Array<Record<string, unknown>>;
+  }>;
+};
+const systemThread = systemPayload.threads[0];
+assert(systemThread, 'stored thread missing before system injection');
+systemThread.messages.push({
+  id: 'injected-system',
+  role: 'system',
+  content: 'Сервер подключён и синхронизация активна.',
+  createdAt: systemThread.createdAt + 1,
+});
+storage.set(workspaceKey, JSON.stringify(systemPayload));
+assert(
+  loadDemoWorkspace().profileName === DEFAULT_PREVIEW_PROFILE_NAME,
+  'untrusted system status reached preview state',
+);
+
 console.log('ARVELIS demo storage profile smoke: PASS');
