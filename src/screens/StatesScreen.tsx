@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AuthStatusPanel } from '../auth/AuthStatusPanel';
-import type { AuthUiState } from '../auth/contracts';
+import type { AuthSession, AuthUiState } from '../auth/contracts';
 import { Topbar } from '../components/Topbar';
 import type { SystemState } from '../types';
 
@@ -12,14 +12,29 @@ const content: Record<SystemState, { label: string; kicker: string; title: strin
   limit: { label: 'Лимит', kicker: 'LIMIT', title: 'Достигнут лимит', copy: 'Это только UX-preview. Тарифы, квоты и биллинг ARVELIS AI ещё не утверждены.' },
 };
 
-type AuthPreviewState = 'checking' | 'submitting' | 'challenge' | 'external' | 'verifying' | 'expired' | 'offline' | 'rate' | 'error';
+type AuthPreviewState =
+  | 'checking'
+  | 'submitting'
+  | 'challenge'
+  | 'challengeError'
+  | 'external'
+  | 'verifying'
+  | 'signingOut'
+  | 'signOutError'
+  | 'expired'
+  | 'offline'
+  | 'rate'
+  | 'error';
 
 const authPreviewLabels: Record<AuthPreviewState, string> = {
   checking: 'Проверка',
   submitting: 'Вход',
   challenge: 'Код',
+  challengeError: 'Код · ошибка',
   external: 'Провайдер',
   verifying: 'Проверка кода',
+  signingOut: 'Выход',
+  signOutError: 'Выход · ошибка',
   expired: 'Сессия',
   offline: 'Офлайн',
   rate: 'Лимит',
@@ -33,6 +48,17 @@ const previewExternalChallenge = {
   kind: 'external_redirect' as const,
   redirectUrl: 'https://example.invalid/authorization',
 };
+const previewSession: AuthSession = {
+  id: 'preview-session',
+  account: {
+    id: 'preview-account',
+    displayName: 'Пользователь preview',
+    emailVerified: false,
+    phoneVerified: false,
+  },
+  createdAt: '2026-08-21T08:00:00.000Z',
+  expiresAt: '2026-08-22T08:00:00.000Z',
+};
 
 const authPreviewStates: Record<AuthPreviewState, AuthUiState> = {
   checking: { status: 'checking_session' },
@@ -41,6 +67,12 @@ const authPreviewStates: Record<AuthPreviewState, AuthUiState> = {
     status: 'challenge',
     intent: 'sign_in',
     challenge: previewCodeChallenge,
+  },
+  challengeError: {
+    status: 'challenge',
+    intent: 'sign_in',
+    challenge: previewCodeChallenge,
+    error: { code: 'invalid_challenge', message: 'Internal preview invalid code' },
   },
   external: {
     status: 'challenge',
@@ -51,6 +83,15 @@ const authPreviewStates: Record<AuthPreviewState, AuthUiState> = {
     status: 'verifying',
     intent: 'sign_in',
     challenge: previewCodeChallenge,
+  },
+  signingOut: {
+    status: 'signing_out',
+    session: previewSession,
+  },
+  signOutError: {
+    status: 'sign_out_error',
+    session: previewSession,
+    error: { code: 'service_unavailable', message: 'Internal preview logout error' },
   },
   expired: { status: 'session_expired' },
   offline: { status: 'offline' },
