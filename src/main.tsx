@@ -21,6 +21,7 @@ import './auth-foundation-v2.css';
 import './account-security.css';
 import './home-foundation-v1.css';
 import './profile-foundation-v1.css';
+import './history-foundation-v1.css';
 
 const root = document.getElementById('root');
 
