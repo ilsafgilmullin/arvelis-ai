@@ -5,19 +5,28 @@ import type {
   SessionClock,
   SessionIssueInput,
   SessionIssueResult,
+  SessionListResult,
   SessionRecord,
   SessionRevokeReason,
   SessionSecurityPort,
   SessionStore,
-  SessionSummary,
 } from './contracts';
 import { SESSION_POLICY_CANDIDATE, type SessionPolicy } from './policy';
 
 const SESSION_ID_PATTERN = /^[a-f0-9]{32}$/;
 const SESSION_SECRET_PATTERN = /^[a-f0-9]{64}$/;
+const MAC_PATTERN = /^[a-f0-9]{64}$/;
 const UNSAFE_TEXT_PATTERN = /\p{C}/u;
 const MAX_LABEL_LENGTH = 120;
 const MAX_ACCOUNT_ID_LENGTH = 128;
+const ACCOUNT_STATUSES = new Set(['active', 'suspended', 'pending_deletion', 'deleted']);
+const REVOKE_REASONS = new Set<SessionRevokeReason>([
+  'user_sign_out',
+  'user_revoke',
+  'security_change',
+  'account_disabled',
+  'expired_cleanup',
+]);
 
 function isCanonicalAccountId(value: string): boolean {
   return value.length > 0
@@ -33,7 +42,7 @@ function isValidSecurityVersion(value: number): boolean {
 function isValidAccountSnapshot(account: AccountAuthenticationSnapshot): boolean {
   return isCanonicalAccountId(account.id)
     && isValidSecurityVersion(account.securityVersion)
-    && ['active', 'suspended', 'pending_deletion', 'deleted'].includes(account.status);
+    && ACCOUNT_STATUSES.has(account.status);
 }
 
 function normalizeOptionalLabel(value: string | undefined): string | null | undefined {
@@ -44,10 +53,28 @@ function normalizeOptionalLabel(value: string | undefined): string | null | unde
   return value;
 }
 
+function isValidPolicy(policy: Readonly<SessionPolicy>): boolean {
+  return Number.isSafeInteger(policy.ttlMs)
+    && policy.ttlMs > 0
+    && Number.isSafeInteger(policy.touchIntervalMs)
+    && policy.touchIntervalMs >= 0
+    && policy.touchIntervalMs < policy.ttlMs
+    && Number.isSafeInteger(policy.listLimit)
+    && policy.listLimit > 0
+    && policy.listLimit <= 100;
+}
+
 function isValidRecord(record: SessionRecord): boolean {
+  const validRevokeState = record.revokedAt === null
+    ? record.revokeReason === null
+    : Number.isFinite(record.revokedAt)
+      && record.revokedAt >= record.createdAt
+      && record.revokeReason !== null
+      && REVOKE_REASONS.has(record.revokeReason);
+
   return SESSION_ID_PATTERN.test(record.id)
     && isCanonicalAccountId(record.accountId)
-    && /^[a-f0-9]{64}$/.test(record.secretMac)
+    && MAC_PATTERN.test(record.secretMac)
     && isValidSecurityVersion(record.securityVersion)
     && Number.isFinite(record.createdAt)
     && Number.isFinite(record.lastSeenAt)
@@ -55,7 +82,7 @@ function isValidRecord(record: SessionRecord): boolean {
     && record.createdAt <= record.lastSeenAt
     && record.lastSeenAt <= record.expiresAt
     && record.expiresAt > record.createdAt
-    && (record.revokedAt === null || Number.isFinite(record.revokedAt))
+    && validRevokeState
     && (record.deviceLabel === null || normalizeOptionalLabel(record.deviceLabel) === record.deviceLabel)
     && (record.browserLabel === null || normalizeOptionalLabel(record.browserLabel) === record.browserLabel);
 }
@@ -81,6 +108,10 @@ export class SessionService {
     this.security = dependencies.security;
     this.now = dependencies.now ?? Date.now;
     this.policy = dependencies.policy ?? SESSION_POLICY_CANDIDATE;
+
+    if (!isValidPolicy(this.policy)) {
+      throw new Error('Invalid server session policy');
+    }
   }
 
   async issue(input: SessionIssueInput): Promise<SessionIssueResult> {
@@ -194,14 +225,16 @@ export class SessionService {
     }
   }
 
-  async listForAccount(accountId: string, currentSessionId?: string): Promise<SessionSummary[]> {
-    if (!isCanonicalAccountId(accountId)) return [];
-    if (currentSessionId !== undefined && !SESSION_ID_PATTERN.test(currentSessionId)) return [];
+  async listForAccount(accountId: string, currentSessionId?: string): Promise<SessionListResult> {
+    if (!isCanonicalAccountId(accountId)) return { ok: false, error: 'invalid_request' };
+    if (currentSessionId !== undefined && !SESSION_ID_PATTERN.test(currentSessionId)) {
+      return { ok: false, error: 'invalid_request' };
+    }
 
     try {
       const now = this.now();
       const records = await this.store.listForAccount(accountId, now, this.policy.listLimit);
-      return records
+      const sessions = records
         .filter((record) => isValidRecord(record)
           && record.accountId === accountId
           && record.revokedAt === null
@@ -217,8 +250,9 @@ export class SessionService {
           deviceLabel: record.deviceLabel,
           browserLabel: record.browserLabel,
         }));
+      return { ok: true, sessions };
     } catch {
-      return [];
+      return { ok: false, error: 'service_unavailable' };
     }
   }
 
@@ -227,7 +261,9 @@ export class SessionService {
     sessionId: string,
     reason: SessionRevokeReason = 'user_revoke',
   ): Promise<boolean> {
-    if (!isCanonicalAccountId(accountId) || !SESSION_ID_PATTERN.test(sessionId)) return false;
+    if (!isCanonicalAccountId(accountId) || !SESSION_ID_PATTERN.test(sessionId) || !REVOKE_REASONS.has(reason)) {
+      return false;
+    }
     try {
       return await this.store.revokeOwned(sessionId, accountId, this.now(), reason);
     } catch {
@@ -239,7 +275,7 @@ export class SessionService {
     accountId: string,
     reason: SessionRevokeReason = 'security_change',
   ): Promise<number> {
-    if (!isCanonicalAccountId(accountId)) return 0;
+    if (!isCanonicalAccountId(accountId) || !REVOKE_REASONS.has(reason)) return 0;
     try {
       return await this.store.revokeAllForAccount(accountId, this.now(), reason);
     } catch {
