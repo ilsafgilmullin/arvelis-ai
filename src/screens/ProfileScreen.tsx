@@ -19,7 +19,7 @@ export function ProfileScreen({
   profileName: string;
   onSaveName: (name: string) => void;
   onOpenStates: () => void;
-  onSignOut?: () => void;
+  onSignOut: () => void;
   onReset: () => void;
 }) {
   const [name, setName] = useState(profileName);
@@ -42,14 +42,6 @@ export function ProfileScreen({
     setValidationMessage(null);
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1400);
-  };
-
-  const signOutPreview = () => {
-    if (onSignOut) {
-      onSignOut();
-      return;
-    }
-    window.location.reload();
   };
 
   const reset = () => {
@@ -88,7 +80,7 @@ export function ProfileScreen({
           {validationMessage ? <p className="auth-field-error" id="profile-name-error" role="alert">{validationMessage}</p> : null}
         </div>
 
-        <button className="setting-action" type="button" onClick={signOutPreview}>
+        <button className="setting-action" type="button" onClick={onSignOut}>
           <SignOutIcon /><div><strong>Выйти из preview-профиля</strong><span>Вернёт на экран входа. Локальные диалоги и настройки останутся на этом устройстве.</span></div><span>Выйти</span>
         </button>
 
