@@ -23,6 +23,15 @@ function invalidChallengeFailure(): AuthFailure {
   return { code: 'invalid_challenge', message: 'No matching active code challenge' };
 }
 
+function preservesCodeChallenge(error: AuthFailure): boolean {
+  return error.code === 'invalid_input'
+    || error.code === 'invalid_challenge'
+    || error.code === 'rate_limited'
+    || error.code === 'network_error'
+    || error.code === 'service_unavailable'
+    || error.code === 'unknown';
+}
+
 export function useAuthController(gateway: AuthGateway | null) {
   const [state, dispatch] = useReducer(authUiReducer, initialAuthUiState);
   const [methods, setMethods] = useState<AuthMethodDescriptor[]>([]);
@@ -145,15 +154,21 @@ export function useAuthController(gateway: AuthGateway | null) {
       return false;
     }
 
+    const activeChallenge = state.challenge;
+    const activeIntent = state.intent;
     const sequence = ++authSequenceRef.current;
-    dispatch({ type: 'VERIFY', intent: state.intent, challenge: state.challenge });
+    dispatch({ type: 'VERIFY', intent: activeIntent, challenge: activeChallenge });
 
     try {
       const result = await gateway.complete(request);
       if (sequence !== authSequenceRef.current) return false;
 
       if (!result.ok) {
-        dispatch({ type: 'FAILURE', error: result.error });
+        if (preservesCodeChallenge(result.error)) {
+          dispatch({ type: 'CHALLENGE_FAILURE', intent: activeIntent, challenge: activeChallenge, error: result.error });
+        } else {
+          dispatch({ type: 'FAILURE', error: result.error });
+        }
         return false;
       }
 
@@ -161,15 +176,17 @@ export function useAuthController(gateway: AuthGateway | null) {
       return true;
     } catch {
       if (sequence !== authSequenceRef.current) return false;
-      dispatch({ type: 'FAILURE', error: unexpectedFailure() });
+      dispatch({ type: 'CHALLENGE_FAILURE', intent: activeIntent, challenge: activeChallenge, error: unexpectedFailure() });
       return false;
     }
   }, [gateway, state]);
 
+  const stateHasLiveSession = state.status === 'authenticated' || state.status === 'sign_out_error';
+
   const loadSessions = useCallback(async () => {
     const sequence = ++sessionsSequenceRef.current;
 
-    if (!gateway || state.status !== 'authenticated') {
+    if (!gateway || !stateHasLiveSession) {
       setSessions([]);
       setSessionsStatus('idle');
       return false;
@@ -191,11 +208,15 @@ export function useAuthController(gateway: AuthGateway | null) {
       setSessionsStatus('error');
       return false;
     }
-  }, [gateway, state.status]);
+  }, [gateway, stateHasLiveSession]);
 
   useEffect(() => {
     if (state.status === 'authenticated') {
       void loadSessions();
+      return;
+    }
+
+    if (state.status === 'signing_out' || state.status === 'sign_out_error') {
       return;
     }
 
@@ -205,8 +226,15 @@ export function useAuthController(gateway: AuthGateway | null) {
   }, [loadSessions, state.status]);
 
   const signOut = useCallback(async () => {
-    authSequenceRef.current += 1;
+    const activeSession = state.status === 'authenticated' || state.status === 'sign_out_error'
+      ? state.session
+      : null;
+
+    if (!activeSession) return false;
+
+    const sequence = ++authSequenceRef.current;
     sessionsSequenceRef.current += 1;
+    dispatch({ type: 'SIGN_OUT_START', session: activeSession });
 
     if (!gateway) {
       setSessions([]);
@@ -217,18 +245,22 @@ export function useAuthController(gateway: AuthGateway | null) {
 
     try {
       await gateway.signOut();
+      if (sequence !== authSequenceRef.current) return false;
+
       setSessions([]);
       setSessionsStatus('idle');
       dispatch({ type: 'RESET', intent: 'sign_in' });
       return true;
     } catch {
-      dispatch({ type: 'FAILURE', error: unexpectedFailure() });
+      if (sequence !== authSequenceRef.current) return false;
+
+      dispatch({ type: 'SIGN_OUT_FAILED', session: activeSession, error: unexpectedFailure() });
       return false;
     }
-  }, [gateway]);
+  }, [gateway, state]);
 
   const revokeSession = useCallback(async (sessionId: string) => {
-    if (!gateway || !sessionId) return false;
+    if (!gateway || !sessionId || !stateHasLiveSession) return false;
 
     try {
       await gateway.revokeSession(sessionId);
@@ -237,7 +269,7 @@ export function useAuthController(gateway: AuthGateway | null) {
     } catch {
       return false;
     }
-  }, [gateway, loadSessions]);
+  }, [gateway, loadSessions, stateHasLiveSession]);
 
   const expireSession = useCallback(() => {
     authSequenceRef.current += 1;
