@@ -1,7 +1,12 @@
 import type { AuthTransport } from '../src/auth/guardedGateway';
 import { AuthProtocolError, createGuardedAuthGateway } from '../src/auth/guardedGateway';
 import { containsUnsafeProtocolCharacters } from '../src/auth/protocolText';
-import { isAuthMethodDescriptor, isAuthSession } from '../src/auth/runtimeGuards';
+import {
+  isAuthChallenge,
+  isAuthMethodDescriptor,
+  isAuthSession,
+  isAuthSessionSummary,
+} from '../src/auth/runtimeGuards';
 
 function assert(value: unknown, message: string): asserts value {
   if (!value) throw new Error(message);
@@ -23,19 +28,52 @@ assert(
   'bidi control in server method label reached application state',
 );
 
+const validSession = {
+  id: 'session-1',
+  account: {
+    id: 'account-1',
+    displayName: 'Ильсаф',
+    emailVerified: false,
+    phoneVerified: false,
+  },
+  createdAt: '2026-08-21T08:00:00.000Z',
+  expiresAt: '2026-08-22T08:00:00.000Z',
+};
+
+assert(isAuthSession(validSession), 'valid session rejected');
 assert(
   !isAuthSession({
-    id: 'session-1',
-    account: {
-      id: 'account-1',
-      displayName: 'User\u200BAdmin',
-      emailVerified: false,
-      phoneVerified: false,
-    },
-    createdAt: '2026-08-21T08:00:00.000Z',
-    expiresAt: '2026-08-22T08:00:00.000Z',
+    ...validSession,
+    account: { ...validSession.account, displayName: 'User\u200BAdmin' },
   }),
   'zero-width control in server account display name reached application state',
+);
+assert(
+  !isAuthSession({ ...validSession, createdAt: '2026-08-21T08:00:00.000Z\n' }),
+  'raw newline in session createdAt was accepted by Date parser',
+);
+assert(
+  !isAuthSession({ ...validSession, expiresAt: '\t2026-08-22T08:00:00.000Z' }),
+  'raw tab in session expiresAt was accepted by Date parser',
+);
+assert(
+  !isAuthSessionSummary({
+    id: 'session-summary-1',
+    current: true,
+    createdAt: '2026-08-21T08:00:00.000Z',
+    lastSeenAt: '2026-08-21T09:00:00.000Z\n',
+    expiresAt: '2026-08-22T08:00:00.000Z',
+  }),
+  'raw control in session lastSeenAt was accepted',
+);
+assert(
+  !isAuthChallenge({
+    id: 'challenge-1',
+    methodId: 'email',
+    kind: 'code',
+    expiresAt: '2026-08-21T08:10:00.000Z\n',
+  }),
+  'raw control in challenge expiresAt was accepted',
 );
 
 class CaptureTransport implements AuthTransport {
