@@ -17,9 +17,10 @@ export function AuthScreen({
   initialName: string;
   onContinue: (name: string) => void;
 }) {
-  const hasLocalProfile = !isDefaultPreviewProfileName(initialName);
+  const initialProfileName = normalizePreviewProfileName(initialName);
+  const hasLocalProfile = Boolean(initialProfileName) && !isDefaultPreviewProfileName(initialProfileName);
   const [mode, setMode] = useState<AuthMode>(hasLocalProfile ? 'signin' : 'signup');
-  const [name, setName] = useState(hasLocalProfile ? initialName : '');
+  const [name, setName] = useState(hasLocalProfile ? initialProfileName : '');
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const online = useOnlineStatus();
   const isSignIn = mode === 'signin';
@@ -34,7 +35,7 @@ export function AuthScreen({
       selectMode('signup');
       return;
     }
-    onContinue(normalizePreviewProfileName(initialName));
+    onContinue(initialProfileName);
   };
 
   const submitRegistration = (event: FormEvent<HTMLFormElement>) => {
@@ -102,11 +103,11 @@ export function AuthScreen({
           hasLocalProfile ? (
             <section className="auth-local-profile" aria-label="Локальный профиль">
               <div className="auth-local-profile__avatar" aria-hidden="true">
-                {normalizePreviewProfileName(initialName).slice(0, 1).toLocaleUpperCase('ru-RU') || 'A'}
+                {initialProfileName.slice(0, 1).toLocaleUpperCase('ru-RU') || 'A'}
               </div>
               <div className="auth-local-profile__copy">
                 <span>Профиль на этом устройстве</span>
-                <strong>{normalizePreviewProfileName(initialName)}</strong>
+                <strong>{initialProfileName}</strong>
                 <p>История и настройки хранятся только в локальном preview-хранилище этого браузера.</p>
               </div>
               <button className="button button--primary auth-submit" type="button" onClick={continueExistingProfile}>
