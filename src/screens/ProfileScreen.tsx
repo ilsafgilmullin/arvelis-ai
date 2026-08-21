@@ -89,7 +89,7 @@ export function ProfileScreen({
         </button>
 
         <button className="setting-action setting-action--danger" type="button" onClick={() => setConfirmReset(true)}>
-          <ResetIcon /><div><strong>Сбросить локальные данные</strong><span>Удалит локальные диалоги, имя и вернёт стартовые примеры.</span></div><span>Сбросить</span>
+          <ResetIcon /><div><strong>Сбросить локальные данные</strong><span>Удалит локальные диалоги и профиль, восстановит стартовые примеры и вернёт на регистрацию.</span></div><span>Сбросить</span>
         </button>
       </section>
 
@@ -98,7 +98,7 @@ export function ProfileScreen({
       <ConfirmDialog
         open={confirmReset}
         title="Сбросить локальные данные?"
-        description="Все созданные в этом браузере диалоги и изменённое имя будут удалены. Затем восстановятся стартовые примеры."
+        description="Локальные диалоги, имя и настройки этого preview-профиля будут удалены. Стартовые примеры восстановятся, после чего ARVELIS AI вернётся на экран регистрации."
         confirmLabel="Сбросить данные"
         danger
         onConfirm={reset}
