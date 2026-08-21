@@ -18,6 +18,7 @@ import './chat-history-v2.css';
 import './chat-runtime-hardening-v2.css';
 import './app-foundation-v1.css';
 import './auth-foundation-v2.css';
+import './account-security.css';
 
 const root = document.getElementById('root');
 
