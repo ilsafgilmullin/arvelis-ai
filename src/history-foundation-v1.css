@@ -331,11 +331,19 @@
 }
 
 @media (hover: none) and (pointer: coarse) {
-  .history-v3__open:hover,
-  .history-v3__delete:hover,
+  .history-v3__open:hover {
+    background: transparent;
+  }
+
+  .history-v3__delete:hover {
+    border-color: transparent;
+    background: transparent;
+    color: #6e747d;
+  }
+
   .history-v3__clear:hover {
     background: transparent;
-    color: inherit;
+    color: #737982;
   }
 }
 
