@@ -94,10 +94,11 @@ const authPreviewStates: Record<AuthPreviewState, AuthUiState> = {
     error: { code: 'service_unavailable', message: 'Internal preview logout error' },
   },
   expired: { status: 'session_expired' },
-  offline: { status: 'offline' },
-  rate: { status: 'rate_limited', retryAfterSeconds: 30 },
+  offline: { status: 'offline', intent: 'sign_in' },
+  rate: { status: 'rate_limited', intent: 'sign_in', retryAfterSeconds: 30 },
   error: {
     status: 'error',
+    intent: 'sign_up',
     error: { code: 'service_unavailable', message: 'Internal preview error' },
   },
 };
