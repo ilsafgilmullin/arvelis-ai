@@ -18,6 +18,10 @@ function unexpectedFailure(): AuthFailure {
   return { code: 'service_unavailable', message: 'Auth service unavailable' };
 }
 
+function invalidChallengeFailure(): AuthFailure {
+  return { code: 'invalid_challenge', message: 'No matching active code challenge' };
+}
+
 export function useAuthController(gateway: AuthGateway | null) {
   const [state, dispatch] = useReducer(authUiReducer, initialAuthUiState);
   const [methods, setMethods] = useState<AuthMethodDescriptor[]>([]);
@@ -133,10 +137,15 @@ export function useAuthController(gateway: AuthGateway | null) {
       return false;
     }
 
-    const sequence = ++authSequenceRef.current;
-    if (state.status === 'challenge') {
-      dispatch({ type: 'VERIFY', intent: state.intent, challenge: state.challenge });
+    if (state.status !== 'challenge'
+      || state.challenge.kind !== 'code'
+      || state.challenge.id !== request.challengeId) {
+      dispatch({ type: 'FAILURE', error: invalidChallengeFailure() });
+      return false;
     }
+
+    const sequence = ++authSequenceRef.current;
+    dispatch({ type: 'VERIFY', intent: state.intent, challenge: state.challenge });
 
     try {
       const result = await gateway.complete(request);
