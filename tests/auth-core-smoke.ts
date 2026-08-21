@@ -145,6 +145,23 @@ assert(signUpFailure.status === 'error' && signUpFailure.intent === 'sign_up', '
 const signUpRetry = authUiReducer(signUpFailure, { type: 'RESET' });
 assert(signUpRetry.status === 'signed_out' && signUpRetry.intent === 'sign_up', 'sign-up intent lost on retry');
 
+const modeSwitchDuringSession = authUiReducer(
+  { status: 'authenticated', session: validSession },
+  { type: 'SET_INTENT', intent: 'sign_up' },
+);
+assert(
+  modeSwitchDuringSession.status === 'authenticated' && modeSwitchDuringSession.session.id === validSession.id,
+  'local mode switch discarded a live server session',
+);
+const offlineDuringSession = authUiReducer(
+  { status: 'authenticated', session: validSession },
+  { type: 'OFFLINE' },
+);
+assert(
+  offlineDuringSession.status === 'authenticated' && offlineDuringSession.session.id === validSession.id,
+  'offline event discarded a live server session',
+);
+
 const signOutStarted = authUiReducer(
   { status: 'authenticated', session: validSession },
   { type: 'SIGN_OUT_START', session: validSession },
