@@ -69,10 +69,10 @@ Method catalog не является prerequisite для уже существу
 
 Требования:
 
-- не считать отсутствие session исключительной ошибкой;
+- отсутствие session не считается исключительной ошибкой;
 - session authorization проверяется сервером;
 - frontend account object содержит только необходимые UI-поля;
-- role/permission details выдаются только если они реально нужны клиенту, но server remains authoritative;
+- role/permission details выдаются только если они реально нужны клиенту, но server остаётся authoritative;
 - restore session обрабатывается независимо от method catalog и device/session list.
 
 ## 3. Start authentication
@@ -99,28 +99,80 @@ Security requirements:
 - не сообщать постороннему, существует ли конкретный аккаунт, если это создаёт enumeration risk;
 - challenge имеет TTL, attempt limit и replay protection.
 
-## 4. Complete authentication
+### `code`
+
+Используется для first-party challenge, который frontend может завершить через `/api/auth/complete`.
+
+Frontend получает только:
+
+- challenge id;
+- method id;
+- optional masked destination;
+- optional expiry.
+
+### `external_redirect`
+
+Используется для внешнего OAuth/OIDC входа.
+
+Frontend получает:
+
+- challenge id;
+- method id;
+- абсолютный HTTPS authorization URL;
+- optional expiry.
+
+Redirect URL — это server-issued navigation target. Production backend обязан строить его только из заранее зарегистрированного/allowlisted provider configuration.
+
+## 4. Complete first-party code challenge
 
 ### `POST /api/auth/complete`
 
-Рабочий request:
+Этот endpoint в executable v1 contract применяется **только к `code` challenge**.
+
+Request:
 
 - challenge id;
-- challenge response/authorization result, если применимо.
+- непустой challenge response/code.
+
+Frontend controller обязан убедиться, что:
+
+- текущий UI state действительно содержит активный `code` challenge;
+- challenge id совпадает с активной транзакцией;
+- stale/чужой challenge id не отправляется в transport.
 
 Успех:
 
-- backend создаёт/rotates server session;
+- backend валидирует challenge server-side;
+- challenge single-use/replay rules применяются на сервере;
+- backend создаёт/rotates собственную ARVELIS server session;
 - frontend получает только UI-safe session/account result;
 - session secret не записывается JavaScript-кодом в localStorage.
 
 Ошибка:
 
 - возвращается нормализованный ARVELIS error code;
-- сырые provider exceptions остаются server-side;
+- сырые provider/internal exceptions остаются server-side;
 - sensitive details не отражаются пользователю.
 
-## 5. Sign out
+## 5. External OAuth/OIDC callback
+
+External provider **не завершает вход через универсальный frontend `complete()`**.
+
+Рабочая web/BFF семантика:
+
+1. `/api/auth/start` создаёт server-side auth transaction и возвращает `external_redirect` challenge;
+2. браузер переходит по server-issued HTTPS authorization URL;
+3. provider возвращает браузер на зарегистрированный callback ARVELIS backend/BFF;
+4. backend проверяет transaction binding, `state`, issuer/client/audience, PKCE/nonce там, где применимо, и защищается от replay/mix-up;
+5. backend завершает/связывает identity и создаёт ARVELIS server session;
+6. backend перенаправляет браузер только на заранее разрешённый app return location;
+7. frontend после возврата вызывает `restoreSession()`.
+
+Provider authorization code, access token или refresh token **не должны становиться обычным React-state/URL query, который приложение читает и хранит самостоятельно**.
+
+OAuth provider secrets/tokens остаются за trusted backend boundary.
+
+## 6. Sign out
 
 ### `POST /api/auth/sign-out`
 
@@ -131,7 +183,7 @@ Security requirements:
 - frontend переходит в signed-out состояние только после подтверждённого результата либо отдельно утверждённой degraded policy;
 - сетевой/серверный сбой не должен визуально выдаваться за подтверждённый revoke.
 
-## 6. Session management
+## 7. Session management
 
 ### `GET /api/auth/sessions`
 
@@ -173,7 +225,7 @@ Server requirements:
 
 Опциональный candidate: отозвать все остальные сессии после re-auth/step-up, если security review это утвердит.
 
-## 7. Recovery
+## 8. Recovery
 
 Recovery flow пока `OPEN` по продукту, но server contract обязан позволять отдельный start/complete lifecycle вместо клиентской «магии».
 
@@ -190,7 +242,7 @@ Candidate semantics:
 - revoke/rotate sessions после критического восстановления, если политика это требует;
 - security event/audit entry.
 
-## 8. Account lifecycle
+## 9. Account lifecycle
 
 Будущие server endpoints/operations должны поддержать:
 
@@ -228,13 +280,15 @@ Frontend foundation:
 `runtimeGuards.ts` / `guardedGateway.ts` проверяют до попадания данных в application state:
 
 - shape account/session/challenge/failure;
+- discriminated `code` vs `external_redirect` challenge fields;
 - bounded protocol field lengths;
 - bounded method/session collection sizes;
 - duplicate ids;
 - максимум одну `current` session;
 - согласованность verified email/phone fields;
 - absolute HTTPS URL для `external_redirect`;
-- outgoing method/challenge ids и response size.
+- outgoing method/challenge ids и code response size;
+- непустой response для first-party code completion.
 
 Это defensive frontend boundary. **Backend обязан валидировать всё повторно** и остаётся источником истины.
 
