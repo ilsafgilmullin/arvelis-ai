@@ -34,6 +34,15 @@ export function AuthStatusPanel({ state }: { state: AuthUiState }) {
     );
   }
 
+  if (state.status === 'verifying') {
+    return (
+      <section className="auth-status-panel auth-status-panel--loading" role="status" aria-live="polite">
+        <span className="auth-status-panel__signal" aria-hidden="true" />
+        <div><strong>Проверяем подтверждение</strong><p>ARVELIS AI завершает проверку и создаёт защищённую сессию.</p></div>
+      </section>
+    );
+  }
+
   if (state.status === 'session_expired') {
     return (
       <section className="auth-status-panel auth-status-panel--warning" role="alert">
