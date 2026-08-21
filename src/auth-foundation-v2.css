@@ -1,6 +1,10 @@
 /* ARVELIS AI auth foundation v2.
    Loaded after app-foundation-v1 to isolate auth-state polish from stable app/chat layers. */
 
+.auth-mode-switch__item {
+  min-height: 46px;
+}
+
 .auth-network-note {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -271,6 +275,28 @@
   .auth-state-qa {
     margin-top: 34px;
     padding-top: 28px;
+  }
+}
+
+@media (max-width: 780px) and (max-height: 720px) {
+  .auth-panel--v2 {
+    justify-content: flex-start;
+  }
+
+  .auth-heading--v2 {
+    margin-top: 32px;
+  }
+
+  .auth-heading--v2 h1 {
+    font-size: clamp(30px, 9vw, 40px);
+  }
+
+  .auth-security-note {
+    margin-top: 14px;
+  }
+
+  .auth-legal-note {
+    margin-top: 12px;
   }
 }
 
