@@ -15,23 +15,6 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 12
-    services:
-      postgres:
-        image: postgres:18.4
-        env:
-          POSTGRES_DB: arvelis_test
-          POSTGRES_USER: arvelis
-          POSTGRES_PASSWORD: arvelis_test_password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U arvelis -d arvelis_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    env:
-      DATABASE_URL: postgresql://arvelis:arvelis_test_password@127.0.0.1:5432/arvelis_test
 
     steps:
       - name: Checkout
@@ -65,12 +48,6 @@ jobs:
       - name: Auth server runtime build
         run: npm run build:auth-server
 
-      - name: Auth database migration
-        run: npm run db:migrate
-
-      - name: PostgreSQL auth persistence smoke
-        run: npm run test:server-db
-
       - name: Build
         run: npm run build
 
@@ -82,3 +59,42 @@ jobs:
           path: package-lock.json
           if-no-files-found: ignore
           retention-days: 3
+
+  postgres-compat:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:18.4
+        env:
+          POSTGRES_DB: arvelis_test
+          POSTGRES_USER: arvelis
+          POSTGRES_PASSWORD: arvelis_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arvelis -d arvelis_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://arvelis:arvelis_test_password@127.0.0.1:5432/arvelis_test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: PostgreSQL auth migration
+        run: npm run db:migrate
+
+      - name: PostgreSQL auth persistence smoke
+        run: npm run test:server-db
