@@ -19,3 +19,4 @@ export const EditIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="m5 16
 export const CheckIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="m5 12.5 4.3 4.3L19 7" /></svg></IconFrame>;
 export const TrashIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="M5.5 7.2h13M9 7.2V4.8h6v2.4M7.4 7.2l.7 12h7.8l.7-12M10 10.2v6M14 10.2v6" /></svg></IconFrame>;
 export const ResetIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="M4.5 8.2V4.5h3.7M4.6 4.7a8.8 8.8 0 1 1-1.4 10.1" /></svg></IconFrame>;
+export const SignOutIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="M10 5H5.8A1.8 1.8 0 0 0 4 6.8v10.4A1.8 1.8 0 0 0 5.8 19H10" /><path d="M13 8.2 16.8 12 13 15.8M8.5 12h8.3" /></svg></IconFrame>;
