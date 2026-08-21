@@ -40,6 +40,9 @@ export class SmtpEmailOtpDelivery implements EmailOtpDeliveryPort {
         pass: config.password,
       },
       requireTLS: !config.secure,
+      tls: {
+        minVersion: 'TLSv1.2',
+      },
       connectionTimeout: 8_000,
       greetingTimeout: 8_000,
       socketTimeout: 12_000,
