@@ -11,6 +11,14 @@ function assert(value: unknown, message: string): asserts value {
 }
 
 async function main(): Promise<void> {
+  let rejectedUnsafePath = false;
+  try {
+    openSqliteAuthDatabase('arvelis-auth.db');
+  } catch {
+    rejectedUnsafePath = true;
+  }
+  assert(rejectedUnsafePath, 'SQLite runtime accepted a file path outside .data/');
+
   const database = openSqliteAuthDatabase(':memory:');
   try {
     const accounts = new SqliteAccountIdentityStore(database);
