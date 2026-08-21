@@ -76,11 +76,14 @@ export function authUiReducer(state: AuthUiState, event: AuthUiEvent): AuthUiSta
     case 'OFFLINE':
       return { status: 'offline' };
 
-    case 'FAILURE':
+    case 'FAILURE': {
       if (event.error.code === 'rate_limited') {
-        return { status: 'rate_limited', retryAfterSeconds: event.error.retryAfterSeconds };
+        return event.error.retryAfterSeconds === undefined
+          ? { status: 'rate_limited' }
+          : { status: 'rate_limited', retryAfterSeconds: event.error.retryAfterSeconds };
       }
       return { status: 'error', error: event.error };
+    }
 
     case 'RESET':
       return signedOut(event.intent ?? (state.status === 'signed_out' ? state.intent : 'sign_in'));
