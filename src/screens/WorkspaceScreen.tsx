@@ -9,6 +9,24 @@ import {
 } from '../domain/chatPresentation';
 import type { DemoThread } from '../types';
 
+const productDirections = [
+  {
+    index: '01',
+    title: 'Работа',
+    copy: 'Разбирать задачи, ограничения и варианты решения в понятной профессиональной структуре.',
+  },
+  {
+    index: '02',
+    title: 'Учёба',
+    copy: 'Помогать выстраивать сложный материал последовательно и сохранять контекст разбора в одном диалоге.',
+  },
+  {
+    index: '03',
+    title: 'Сложные задачи',
+    copy: 'Превращать неструктурированный запрос в более точный, ясный и практически применимый результат.',
+  },
+] as const;
+
 function greetingFor(profileName: string): string {
   const hour = new Date().getHours();
   const greeting = hour < 6 ? 'Доброй ночи' : hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
@@ -31,63 +49,69 @@ export function WorkspaceScreen({
   onNewChat: () => void;
   onOpenThread: (threadId: string) => void;
 }) {
+  const recentThreads = threads.slice(0, 3);
+
   return (
-    <div className="content-page home-v2">
-      <Topbar title="Главная" subtitle={`${greetingFor(profileName)}. Здесь собрана основная информация об ARVELIS AI.`} />
+    <div className="content-page home-v3">
+      <Topbar title="Главная" subtitle={`${greetingFor(profileName)}.`} />
 
-      <section className="home-v2__hero">
-        <div className="home-v2__hero-mark" aria-hidden="true"><BrandMark size="default" /></div>
-        <div className="home-v2__hero-copy">
+      <section className="home-v3__hero" aria-labelledby="home-primary-title">
+        <div className="home-v3__hero-copy">
           <p className="section-kicker">ARVELIS AI</p>
-          <h2>Интеллект вокруг вашей задачи.</h2>
+          <h2 id="home-primary-title">Профессиональный ассистент вокруг вашей задачи.</h2>
           <p>
-            ARVELIS AI создаётся как профессиональный универсальный ассистент для работы, учёбы и сложных повседневных задач — с понятным интерфейсом, контролем данных и модульной архитектурой.
+            ARVELIS AI создаётся для работы, учёбы и решения сложных повседневных задач — с понятным диалогом, историей и контролем данных.
           </p>
-          <button className="button button--primary home-v2__primary" type="button" onClick={onNewChat} disabled={threadLimitReached}>
-            <ChatIcon />Новый чат
-          </button>
-          {threadLimitReached ? <span className="home-v2__limit">Локальный preview достиг лимита диалогов. Удалите ненужный диалог в истории.</span> : null}
+          <div className="home-v3__hero-actions">
+            <button
+              className="button button--primary home-v3__primary"
+              type="button"
+              onClick={onNewChat}
+              disabled={threadLimitReached}
+            >
+              <ChatIcon />Новый чат
+            </button>
+          </div>
+          {threadLimitReached ? (
+            <p className="home-v3__limit" role="status">
+              Достигнут локальный лимит диалогов. Удалите ненужный диалог в Истории, чтобы начать новый.
+            </p>
+          ) : null}
         </div>
+
+        <aside className="home-v3__preview" aria-label="Статус текущей версии">
+          <div className="home-v3__preview-brand" aria-hidden="true">
+            <BrandMark size="default" />
+          </div>
+          <div className="home-v3__preview-copy">
+            <div className="home-v3__preview-heading">
+              <span className="home-v3__preview-dot" aria-hidden="true" />
+              <strong>PRODUCT PREVIEW</strong>
+            </div>
+            <p>Сейчас работает интерфейс и локальная история. Реальная авторизация, серверное хранение и AI ещё не подключены.</p>
+          </div>
+          <dl className="home-v3__preview-facts">
+            <div><dt>Данные</dt><dd>Локально</dd></div>
+            <div><dt>AI</dt><dd>Не подключён</dd></div>
+          </dl>
+        </aside>
       </section>
 
-      <section className="home-v2__grid" aria-label="О проекте ARVELIS AI">
-        <article className="home-v2__card home-v2__card--wide">
-          <span className="home-v2__card-index">01</span>
-          <p className="section-kicker">О ПРОЕКТЕ</p>
-          <h3>Профессиональный ассистент, а не очередной безликий чат.</h3>
-          <p>Продукт проектируется mobile-first: быстрый запуск, спокойный премиальный интерфейс, история диалогов, профиль и понятные системные состояния.</p>
-        </article>
-        <article className="home-v2__card">
-          <span className="home-v2__card-index">02</span>
-          <p className="section-kicker">КАК ПОЛЬЗОВАТЬСЯ</p>
-          <h3>Начните с обычной формулировки.</h3>
-          <p>Откройте «Чат», опишите цель или вопрос своими словами, затем уточняйте задачу в одном диалоге.</p>
-        </article>
-        <article className="home-v2__card">
-          <span className="home-v2__card-index">03</span>
-          <p className="section-kicker">КОНФИДЕНЦИАЛЬНОСТЬ</p>
-          <h3>Сейчас данные остаются локально.</h3>
-          <p>В этой версии нет серверного аккаунта, AI-провайдера или production-хранилища. Не вводите секреты и чувствительные данные.</p>
-        </article>
-        <article className="home-v2__card home-v2__card--status">
-          <div className="home-v2__status-line"><span className="home-v2__status-dot" /><strong>PRODUCT PREVIEW</strong></div>
-          <p className="section-kicker">СТАТУС</p>
-          <h3>Интерфейс строится до подключения модели.</h3>
-          <p>Авторизация, backend, production database и реальный AI пока не подключены. Это намеренный этап разработки.</p>
-        </article>
-      </section>
-
-      <section className="home-v2__recent">
-        <div className="section-heading section-heading--inline">
-          <div><p className="section-kicker">БЫСТРЫЙ ДОСТУП</p><h2>Недавние диалоги</h2></div>
+      <section className="home-v3__recent" aria-labelledby="home-recent-title">
+        <div className="home-v3__section-heading">
+          <div>
+            <p className="section-kicker">ПРОДОЛЖИТЬ</p>
+            <h2 id="home-recent-title">Недавние диалоги</h2>
+          </div>
           <span>{threads.length}</span>
         </div>
-        {threads.length ? (
-          <div className="history-list">
-            {threads.slice(0, 3).map((thread) => {
+
+        {recentThreads.length ? (
+          <div className="home-v3__recent-list">
+            {recentThreads.map((thread) => {
               const conversationCount = conversationMessageCount(thread);
               return (
-                <button className="history-row" type="button" key={thread.id} onClick={() => onOpenThread(thread.id)}>
+                <button className="home-v3__recent-row" type="button" key={thread.id} onClick={() => onOpenThread(thread.id)}>
                   <div>
                     <strong>{thread.title}</strong>
                     <span>{conversationMessageCountLabel(conversationCount)} · {conversationRelativeTime(thread.updatedAt)}</span>
@@ -97,7 +121,54 @@ export function WorkspaceScreen({
               );
             })}
           </div>
-        ) : <div className="empty-inline">Диалогов пока нет. Новый разговор можно начать во вкладке «Чат».</div>}
+        ) : (
+          <div className="home-v3__empty">
+            <strong>Здесь появятся ваши недавние диалоги</strong>
+            <p>Начните новый чат — после этого к разговору можно будет быстро вернуться с Главной.</p>
+          </div>
+        )}
+      </section>
+
+      <section className="home-v3__directions" aria-labelledby="home-directions-title">
+        <div className="home-v3__section-heading">
+          <div>
+            <p className="section-kicker">НАПРАВЛЕНИЯ</p>
+            <h2 id="home-directions-title">Для чего создаётся ARVELIS AI</h2>
+          </div>
+        </div>
+        <div className="home-v3__direction-grid">
+          {productDirections.map((direction) => (
+            <article className="home-v3__direction" key={direction.index}>
+              <span>{direction.index}</span>
+              <h3>{direction.title}</h3>
+              <p>{direction.copy}</p>
+            </article>
+          ))}
+        </div>
+        <p className="home-v3__direction-note">
+          Это продуктовые направления, а не обещание уже работающих AI-функций в текущем preview.
+        </p>
+      </section>
+
+      <section className="home-v3__info" aria-labelledby="home-info-title">
+        <div className="home-v3__section-heading">
+          <div>
+            <p className="section-kicker">О ПРОЕКТЕ</p>
+            <h2 id="home-info-title">Полезная информация</h2>
+          </div>
+        </div>
+        <div className="home-v3__info-grid">
+          <article>
+            <span>КАК ПОЛЬЗОВАТЬСЯ</span>
+            <h3>Один диалог — один контекст задачи.</h3>
+            <p>Начните новый чат, сформулируйте задачу обычными словами и продолжайте уточнять её в том же разговоре. Диалог останется в локальной Истории.</p>
+          </article>
+          <article>
+            <span>КОНФИДЕНЦИАЛЬНОСТЬ</span>
+            <h3>Текущие данные остаются на этом устройстве.</h3>
+            <p>В preview нет production-базы и реального AI. Не вводите пароли, секреты и чувствительные персональные данные до подключения защищённой серверной инфраструктуры.</p>
+          </article>
+        </div>
       </section>
     </div>
   );
