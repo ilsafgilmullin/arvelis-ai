@@ -437,6 +437,12 @@
   }
 }
 
+@media (hover: none) and (pointer: coarse) {
+  .home-v3__recent-row:hover {
+    color: inherit;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .home-v3__recent-row,
   .home-v3__primary {
