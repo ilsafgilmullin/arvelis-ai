@@ -59,15 +59,15 @@ function assertStartRequest(request: AuthStartRequest): AuthStartRequest {
 
   if ((request.intent !== 'sign_in' && request.intent !== 'sign_up')
     || containsUnsafeProtocolCharacters(rawMethodId)
+    || rawMethodId.trim() !== rawMethodId
     || (rawIdentifier !== undefined && containsUnsafeProtocolCharacters(rawIdentifier))) {
     throw new AuthProtocolError('start-request');
   }
 
-  const methodId = rawMethodId.trim();
   const identifier = rawIdentifier?.trim();
 
-  if (!methodId
-    || methodId.length > AUTH_PROTOCOL_LIMITS.methodIdLength
+  if (!rawMethodId
+    || rawMethodId.length > AUTH_PROTOCOL_LIMITS.methodIdLength
     || (identifier !== undefined && (
       !identifier
       || identifier.length > AUTH_PROTOCOL_LIMITS.identifierLength
@@ -76,27 +76,27 @@ function assertStartRequest(request: AuthStartRequest): AuthStartRequest {
   }
 
   return identifier === undefined
-    ? { intent: request.intent, methodId }
-    : { intent: request.intent, methodId, identifier };
+    ? { intent: request.intent, methodId: rawMethodId }
+    : { intent: request.intent, methodId: rawMethodId, identifier };
 }
 
 function assertCompleteRequest(request: AuthCompleteRequest): AuthCompleteRequest {
   if (containsUnsafeProtocolCharacters(request.challengeId)
+    || request.challengeId.trim() !== request.challengeId
     || containsUnsafeProtocolCharacters(request.response)) {
     throw new AuthProtocolError('complete-request');
   }
 
-  const challengeId = request.challengeId.trim();
   const response = request.response.trim();
 
-  if (!challengeId
-    || challengeId.length > AUTH_PROTOCOL_LIMITS.idLength
+  if (!request.challengeId
+    || request.challengeId.length > AUTH_PROTOCOL_LIMITS.idLength
     || !response
     || response.length > AUTH_PROTOCOL_LIMITS.challengeResponseLength) {
     throw new AuthProtocolError('complete-request');
   }
 
-  return { challengeId, response };
+  return { challengeId: request.challengeId, response };
 }
 
 function parseStartResult(value: unknown): AuthStartResult {
@@ -198,15 +198,13 @@ export function createGuardedAuthGateway(transport: AuthTransport): AuthGateway 
     },
 
     async revokeSession(sessionId) {
-      if (containsUnsafeProtocolCharacters(sessionId)) {
+      if (containsUnsafeProtocolCharacters(sessionId)
+        || sessionId.trim() !== sessionId
+        || !sessionId
+        || sessionId.length > AUTH_PROTOCOL_LIMITS.idLength) {
         throw new AuthProtocolError('revoke-session');
       }
-
-      const normalizedId = sessionId.trim();
-      if (!normalizedId || normalizedId.length > AUTH_PROTOCOL_LIMITS.idLength) {
-        throw new AuthProtocolError('revoke-session');
-      }
-      await transport.revokeSession(normalizedId);
+      await transport.revokeSession(sessionId);
     },
   };
 }
