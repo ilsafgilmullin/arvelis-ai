@@ -3,7 +3,7 @@ import type { AuthResourceStatus, AuthSessionSummary } from './contracts';
 export function AccountSecurityPanel({
   connected,
   sessions = [],
-  sessionsStatus = 'ready',
+  sessionsStatus = 'idle',
   onRefreshSessions,
   onRevokeSession,
 }: {
