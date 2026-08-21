@@ -7,7 +7,9 @@ import type {
   SessionIssueResult,
   SessionListResult,
   SessionRecord,
+  SessionRevokeAllResult,
   SessionRevokeReason,
+  SessionRevokeResult,
   SessionSecurityPort,
   SessionStore,
 } from './contracts';
@@ -260,26 +262,30 @@ export class SessionService {
     accountId: string,
     sessionId: string,
     reason: SessionRevokeReason = 'user_revoke',
-  ): Promise<boolean> {
+  ): Promise<SessionRevokeResult> {
     if (!isCanonicalAccountId(accountId) || !SESSION_ID_PATTERN.test(sessionId) || !REVOKE_REASONS.has(reason)) {
-      return false;
+      return { ok: false, error: 'invalid_request' };
     }
     try {
-      return await this.store.revokeOwned(sessionId, accountId, this.now(), reason);
+      const revoked = await this.store.revokeOwned(sessionId, accountId, this.now(), reason);
+      return { ok: true, revoked };
     } catch {
-      return false;
+      return { ok: false, error: 'service_unavailable' };
     }
   }
 
   async revokeAllForAccount(
     accountId: string,
     reason: SessionRevokeReason = 'security_change',
-  ): Promise<number> {
-    if (!isCanonicalAccountId(accountId) || !REVOKE_REASONS.has(reason)) return 0;
+  ): Promise<SessionRevokeAllResult> {
+    if (!isCanonicalAccountId(accountId) || !REVOKE_REASONS.has(reason)) {
+      return { ok: false, error: 'invalid_request' };
+    }
     try {
-      return await this.store.revokeAllForAccount(accountId, this.now(), reason);
+      const revoked = await this.store.revokeAllForAccount(accountId, this.now(), reason);
+      return { ok: true, revoked };
     } catch {
-      return 0;
+      return { ok: false, error: 'service_unavailable' };
     }
   }
 
