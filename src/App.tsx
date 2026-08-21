@@ -289,11 +289,15 @@ export default function App() {
   };
 
   const resetPreview = () => {
+    ++launchSequenceRef.current;
     clearChatDrafts();
     const next = resetDemoWorkspace();
     setWorkspace(next);
     setPersistenceAvailable(saveDemoWorkspace(next));
-    setScreen('workspace');
+    setPendingProfileName(undefined);
+    setLoadError(false);
+    setScreen('chat');
+    setEntry('auth');
   };
 
   if (entry === 'splash') {
