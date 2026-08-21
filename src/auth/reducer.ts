@@ -13,8 +13,11 @@ export type AuthUiEvent =
   | { type: 'SET_INTENT'; intent: AuthIntent }
   | { type: 'SUBMIT'; intent: AuthIntent; methodId: string }
   | { type: 'CHALLENGE'; intent: AuthIntent; challenge: AuthChallenge }
+  | { type: 'CHALLENGE_FAILURE'; intent: AuthIntent; challenge: AuthCodeChallenge; error: AuthFailure }
   | { type: 'VERIFY'; intent: AuthIntent; challenge: AuthCodeChallenge }
   | { type: 'AUTHENTICATED'; session: AuthSession }
+  | { type: 'SIGN_OUT_START'; session: AuthSession }
+  | { type: 'SIGN_OUT_FAILED'; session: AuthSession; error: AuthFailure }
   | { type: 'SESSION_EXPIRED' }
   | { type: 'OFFLINE' }
   | { type: 'FAILURE'; error: AuthFailure }
@@ -47,11 +50,25 @@ export function authUiReducer(state: AuthUiState, event: AuthUiEvent): AuthUiSta
     case 'CHALLENGE':
       return { status: 'challenge', intent: event.intent, challenge: event.challenge };
 
+    case 'CHALLENGE_FAILURE':
+      return {
+        status: 'challenge',
+        intent: event.intent,
+        challenge: event.challenge,
+        error: event.error,
+      };
+
     case 'VERIFY':
       return { status: 'verifying', intent: event.intent, challenge: event.challenge };
 
     case 'AUTHENTICATED':
       return { status: 'authenticated', session: event.session };
+
+    case 'SIGN_OUT_START':
+      return { status: 'signing_out', session: event.session };
+
+    case 'SIGN_OUT_FAILED':
+      return { status: 'sign_out_error', session: event.session, error: event.error };
 
     case 'SESSION_EXPIRED':
       return { status: 'session_expired' };
