@@ -1,14 +1,14 @@
+import { containsUnsafeProtocolCharacters } from './protocolText';
+
 export const PREVIEW_PROFILE_NAME_MAX_LENGTH = 80;
 export const DEFAULT_PREVIEW_PROFILE_NAME = 'Пользователь ARVELIS';
-
-const PREVIEW_PROFILE_CONTROL_CHARACTER_PATTERN = /\p{C}/u;
 
 export function normalizePreviewProfileName(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
 export function validatePreviewProfileName(value: string): string | null {
-  if (PREVIEW_PROFILE_CONTROL_CHARACTER_PATTERN.test(value)) {
+  if (containsUnsafeProtocolCharacters(value)) {
     return 'Имя содержит недопустимые служебные символы.';
   }
 
