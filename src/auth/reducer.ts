@@ -31,6 +31,21 @@ function signedOut(intent: AuthIntent = 'sign_in'): AuthUiState {
   return { status: 'signed_out', intent };
 }
 
+function intentFromState(state: AuthUiState): AuthIntent {
+  switch (state.status) {
+    case 'signed_out':
+    case 'submitting':
+    case 'challenge':
+    case 'verifying':
+    case 'offline':
+    case 'rate_limited':
+    case 'error':
+      return state.intent;
+    default:
+      return 'sign_in';
+  }
+}
+
 export function authUiReducer(state: AuthUiState, event: AuthUiEvent): AuthUiState {
   switch (event.type) {
     case 'CHECK_SESSION':
@@ -74,19 +89,20 @@ export function authUiReducer(state: AuthUiState, event: AuthUiEvent): AuthUiSta
       return { status: 'session_expired' };
 
     case 'OFFLINE':
-      return { status: 'offline' };
+      return { status: 'offline', intent: intentFromState(state) };
 
     case 'FAILURE': {
+      const intent = intentFromState(state);
       if (event.error.code === 'rate_limited') {
         return event.error.retryAfterSeconds === undefined
-          ? { status: 'rate_limited' }
-          : { status: 'rate_limited', retryAfterSeconds: event.error.retryAfterSeconds };
+          ? { status: 'rate_limited', intent }
+          : { status: 'rate_limited', intent, retryAfterSeconds: event.error.retryAfterSeconds };
       }
-      return { status: 'error', error: event.error };
+      return { status: 'error', intent, error: event.error };
     }
 
     case 'RESET':
-      return signedOut(event.intent ?? (state.status === 'signed_out' ? state.intent : 'sign_in'));
+      return signedOut(event.intent ?? intentFromState(state));
 
     default: {
       const exhaustive: never = event;
