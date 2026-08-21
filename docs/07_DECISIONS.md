@@ -133,19 +133,19 @@
 
 Остаются `OPEN`: production DB provider/region, окончательная backend topology, account linking/recovery, роли и уровни доступа, production session/cookie policy.
 
-## 2026-08-21 — Email delivery provider первого auth release
+## 2026-08-21 — Бесплатная отправка email OTP для test/auth
 
-Утверждён первый provider для отправки email OTP: **Yandex Cloud Postbox**.
+Предыдущее решение использовать **Yandex Cloud Postbox отменено пользователем до активации инфраструктуры**.
 
-- Интеграция остаётся за `EmailOtpDeliveryPort` / generic SMTP adapter: ARVELIS Account, Session и frontend не зависят от Postbox API.
-- Для Yandex Cloud Postbox используется официальный SMTP endpoint `postbox.cloud.yandex.net`.
-- Основной режим: port `587` + STARTTLS; допустимый альтернативный режим: port `465` + SMTPS.
+- Postbox resource, billing account, sender/domain и API credentials не создавались.
+- Для закрытого тестирования утверждён бесплатный path: обычный бесплатный ящик **Яндекс Почты** через generic SMTP adapter.
+- Отдельный Yandex Cloud billing account, платный email-сервис и собственный домен для test/auth не требуются.
+- Основной SMTP test endpoint: `smtp.yandex.ru`, port `465`, SSL/SMTPS.
+- Для ARVELIS используется отдельный тестовый mailbox и отдельный пароль приложения типа «Почта»; обычный пароль Яндекс ID не хранится в ARVELIS.
+- SMTP credentials хранятся только в protected environment/secrets.
 - SMTP-транспорт ARVELIS требует TLS `1.2+`.
-- Для SMTP используется отдельный service account с ролью `postbox.sender` и API key scope `yc.postbox.send`.
-- API key ID/secret и sender address хранятся только в protected environment/secrets.
-- Sender/address должен быть подтверждён в Postbox до включения реальной регистрации.
-- Generic SMTP fallback сохраняется, чтобы email delivery provider можно было заменить без изменения auth domain.
-- Решение утверждает provider, но **не является разрешением на production deploy, публикацию production-секретов или автоматическое создание/оплату cloud-ресурсов**.
+- Account, Session и frontend по-прежнему не зависят от Яндекса: email delivery остаётся за `EmailOtpDeliveryPort` / generic SMTP adapter.
+- Обычная Яндекс Почта утверждена только для development/closed testing. Production transactional-email provider остаётся `OPEN`.
 
 ## 2026-08-21 — ARVELIS CONTROL
 
@@ -167,7 +167,7 @@
 - production database/data model;
 - роли и уровни доступа;
 - конкретный auth provider / identity core;
-- production Postbox resource/address/domain и активация credentials;
+- production transactional-email provider;
 - production session backend/cookie topology;
 - финальные требования по персональным данным;
 - биллинг и тарифы;
