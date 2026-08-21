@@ -16,9 +16,10 @@
     "typecheck": "tsc -b --pretty false",
     "test:auth": "node scripts/prepare-smoke-runtime.mjs auth && tsc -p tsconfig.auth-smoke.json && node tests/.dist-auth/tests/auth-core-smoke.js && node tests/.dist-auth/tests/preview-profile-smoke.js && node tests/.dist-auth/tests/demo-storage-profile-smoke.js && node tests/.dist-auth/tests/protocol-text-smoke.js && node tests/.dist-auth/tests/protocol-shape-smoke.js",
     "test:server-auth": "node scripts/prepare-smoke-runtime.mjs server-auth && tsc -p tsconfig.server-auth-smoke.json && node tests/.dist-server-auth/tests/email-otp-core-smoke.js && node tests/.dist-server-auth/tests/session-core-smoke.js && node tests/.dist-server-auth/tests/account-auth-application-smoke.js && node tests/.dist-server-auth/tests/runtime-config-smoke.js",
+    "test:server-sqlite": "node scripts/prepare-smoke-runtime.mjs server-sqlite && tsc -p tsconfig.server-sqlite-smoke.json && node --experimental-sqlite tests/.dist-server-sqlite/tests/sqlite-auth-persistence-smoke.js",
     "db:migrate": "node scripts/migrate-auth-db.mjs",
     "test:server-db": "node scripts/prepare-smoke-runtime.mjs server-db && tsc -p tsconfig.server-db-smoke.json && node tests/.dist-server-db/tests/postgres-auth-persistence-smoke.js",
-    "check": "npm run typecheck && npm run test:auth && npm run test:server-auth && npm run build:auth-server && npm run build",
+    "check": "npm run typecheck && npm run test:auth && npm run test:server-auth && npm run test:server-sqlite && npm run build:auth-server && npm run build",
     "check:with-db": "npm run check && npm run db:migrate && npm run test:server-db"
   },
   "dependencies": {
