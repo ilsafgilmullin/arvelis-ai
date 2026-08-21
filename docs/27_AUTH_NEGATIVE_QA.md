@@ -18,7 +18,8 @@
 - `identifier` без `identifierType`;
 - `external` с `identifierType`;
 - oversized id/label;
-- malformed enabled flag.
+- malformed enabled flag;
+- control characters в protocol strings.
 
 Временная ошибка method catalog **не инвалидирует уже восстановленную ARVELIS session**.
 
@@ -28,10 +29,14 @@ Fail closed:
 
 - malformed account/session object;
 - пустой session/account id;
+- пустой display name в server account object;
+- пустой email/phone, если поле присутствует;
 - invalid timestamp;
+- `expiresAt <= createdAt`;
 - `emailVerified=true` без email;
 - `phoneVerified=true` без phone;
-- oversized account/display fields.
+- oversized account/display fields;
+- control characters в server-provided account/session strings.
 
 `null` означает обычный signed-out state и не считается protocol error.
 
@@ -41,7 +46,10 @@ Outgoing request блокируется до transport, если:
 
 - intent неизвестен;
 - method id пустой/oversized;
-- identifier превышает defensive ceiling.
+- method id содержит control characters;
+- identifier присутствует, но пустой после trim;
+- identifier превышает defensive ceiling;
+- identifier содержит control characters.
 
 Backend всё равно повторно валидирует request и остаётся источником истины.
 
@@ -53,7 +61,7 @@ Backend всё равно повторно валидирует request и ос�
 
 - id;
 - method id;
-- optional masked destination;
+- optional non-empty masked destination;
 - optional expiry.
 
 `complete()` разрешён только если:
@@ -61,9 +69,12 @@ Backend всё равно повторно валидирует request и ос�
 - controller находится в active `challenge` state;
 - challenge kind = `code`;
 - request challenge id совпадает с активным challenge;
-- response непустой и находится в protocol ceiling.
+- response непустой и находится в protocol ceiling;
+- challenge id/response не содержат control characters.
 
 Stale/чужой challenge id не отправляется в transport.
+
+Recoverable ошибка подтверждения сохраняет active code challenge, чтобы пользователь мог повторить ввод без запуска нового flow. Expired/locked/denied state может завершить challenge по policy.
 
 ## 5. External redirect challenge
 
@@ -81,6 +92,9 @@ Fail closed:
 - относительный URL;
 - malformed URL;
 - oversized URL;
+- URL с embedded credentials;
+- URL fragment;
+- control characters;
 - `maskedDestination` в external challenge.
 
 Frontend HTTPS guard **не заменяет** backend provider allowlist.
@@ -94,7 +108,8 @@ Fail closed:
 - response не discriminated success/error object;
 - success без валидной session;
 - error без поддерживаемого ARVELIS failure code;
-- malformed/oversized error fields.
+- malformed/oversized error fields;
+- oversized `retryAfterSeconds`.
 
 Raw backend/provider error message не отображается напрямую пользователю.
 
@@ -108,6 +123,9 @@ Fail closed:
 - элементов больше defensive ceiling;
 - duplicate session id;
 - больше одной `current` session;
+- `expiresAt <= createdAt`;
+- `lastSeenAt` раньше `createdAt` или позже `expiresAt`;
+- пустой device/browser label, если поле присутствует;
 - malformed timestamps/labels.
 
 UI отдельно различает:
@@ -123,7 +141,8 @@ UI отдельно различает:
 До transport блокируются:
 
 - пустой session id;
-- oversized session id.
+- oversized session id;
+- session id с control characters.
 
 Backend обязан:
 
@@ -134,9 +153,20 @@ Backend обязан:
 
 После успешного revoke frontend перечитывает session list.
 
-## 9. Sign out
+## 9. Sign out / live-session integrity
 
 Frontend не показывает подтверждённый logout, если server-side sign-out завершился ошибкой.
+
+При failed logout:
+
+- live session сохраняется в auth state;
+- session list не маскируется как «пустой»;
+- пользователь видит, что сессия по-прежнему считается активной.
+
+Локальные UI-события не должны молча уничтожать live-session state:
+
+- `SET_INTENT` (`Вход / Регистрация`) во время authenticated/signing-out/sign-out-error не разлогинивает пользователя;
+- browser offline event сам по себе не разлогинивает уже authenticated пользователя.
 
 После подтверждённого logout:
 
@@ -144,7 +174,16 @@ Frontend не показывает подтверждённый logout, если
 - device/session cache очищается;
 - user product data не удаляется автоматически.
 
-## 10. Network / stale async
+## 10. Intent preservation
+
+Если `sign_up` flow получает recoverable/global error до создания сессии:
+
+- error/rate/offline state сохраняет исходный `sign_up` intent;
+- Retry/Reset возвращает пользователя в `sign_up`, а не самопроизвольно в `sign_in`.
+
+То же правило применяется симметрично к `sign_in`.
+
+## 11. Network / stale async
 
 Проверить:
 
@@ -152,9 +191,11 @@ Frontend не показывает подтверждённый logout, если
 - старый method request не перезаписывает новый catalog;
 - старый session-list request не перезаписывает новый list;
 - unmount/gateway change инвалидирует pending sequences;
-- offline/network error не выдаётся за invalid credentials.
+- offline/network error не выдаётся за invalid credentials;
+- временный сбой method catalog не инвалидирует существующую session;
+- ошибка session-list не инвалидирует существующую session.
 
-## 11. OAuth/OIDC backend negative cases
+## 12. OAuth/OIDC backend negative cases
 
 До production внешний provider должен иметь отдельные tests:
 
@@ -173,7 +214,7 @@ Frontend не показывает подтверждённый logout, если
 
 Provider code/token не должен попадать в application logs или localStorage.
 
-## 12. Account linking / recovery
+## 13. Account linking / recovery
 
 До production обязательны negative tests:
 
@@ -184,7 +225,7 @@ Provider code/token не должен попадать в application logs ил�
 - linking без re-auth/verification policy;
 - critical identity change без session rotation/revoke policy.
 
-## 13. ARVELIS CONTROL
+## 14. ARVELIS CONTROL
 
 Обычная user session не даёт административных прав.
 
@@ -196,6 +237,29 @@ Fail closed:
 - попытка вызвать CONTROL action без owner/admin permission;
 - stale/revoked admin session;
 - dangerous action без требуемого step-up/confirmation/audit policy.
+
+## Automated smoke coverage
+
+`npm run test:auth` — no-dependency Auth Core smoke для pure contract слоя.
+
+На текущем этапе он покрывает, в том числе:
+
+- unsafe external URL;
+- mixed challenge fields;
+- malformed account/session metadata;
+- invalid session time windows;
+- invalid `lastSeenAt` window;
+- verified identifier inconsistency;
+- oversized retry metadata;
+- duplicate methods;
+- multiple current sessions;
+- malformed outgoing method/identifier/code payloads;
+- sign-up intent preservation;
+- recoverable code challenge preservation;
+- live-session preservation при mode switch/offline;
+- live-session preservation при failed logout.
+
+Это не заменяет будущие backend/integration/e2e tests.
 
 ## Merge/backend spike gate
 
