@@ -4,15 +4,23 @@ const encoder = new TextEncoder();
 const UINT32_RANGE = 0x1_0000_0000;
 const MIN_PEPPER_BYTES = 32;
 
+type CryptoBytes = Uint8Array<ArrayBuffer>;
+
+function copyToCryptoBytes(source: Uint8Array): CryptoBytes {
+  const copy = new Uint8Array(new ArrayBuffer(source.byteLength));
+  copy.set(source);
+  return copy;
+}
+
 function toHex(bytes: Uint8Array): string {
   let output = '';
   for (const value of bytes) output += value.toString(16).padStart(2, '0');
   return output;
 }
 
-function fromHex(value: string): Uint8Array | null {
+function fromHex(value: string): CryptoBytes | null {
   if (!value || value.length % 2 !== 0 || !/^[a-f0-9]+$/i.test(value)) return null;
-  const bytes = new Uint8Array(value.length / 2);
+  const bytes = new Uint8Array(new ArrayBuffer(value.length / 2));
   for (let index = 0; index < bytes.length; index += 1) {
     const pair = value.slice(index * 2, index * 2 + 2);
     const parsed = Number.parseInt(pair, 16);
@@ -22,8 +30,8 @@ function fromHex(value: string): Uint8Array | null {
   return bytes;
 }
 
-function randomBytes(length: number): Uint8Array {
-  const bytes = new Uint8Array(length);
+function randomBytes(length: number): CryptoBytes {
+  const bytes = new Uint8Array(new ArrayBuffer(length));
   globalThis.crypto.getRandomValues(bytes);
   return bytes;
 }
@@ -34,7 +42,7 @@ function randomInteger(maxExclusive: number): number {
   }
 
   const cutoff = UINT32_RANGE - (UINT32_RANGE % maxExclusive);
-  const buffer = new Uint32Array(1);
+  const buffer = new Uint32Array(new ArrayBuffer(Uint32Array.BYTES_PER_ELEMENT));
 
   for (;;) {
     globalThis.crypto.getRandomValues(buffer);
@@ -43,8 +51,8 @@ function randomInteger(maxExclusive: number): number {
   }
 }
 
-function otpPayload(input: { challengeId: string; email: string; code: string }): Uint8Array {
-  return encoder.encode(`otp:v1\0${input.challengeId}\0${input.email}\0${input.code}`);
+function otpPayload(input: { challengeId: string; email: string; code: string }): CryptoBytes {
+  return copyToCryptoBytes(encoder.encode(`otp:v1\0${input.challengeId}\0${input.email}\0${input.code}`));
 }
 
 /**
@@ -60,10 +68,10 @@ export class WebCryptoEmailOtpSecurity implements EmailOtpSecurityPort {
       throw new Error('Email OTP security requires Web Crypto and a >=32 byte pepper');
     }
 
-    this.keyPromise = this.importPepper(new Uint8Array(pepper));
+    this.keyPromise = this.importPepper(copyToCryptoBytes(pepper));
   }
 
-  private async importPepper(keyMaterial: Uint8Array): Promise<CryptoKey> {
+  private async importPepper(keyMaterial: CryptoBytes): Promise<CryptoKey> {
     try {
       return await globalThis.crypto.subtle.importKey(
         'raw',
@@ -122,7 +130,7 @@ export class WebCryptoEmailOtpSecurity implements EmailOtpSecurityPort {
 
   async derivePrivacyKey(scope: EmailOtpRateLimitScope, value: string): Promise<string> {
     const key = await this.keyPromise;
-    const payload = encoder.encode(`rate:v1\0${scope}\0${value}`);
+    const payload = copyToCryptoBytes(encoder.encode(`rate:v1\0${scope}\0${value}`));
     try {
       const signature = await globalThis.crypto.subtle.sign('HMAC', key, payload);
       return toHex(new Uint8Array(signature));
