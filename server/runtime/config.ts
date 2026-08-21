@@ -1,16 +1,12 @@
 import type { SmtpEmailOtpDeliveryConfig } from '../auth/emailOtp/smtpDelivery';
 
 export type CookieSecureMode = 'auto' | 'always' | 'never';
-export type EmailDeliveryProvider = 'yandex_cloud_postbox' | 'smtp';
-
-const YANDEX_CLOUD_POSTBOX_SMTP_HOST = 'postbox.cloud.yandex.net';
 
 export type AuthRuntimeConfig = {
   port: number;
   databaseUrl: string;
   otpPepper: Uint8Array;
   sessionPepper: Uint8Array;
-  emailDeliveryProvider: EmailDeliveryProvider;
   smtp: SmtpEmailOtpDeliveryConfig;
   trustProxy: boolean;
   cookieSecureMode: CookieSecureMode;
@@ -42,14 +38,6 @@ function parseCookieSecureMode(value: string | undefined): CookieSecureMode {
   throw new Error('Invalid AUTH_COOKIE_SECURE mode');
 }
 
-function parseEmailDeliveryProvider(value: string | undefined): EmailDeliveryProvider {
-  if (value === undefined || value === '' || value === 'yandex_cloud_postbox') {
-    return 'yandex_cloud_postbox';
-  }
-  if (value === 'smtp') return 'smtp';
-  throw new Error('Invalid EMAIL_DELIVERY_PROVIDER');
-}
-
 function parseHexSecret(name: string): Uint8Array {
   const value = required(name);
   if (value.length < 64 || value.length % 2 !== 0 || !/^[a-f0-9]+$/i.test(value)) {
@@ -63,29 +51,8 @@ function parseHexSecret(name: string): Uint8Array {
   return bytes;
 }
 
-function loadYandexCloudPostboxConfig(): SmtpEmailOtpDeliveryConfig {
-  const port = parsePort(process.env.POSTBOX_SMTP_PORT, 587);
-  if (port !== 587 && port !== 465) {
-    throw new Error('Yandex Cloud Postbox SMTP port must be 587 or 465');
-  }
-
-  const secure = parseBoolean(process.env.POSTBOX_SMTP_SECURE, port === 465);
-  if ((port === 465) !== secure) {
-    throw new Error('Yandex Cloud Postbox requires STARTTLS on 587 or SMTPS on 465');
-  }
-
-  return {
-    host: YANDEX_CLOUD_POSTBOX_SMTP_HOST,
-    port,
-    secure,
-    username: required('POSTBOX_API_KEY_ID'),
-    password: required('POSTBOX_API_KEY_SECRET'),
-    from: required('POSTBOX_FROM'),
-  };
-}
-
-function loadGenericSmtpConfig(): SmtpEmailOtpDeliveryConfig {
-  const port = parsePort(process.env.SMTP_PORT, 587);
+function loadSmtpConfig(): SmtpEmailOtpDeliveryConfig {
+  const port = parsePort(process.env.SMTP_PORT, 465);
   return {
     host: required('SMTP_HOST'),
     port,
@@ -97,17 +64,12 @@ function loadGenericSmtpConfig(): SmtpEmailOtpDeliveryConfig {
 }
 
 export function loadAuthRuntimeConfig(): AuthRuntimeConfig {
-  const emailDeliveryProvider = parseEmailDeliveryProvider(process.env.EMAIL_DELIVERY_PROVIDER);
-
   return {
     port: parsePort(process.env.AUTH_API_PORT, 3001),
     databaseUrl: required('DATABASE_URL'),
     otpPepper: parseHexSecret('AUTH_OTP_PEPPER_HEX'),
     sessionPepper: parseHexSecret('AUTH_SESSION_PEPPER_HEX'),
-    emailDeliveryProvider,
-    smtp: emailDeliveryProvider === 'yandex_cloud_postbox'
-      ? loadYandexCloudPostboxConfig()
-      : loadGenericSmtpConfig(),
+    smtp: loadSmtpConfig(),
     trustProxy: parseBoolean(process.env.AUTH_TRUST_PROXY, false),
     cookieSecureMode: parseCookieSecureMode(process.env.AUTH_COOKIE_SECURE),
   };
