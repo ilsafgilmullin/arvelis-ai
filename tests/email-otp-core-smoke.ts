@@ -251,11 +251,29 @@ async function main(): Promise<void> {
   assert(denied.error.retryAfterSeconds === 37, 'retry-after metadata was lost');
   rateLimit.denyScope = null;
 
-  const macA = await security.macCode({ challengeId: 'a'.repeat(32), email: 'same@example.com', code: '123456' });
-  const macB = await security.macCode({ challengeId: 'b'.repeat(32), email: 'same@example.com', code: '123456' });
+  const challengeA = 'a'.repeat(32);
+  const challengeB = 'b'.repeat(32);
+  const macA = await security.macCode({ challengeId: challengeA, email: 'same@example.com', code: '123456' });
+  const macB = await security.macCode({ challengeId: challengeB, email: 'same@example.com', code: '123456' });
   assert(macA !== macB, 'OTP MAC was not bound to challenge id');
-  assert(security.equalsMac(macA, macA), 'MAC equality rejected identical MAC');
-  assert(!security.equalsMac(macA, macB), 'MAC equality accepted different MAC');
+  assert(
+    await security.verifyCodeMac({
+      challengeId: challengeA,
+      email: 'same@example.com',
+      code: '123456',
+      expectedMac: macA,
+    }),
+    'WebCrypto rejected a valid OTP HMAC',
+  );
+  assert(
+    !(await security.verifyCodeMac({
+      challengeId: challengeA,
+      email: 'same@example.com',
+      code: '123456',
+      expectedMac: macB,
+    })),
+    'WebCrypto accepted an HMAC bound to another challenge',
+  );
 
   console.log('ARVELIS email OTP auth core smoke: PASS');
 }
