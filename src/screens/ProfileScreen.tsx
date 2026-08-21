@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AccountSecurityPanel } from '../auth/AccountSecurityPanel';
 import {
   PREVIEW_PROFILE_NAME_MAX_LENGTH,
   normalizePreviewProfileName,
@@ -100,11 +101,7 @@ export function ProfileScreen({
         </button>
       </section>
 
-      <section className="security-note">
-        <p className="section-kicker">АККАУНТ И БЕЗОПАСНОСТЬ</p>
-        <h3>Серверная учётная запись пока не подключена.</h3>
-        <p>Текущий выход завершает только локальную preview-сессию интерфейса и не удаляет данные. Production-версия получит отдельные server sessions, управление устройствами, восстановление доступа и отзыв сессий.</p>
-      </section>
+      <AccountSecurityPanel connected={false} />
 
       <ConfirmDialog
         open={confirmReset}
