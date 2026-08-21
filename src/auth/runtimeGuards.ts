@@ -17,6 +17,8 @@ const failureCodes = new Set<AuthFailureCode>([
   'invalid_challenge',
   'challenge_expired',
   'rate_limited',
+  'account_exists',
+  'account_not_found',
   'account_locked',
   'network_error',
   'service_unavailable',
