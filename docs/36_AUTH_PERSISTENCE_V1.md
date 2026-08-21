@@ -1,36 +1,46 @@
 # ARVELIS AI — Auth Persistence v1
 
-Дата: 2026-08-21.
-Ветка: `feat/auth-persistence-v1`.
-Статус: **implementation candidate, не production deploy**.
+Дата первоначального решения: 2026-08-21.  
+Актуализировано после closed-test E2E: 2026-08-22.  
+Ветка: `feat/auth-persistence-v1`.  
+Статус: **closed-test implementation verified; не production deploy**.
+
+Финальный audit/gate: `docs/39_AUTH_FINAL_AUDIT.md`.
 
 ## Цель
 
-Подключить реальную транзакционную persistence-границу и рабочий server-auth path к уже существующим Email OTP / Account / Session Core без привязки ARVELIS Account к внешнему identity provider или обязательному платному DB-сервису.
+Подключить реальную persistence-границу и server-auth path к Email OTP / Account / Session Core без жёсткой привязки ARVELIS к одному identity/database/email provider.
 
-## Persistence architecture
+## Архитектура
 
-Auth domain зависит от внутренних ports/contracts, а не от конкретной БД.
+Auth domain зависит от внутренних ports/contracts.
 
-Сейчас существуют два adapter path:
+Persistence adapter paths:
 
-1. `SQLite` — основной бесплатный development/closed-test path;
-2. `PostgreSQL` — сохранённый replaceable adapter и production-кандидат, но production provider/region не утверждены.
+1. `SQLite` — текущий бесплатный development/closed-test path;
+2. `PostgreSQL` — сохранённый replaceable adapter/production candidate, но provider/region не утверждены.
 
-Runtime выбирает persistence через:
+Runtime selector:
 
-- `AUTH_DB_PROVIDER=sqlite` — default;
-- `AUTH_DB_PROVIDER=postgres` — явный PostgreSQL path.
+- `AUTH_DB_PROVIDER=sqlite` — closed-test default;
+- `AUTH_DB_PROVIDER=postgres` — explicit PostgreSQL path.
 
-## Бесплатный SQLite test path
+Browser flow:
 
-По умолчанию auth runtime использует встроенный в Node.js `node:sqlite` и локальный файл:
+`React/Vite → same-origin /api/auth/* → trusted Auth API → Account/OTP/Session services → persistence + SMTP`
 
-`AUTH_SQLITE_PATH=.data/arvelis-auth.sqlite`
+## SQLite closed-test path
 
-Для этого закрытого теста не нужен внешний database account, банковская карта или отдельный cloud DB.
+Default:
 
-SQLite schema создаёт:
+```text
+AUTH_DB_PROVIDER=sqlite
+AUTH_SQLITE_PATH=.data/arvelis-auth.sqlite
+```
+
+File-backed SQLite runtime разрешён только внутри `.data/`; `:memory:` используется тестами. `.data/`, SQLite, WAL и SHM исключены из Git и дополнительно закрыты Vite deny rules.
+
+SQLite schema содержит:
 
 - `auth_accounts`;
 - `auth_email_identities`;
@@ -40,121 +50,92 @@ SQLite schema создаёт:
 - `auth_security_events`;
 - `auth_schema_migrations`.
 
-SQLite path использует:
+Используются foreign keys, STRICT tables, `BEGIN IMMEDIATE`, WAL для file-backed DB и checksummed migration. При checksum mismatch runtime прекращает запуск.
 
-- foreign keys;
-- strict tables;
-- UNIQUE canonical email;
-- `BEGIN IMMEDIATE` для транзакционных auth mutations;
-- WAL для file-backed development DB;
-- checksum migration `001_auth_foundation`;
-- fail-closed при checksum mismatch.
-
-`.data/`, SQLite file и WAL/SHM исключены из Git.
-
-Это только development/closed-test persistence. Локальный filesystem published Replit deployment нельзя считать production-persistent database. Production DB остаётся отдельным решением.
+Важно: локальный Replit filesystem не является production-persistent storage. Этот SQLite path нельзя использовать как production database.
 
 ## PostgreSQL adapter
 
-PostgreSQL adapter сохранён и реализует те же domain contracts.
-
-Он поддерживает:
+PostgreSQL adapter реализует те же основные domain contracts:
 
 - atomic Account + Email Identity creation;
-- DB-level unique canonical email;
-- row-locked OTP lifecycle;
-- transactional fixed-window rate limits;
+- unique canonical email;
+- transactional OTP lifecycle;
+- server-side rate limits;
 - server-side Session persistence/revoke/list/touch.
 
-Explicit PostgreSQL path требует:
+Explicit PostgreSQL path требует protected `DATABASE_URL`. `npm run db:migrate` является PostgreSQL-specific command.
 
-`AUTH_DB_PROVIDER=postgres`
-
-и protected:
-
-`DATABASE_URL`.
-
-`npm run db:migrate` остаётся PostgreSQL-specific migration command и не нужен для SQLite closed-test runtime, потому что SQLite checksummed schema применяется idempotent при открытии локальной БД.
+Live PostgreSQL integration в текущем closed-test не был фактически подтверждён; этот path остаётся candidate до отдельного environment test.
 
 ## Account data model
 
 Email не является primary key Account.
 
-`auth_accounts` хранит:
+`auth_accounts` хранит immutable Account ID, display name, status, security version и timestamps. Email identity хранится отдельно и связывается с Account ID.
 
-- immutable Account ID;
-- display name;
-- account status;
-- security version;
-- timestamps.
+Утверждённая conflict semantics после успешной OTP verification:
 
-Email identity хранится отдельно и связывается с Account ID.
+- `sign_up` + email уже связан с Account → `account_exists`;
+- `sign_in` + подтверждённый email не связан с Account → `account_not_found`.
 
-Отображаемое имя принадлежит server account, а не только browser `localStorage` preview-профилю.
+До успешной проверки OTP `start` не раскрывает существование Account.
 
-## Atomic guarantees
+Server-side правила:
 
-Оба persistence adapter path должны сохранять одинаковые auth invariants:
+- display name повторно валидируется;
+- Account/Identity IDs генерируются независимо от email;
+- suspended/deleted/pending-deletion Account не получает session;
+- disabled Email Identity не может войти;
+- raw session secret не выходит за trusted server boundary.
 
-- atomic Account + Email Identity creation;
-- unique canonical email conflict;
-- two-phase OTP lifecycle `pending → delivered → active`;
-- replacement/supersede предыдущего active OTP;
-- atomic attempt increment;
-- single-use consume/replay rejection;
-- transactional server-side rate limits;
-- account-scoped session revoke;
-- active session list/touch.
+Отдельное OPEN-решение перед массовой регистрацией: case semantics local-part email (`User@…` vs `user@…`).
 
-## Утверждённая account conflict policy
+## Email OTP
 
-После успешного подтверждения владения email одноразовым кодом действует следующая семантика:
+Closed-test email delivery:
 
-- `sign_up` + email уже связан с ARVELIS Account → `account_exists`;
-- `sign_in` + подтверждённый email ещё не связан с ARVELIS Account → `account_not_found`.
-
-Эти ответы появляются только после успешной OTP verification. `start` не раскрывает существование аккаунта и остаётся enumeration-resistant.
-
-## Trusted Account Auth Application Layer
-
-`server/auth/application/` соединяет:
-
-`Verified Email → Account / Identity → Server Session`.
-
-Правила:
-
-- при регистрации отображаемое имя повторно валидируется server-side;
-- зарезервированное системное имя не принимается как пользовательское;
-- Account ID и Identity ID генерируются независимо от email;
-- создание Account + Identity остаётся атомарным на persistence layer;
-- гонка двух регистраций одного email закрывается uniqueness и возвращает `account_exists`;
-- suspended/deleted/pending-deletion Account не получает новую session;
-- disabled identity не может аутентифицироваться;
-- успешный вход обновляет `lastAuthenticatedAt`;
-- raw session secret остаётся только внутри trusted server boundary.
-
-## Email delivery — бесплатный test path
-
-Yandex Cloud Postbox был отменён пользователем до активации инфраструктуры. Cloud resource, billing, sender/domain и API credentials не создавались.
-
-Для development/closed testing используется обычная бесплатная Яндекс Почта через generic SMTP adapter:
-
-- host: `smtp.yandex.ru`;
-- port: `465`;
+- generic SMTP adapter;
+- Яндекс Почта test mailbox;
+- `smtp.yandex.ru:465`;
 - SSL/SMTPS;
-- отдельный тестовый mailbox ARVELIS;
-- отдельный Mail app password;
-- normal Yandex ID password не используется ARVELIS;
-- credentials только в protected environment/secrets;
-- transport требует TLS `1.2+`.
+- TLS minimum `1.2`;
+- отдельный Mail app password только в protected Secrets.
 
 Production transactional-email provider остаётся `OPEN`.
 
-Email delivery остаётся за `EmailOtpDeliveryPort`, поэтому Account/Session/frontend не зависят от Яндекса.
+OTP properties:
 
-## Same-origin HTTP/BFF
+- 6-digit code;
+- 10-minute TTL;
+- max attempts policy;
+- HMAC-SHA256 verifier with independent OTP pepper;
+- raw OTP не хранится в БД;
+- two-phase delivery lifecycle;
+- replacement/supersede;
+- replay rejection;
+- server-side email/challenge rate limits.
 
-Server runtime предоставляет:
+Для public auth дополнительно потребуется trusted client/global abuse protection; closed-test `AUTH_TRUST_PROXY=false` намеренно не доверяет forwarded client identity.
+
+## Session
+
+Session properties:
+
+- random session ID + random secret;
+- server хранит только verifier/MAC secret;
+- independent Session pepper;
+- account security-version binding;
+- expiry/revoke/list/touch;
+- HttpOnly browser cookie;
+- `SameSite=Lax`;
+- raw secret не доступен React/localStorage.
+
+Production cookie/proxy policy остаётся отдельным gate. Closed-test `AUTH_COOKIE_SECURE=auto` не считается финальной production policy.
+
+## HTTP/BFF
+
+Auth API предоставляет:
 
 - `GET /api/auth/methods`;
 - `GET /api/auth/session`;
@@ -165,105 +146,70 @@ Server runtime предоставляет:
 - `DELETE /api/auth/sessions/:id`;
 - `GET /api/health`.
 
-Browser session хранится в `HttpOnly`, `SameSite=Lax` cookie. Raw session secret не возвращается React-коду и не сохраняется в browser storage.
+Closed-test API слушает loopback `127.0.0.1:3001`. Browser использует same-origin Vite proxy.
 
-Mutating endpoints используют same-origin boundary и request marker; auth responses используют `Cache-Control: no-store`.
+Mutating endpoints используют same-origin/request-marker boundary; JSON body ограничен; auth responses используют `Cache-Control: no-store`.
 
-## Frontend wiring
+## Frontend
 
-Подготовлены:
+Реализованы:
 
-- guarded HTTP auth transport;
-- реальный `Вход / Регистрация` flow;
+- реальный `Вход / Регистрация` Email OTP flow;
 - имя + email для sign-up;
 - email для sign-in;
 - 6-digit OTP confirmation;
 - restore protected session after refresh;
 - sign out;
-- session management integration candidate в Profile.
+- список активных sessions;
+- revoke session;
+- server Account profile read-only boundary;
+- offline/error/auth states;
+- account-scoped local demo workspace/drafts.
 
-Реальный auth остаётся за:
+AI всё ещё не подключён. Диалоги текущего интерфейсного этапа остаются demo/local и не должны выдаваться за server AI history.
 
-`VITE_REAL_AUTH_ENABLED=false`
+## Фактически выполнено 2026-08-22
 
-до фактического environment/E2E smoke.
+В Replit + iPhone/Safari подтверждены:
 
-## Локальные demo-данные
+1. TypeScript/auth/SQLite/build checks;
+2. SQLite persistence + full auth-flow smoke;
+3. auth-server build;
+4. frontend production build;
+5. SMTP verify + техническая доставка;
+6. реальный sign-up;
+7. получение OTP;
+8. Account creation;
+9. HttpOnly server Session;
+10. refresh/session restore;
+11. `iPhone · Safari` session listing;
+12. logout/server revoke;
+13. повторный sign-in через новый OTP.
 
-При real-auth mode локальные demo workspace/drafts изолируются по ARVELIS Account ID, чтобы история одного account на общем browser/device не показывалась другому account.
+Это заменяет устаревший список «ещё не подключено» из первоначальной версии документа.
 
-AI пока не подключён. Chat data по-прежнему demo/local и не должны выдаваться за server AI history.
+## Что остаётся OPEN
 
-## Проверки, добавленные в код
+Для merge foundation:
 
-Candidate test coverage включает:
+- dependency lockfile;
+- final current-HEAD check;
+- независимый зелёный CI, когда GitHub Actions снова выполняет steps.
 
-- Email OTP Core smoke;
-- Session Core smoke;
-- Account Auth Application smoke;
-- runtime config smoke;
-- SQLite persistence smoke;
-- PostgreSQL persistence integration smoke;
-- frontend/backend TypeScript build commands;
-- CI PostgreSQL migration path.
+Для production/public auth:
 
-`test:server-sqlite` использует in-memory SQLite и проверяет:
-
-- atomic Account + Identity;
-- duplicate email/no partial account;
-- OTP replacement/supersede;
-- attempt + single-use consume;
-- replay rejection;
-- rate limit;
-- session create/touch/list/revoke;
-- migration checksum.
-
-Наличие этих тестов ещё не является доказательством PASS. Hosted GitHub Actions ранее завершал job до первого step, поэтому успешный результат будет зафиксирован только после фактического запуска.
-
-## Zero-cost closed-test stack
-
-Текущий целевой тестовый контур:
-
-`React/Vite → same-origin Auth API → SQLite → Яндекс Почта SMTP`
-
-Отдельный платный DB/email cloud service этому контуру не требуется.
-
-При этом стоимость/лимиты самого Replit account/runtime являются отдельным внешним условием и не относятся к ARVELIS DB/SMTP adapter.
-
-## Что ещё НЕ подключено фактически
-
-- отдельный тестовый Яндекс Почта mailbox;
-- Mail app password в protected Replit Secrets;
-- независимые production-like OTP/session peppers в Replit Secrets;
-- запуск final auth runtime в Replit;
-- фактический SQLite persistence smoke в project environment;
-- фактическая SMTP доставка OTP;
-- `VITE_REAL_AUTH_ENABLED=true`;
-- iPhone/Android E2E;
+- production DB provider/region;
+- backups/recovery;
+- retention/cleanup;
+- security event audit trail;
+- trusted proxy/client abuse protection;
+- production cookie policy;
+- production transactional email;
 - account recovery/linking;
+- account deletion/export;
+- privacy/legal/PII requirements;
+- monitoring/alerts;
 - финальные roles/permissions;
-- production privacy/data-retention policy;
-- production DB provider/region/backups;
-- production transactional-email provider;
-- ARVELIS CONTROL auth;
-- AI.
+- email local-part identity semantics.
 
-## Следующий gate
-
-1. выполнить repository checks и `test:server-sqlite` в фактической Node environment;
-2. создать отдельный бесплатный тестовый Яндекс Почта mailbox;
-3. создать Mail app password;
-4. добавить SMTP credentials только в protected Replit Secrets;
-5. создать два независимых high-entropy pepper для OTP и Session и хранить только в Secrets;
-6. запустить auth runtime с SQLite в test Replit environment;
-7. проверить `/api/health` и persistence=`sqlite`;
-8. проверить реальную доставку OTP;
-9. только после этого включить `VITE_REAL_AUTH_ENABLED=true` в test environment;
-10. выполнить iPhone E2E: регистрация → email OTP → Account → HttpOnly Session → refresh restore → logout → повторный login;
-11. проверить неверный/истёкший OTP, rate limit, existing/unknown account policy;
-12. проверить account-scoped local history/drafts и session revoke;
-13. только после успешного smoke обсуждать merge PR №21 в `main`.
-
-## Production gate
-
-SQLite closed-test path не утверждает production DB. Перед production необходимо отдельно утвердить persistent storage, регион хранения, backups, retention, privacy/legal requirements и migration strategy.
+Подробная severity-классификация и merge decision находятся в `docs/39_AUTH_FINAL_AUDIT.md`.
