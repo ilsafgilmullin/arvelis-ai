@@ -2,11 +2,13 @@ import type {
   AuthCompleteRequest,
   AuthCompleteResult,
   AuthGateway,
+  AuthMethodDescriptor,
   AuthSession,
   AuthSessionSummary,
   AuthStartRequest,
   AuthStartResult,
 } from './contracts';
+import { AUTH_PROTOCOL_LIMITS } from './protocolLimits';
 import {
   isAuthChallenge,
   isAuthFailure,
@@ -82,8 +84,10 @@ function parseCompleteResult(value: unknown): AuthCompleteResult {
   throw new AuthProtocolError('complete');
 }
 
-function parseMethods(value: unknown) {
-  if (!Array.isArray(value) || !value.every(isAuthMethodDescriptor)) {
+function parseMethods(value: unknown): AuthMethodDescriptor[] {
+  if (!Array.isArray(value)
+    || value.length > AUTH_PROTOCOL_LIMITS.methods
+    || !value.every(isAuthMethodDescriptor)) {
     throw new AuthProtocolError('methods');
   }
 
@@ -98,7 +102,9 @@ function parseSession(value: unknown): AuthSession | null {
 }
 
 function parseSessions(value: unknown): AuthSessionSummary[] {
-  if (!Array.isArray(value) || !value.every(isAuthSessionSummary)) {
+  if (!Array.isArray(value)
+    || value.length > AUTH_PROTOCOL_LIMITS.sessions
+    || !value.every(isAuthSessionSummary)) {
     throw new AuthProtocolError('sessions');
   }
 
@@ -139,8 +145,11 @@ export function createGuardedAuthGateway(transport: AuthTransport): AuthGateway 
     },
 
     async revokeSession(sessionId) {
-      if (!sessionId.trim()) throw new AuthProtocolError('revoke-session');
-      await transport.revokeSession(sessionId);
+      const normalizedId = sessionId.trim();
+      if (!normalizedId || normalizedId.length > AUTH_PROTOCOL_LIMITS.idLength) {
+        throw new AuthProtocolError('revoke-session');
+      }
+      await transport.revokeSession(normalizedId);
     },
   };
 }
