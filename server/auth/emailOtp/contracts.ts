@@ -38,11 +38,7 @@ export type EmailOtpVerifyRequest = {
   clientKey?: string;
 };
 
-/**
- * Internal server proof only. This object is intended to be consumed by the
- * trusted ARVELIS account/session application layer in the same request.
- * It is not a frontend/API response contract.
- */
+/** Internal server proof. Never return this object directly to the frontend. */
 export type VerifiedEmailOtpProof = {
   challengeId: string;
   intent: EmailOtpIntent;
@@ -80,14 +76,11 @@ export type EmailOtpAttemptResult =
 
 /**
  * Production adapter requirements:
- *
- * - createPending() persists a challenge without making it verifiable;
- * - activateReplacingActive() atomically activates the delivered challenge and
- *   supersedes previous active challenge(s) for the same email + intent;
+ * - createPending() persists an inactive challenge;
+ * - activateReplacingActive() atomically activates delivered challenge and
+ *   supersedes prior active challenge(s) for the same email + intent;
  * - beginAttempt() atomically increments attempts only for active challenges;
  * - consume() atomically enforces single-use and expected attempt version.
- *
- * The domain service intentionally does not assume SQL/NoSQL/Redis or vendor.
  */
 export interface EmailOtpChallengeStore {
   createPending(record: EmailOtpChallengeRecord): Promise<void>;
@@ -140,8 +133,13 @@ export interface EmailOtpSecurityPort {
     email: string;
     code: string;
   }): Promise<string>;
+  verifyCodeMac(input: {
+    challengeId: string;
+    email: string;
+    code: string;
+    expectedMac: string;
+  }): Promise<boolean>;
   derivePrivacyKey(scope: EmailOtpRateLimitScope, value: string): Promise<string>;
-  equalsMac(left: string, right: string): boolean;
 }
 
 export type EmailOtpClock = () => number;
