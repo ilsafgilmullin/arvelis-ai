@@ -16,22 +16,22 @@ export function AccountSecurityPanel({
           <div>
             <p className="section-kicker">АККАУНТ И БЕЗОПАСНОСТЬ</p>
             <h3 id="account-security-title">Защищённый аккаунт ещё не подключён</h3>
-            <p>Текущий профиль существует только в frontend preview. Серверные сессии, устройства и восстановление доступа появятся после выбора production auth/backend.</p>
+            <p>Сейчас профиль хранится только на этом устройстве. После подключения настоящего аккаунта здесь появятся управление входами, устройствами и восстановлением доступа.</p>
           </div>
           <span className="account-security-panel__status">PREVIEW</span>
         </div>
 
         <div className="account-security-panel__rows">
           <div className="account-security-row">
-            <div><strong>Серверная сессия</strong><span>HttpOnly/session lifecycle будет подключён на backend-этапе.</span></div>
+            <div><strong>Защищённый вход</strong><span>Серверная авторизация будет подключена отдельным этапом.</span></div>
             <span className="account-security-row__state">НЕ ПОДКЛЮЧЕНО</span>
           </div>
           <div className="account-security-row">
-            <div><strong>Устройства и сессии</strong><span>Просмотр и отзыв активных входов появятся только с реальными server sessions.</span></div>
+            <div><strong>Устройства и сессии</strong><span>Здесь можно будет увидеть активные входы и завершить лишнюю сессию.</span></div>
             <span className="account-security-row__state">НЕ ПОДКЛЮЧЕНО</span>
           </div>
           <div className="account-security-row">
-            <div><strong>Восстановление доступа</strong><span>Способ recovery зависит от утверждённого идентификатора и метода входа.</span></div>
+            <div><strong>Восстановление доступа</strong><span>Способ восстановления будет определён вместе с основным способом входа.</span></div>
             <span className="account-security-row__state">OPEN</span>
           </div>
         </div>
