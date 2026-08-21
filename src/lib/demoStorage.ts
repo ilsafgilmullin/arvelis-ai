@@ -1,3 +1,8 @@
+import {
+  DEFAULT_PREVIEW_PROFILE_NAME,
+  isPersistablePreviewProfileName,
+  resolveStoredPreviewProfileName,
+} from '../auth/previewProfile';
 import { DEMO_MOCK_RESPONSE, initialDemoThreads } from '../data/demo';
 import type { DemoMessage, DemoThread, DemoWorkspaceState } from '../types';
 
@@ -26,7 +31,6 @@ const DEMO_MAX_SERIALIZED_CHARS = 2_500_000;
 const DEMO_MAX_ID_LENGTH = 128;
 const DEMO_MAX_TITLE_LENGTH = 160;
 const DEMO_MAX_STORED_MESSAGE_CHARS = 12_000;
-const DEMO_MAX_PROFILE_NAME_CHARS = 80;
 
 const defaultState = (): DemoWorkspaceState => ({
   threads: initialDemoThreads.map((thread) => ({
@@ -34,7 +38,7 @@ const defaultState = (): DemoWorkspaceState => ({
     messages: thread.messages.map((message) => ({ ...message })),
   })),
   activeThreadId: initialDemoThreads[0]?.id ?? null,
-  profileName: 'Пользователь ARVELIS',
+  profileName: DEFAULT_PREVIEW_PROFILE_NAME,
 });
 
 function isValidTimestamp(value: unknown): value is number {
@@ -146,8 +150,7 @@ function isWorkspacePersistable(state: DemoWorkspaceState): boolean {
     state.threads.every(isThread) &&
     hasUniqueWorkspaceIds(state.threads) &&
     isWithinContentBudget(state.threads) &&
-    state.profileName.trim().length > 0 &&
-    state.profileName.length <= DEMO_MAX_PROFILE_NAME_CHARS &&
+    isPersistablePreviewProfileName(state.profileName) &&
     (state.activeThreadId === null || state.threads.some((thread) => thread.id === state.activeThreadId))
   );
 }
@@ -190,9 +193,7 @@ export function loadDemoWorkspace(): DemoWorkspaceState {
     return {
       threads,
       activeThreadId,
-      profileName: typeof parsed.profileName === 'string' && parsed.profileName.trim() && parsed.profileName.length <= DEMO_MAX_PROFILE_NAME_CHARS
-        ? parsed.profileName
-        : 'Пользователь ARVELIS',
+      profileName: resolveStoredPreviewProfileName(parsed.profileName),
     };
   } catch {
     return defaultState();
