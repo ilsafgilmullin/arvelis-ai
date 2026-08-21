@@ -44,15 +44,21 @@ export class WebCryptoEmailOtpSecurity implements EmailOtpSecurityPort {
       throw new Error('Email OTP security requires Web Crypto and a >=32 byte pepper');
     }
 
-    const keyMaterial = new Uint8Array(pepper);
-    this.keyPromise = globalThis.crypto.subtle.importKey(
-      'raw',
-      keyMaterial,
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign'],
-    );
-    keyMaterial.fill(0);
+    this.keyPromise = this.importPepper(new Uint8Array(pepper));
+  }
+
+  private async importPepper(keyMaterial: Uint8Array): Promise<CryptoKey> {
+    try {
+      return await globalThis.crypto.subtle.importKey(
+        'raw',
+        keyMaterial,
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign'],
+      );
+    } finally {
+      keyMaterial.fill(0);
+    }
   }
 
   generateChallengeId(): string {
