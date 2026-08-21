@@ -131,7 +131,21 @@
 - ARVELIS CONTROL не использует пользовательский email OTP realm как достаточную owner/admin authorization boundary.
 - Server foundation зафиксирован в `docs/34_EMAIL_OTP_AUTH_CORE.md`.
 
-Остаются `OPEN`: конкретный email delivery provider, production DB, challenge/rate-limit persistence, backend framework/topology, account duplicate/linking semantics, session backend/cookie topology, роли и уровни доступа.
+Остаются `OPEN`: production DB provider/region, окончательная backend topology, account linking/recovery, роли и уровни доступа, production session/cookie policy.
+
+## 2026-08-21 — Email delivery provider первого auth release
+
+Утверждён первый provider для отправки email OTP: **Yandex Cloud Postbox**.
+
+- Интеграция остаётся за `EmailOtpDeliveryPort` / generic SMTP adapter: ARVELIS Account, Session и frontend не зависят от Postbox API.
+- Для Yandex Cloud Postbox используется официальный SMTP endpoint `postbox.cloud.yandex.net`.
+- Основной режим: port `587` + STARTTLS; допустимый альтернативный режим: port `465` + SMTPS.
+- SMTP-транспорт ARVELIS требует TLS `1.2+`.
+- Для SMTP используется отдельный service account с ролью `postbox.sender` и API key scope `yc.postbox.send`.
+- API key ID/secret и sender address хранятся только в protected environment/secrets.
+- Sender/address должен быть подтверждён в Postbox до включения реальной регистрации.
+- Generic SMTP fallback сохраняется, чтобы email delivery provider можно было заменить без изменения auth domain.
+- Решение утверждает provider, но **не является разрешением на production deploy, публикацию production-секретов или автоматическое создание/оплату cloud-ресурсов**.
 
 ## 2026-08-21 — ARVELIS CONTROL
 
@@ -153,7 +167,7 @@
 - production database/data model;
 - роли и уровни доступа;
 - конкретный auth provider / identity core;
-- email delivery provider;
+- production Postbox resource/address/domain и активация credentials;
 - production session backend/cookie topology;
 - финальные требования по персональным данным;
 - биллинг и тарифы;
