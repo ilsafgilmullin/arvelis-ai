@@ -65,7 +65,7 @@ async function main(): Promise<void> {
 
     const signUpStart = await otp.start({
       intent: 'sign_up',
-      email: 'Owner.Test@Example.test',
+      email: 'owner.test@Example.TEST',
       clientKey: 'sqlite-flow-client',
     });
     assert(signUpStart.ok, 'Sign-up OTP start must succeed through SQLite');
@@ -85,7 +85,7 @@ async function main(): Promise<void> {
     });
     assert(signUp.ok, 'Verified email must create Account + Session through SQLite');
     assert(signUp.value.account.displayName === 'Ильсаф', 'Account display name must persist');
-    assert(signUp.value.identity.canonicalEmail === 'owner.test@example.test', 'Email must be canonicalized');
+    assert(signUp.value.identity.canonicalEmail === 'owner.test@example.test', 'Email domain must be canonicalized');
 
     const restored = await sessions.authenticate({
       sessionId: signUp.value.session.sessionId,
