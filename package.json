@@ -10,6 +10,7 @@
     "dev": "vite --host 0.0.0.0 --port 3000",
     "dev:auth": "node scripts/dev-with-auth-api.mjs",
     "auth:readiness": "node scripts/auth-readiness.mjs",
+    "auth:smoke-smtp": "node scripts/smtp-smoke.mjs",
     "start": "vite --host 0.0.0.0 --port 3000",
     "build": "tsc -b && vite build",
     "build:auth-server": "tsc -p tsconfig.server-runtime.json",
@@ -21,6 +22,7 @@
     "db:migrate": "node scripts/migrate-auth-db.mjs",
     "test:server-db": "node scripts/prepare-smoke-runtime.mjs server-db && tsc -p tsconfig.server-db-smoke.json && node tests/.dist-server-db/tests/postgres-auth-persistence-smoke.js",
     "check": "npm run typecheck && npm run test:auth && npm run test:server-auth && npm run test:server-sqlite && npm run build:auth-server && npm run build",
+    "check:free-auth": "npm run auth:readiness && npm run check",
     "check:with-db": "npm run check && npm run db:migrate && npm run test:server-db"
   },
   "dependencies": {
