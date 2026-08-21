@@ -68,18 +68,39 @@ AUTH_SESSION_PEPPER_HEX=<different 32+ random bytes in hex>
 
 Они должны быть разными и храниться только в Replit Secrets/environment.
 
+## Безопасные smoke-команды
+
+До включения real-auth используются отдельные проверки:
+
+- `npm run auth:readiness` — проверяет наличие/формат test-конфигурации без вывода секретов;
+- `npm run check:free-auth` — readiness + TypeScript/auth/SQLite/build проверки;
+- `npm run auth:smoke-smtp` — проверяет SMTP credentials и отправляет одно техническое письмо на сам test mailbox. Письмо явно помечено как техническое, не содержит OTP и не создаёт Account/Session.
+
+`auth:smoke-smtp` не выводит SMTP password и не должен использоваться с личным mailbox.
+
+## Replit test runtime
+
+На feature-ветке `feat/auth-persistence-v1` `.replit` запускает `npm run dev:auth`, то есть одновременно:
+
+- trusted auth API на loopback `127.0.0.1:3001`;
+- Vite frontend на `0.0.0.0:3000`;
+- browser `/api/*` идёт через same-origin Vite proxy.
+
+`VITE_REAL_AUTH_ENABLED=false` остаётся обязательным до успешного SMTP + SQLite + iPhone E2E gate. Поэтому наличие запущенного backend само по себе не включает реальную регистрацию в интерфейсе.
+
 ## Rollout order
 
-1. Фактически пройти TypeScript/build + SQLite smoke.
-2. Создать отдельный бесплатный test mailbox.
-3. Создать Mail app password.
-4. Добавить SMTP credentials и два pepper только в protected Replit Secrets.
-5. Запустить `npm run dev:auth` в test environment.
-6. Проверить `/api/health` и `persistence=sqlite`.
-7. Запросить OTP на тестовый email и подтвердить реальную доставку.
-8. Проверить отсутствие raw OTP, session secret и SMTP password в логах.
-9. Только после этого включить `VITE_REAL_AUTH_ENABLED=true` в test Replit environment.
-10. Выполнить iPhone E2E: sign-up → OTP → session → refresh → logout → sign-in.
+1. Запустить `npm run auth:readiness`.
+2. Фактически пройти `npm run check:free-auth`.
+3. Запустить `npm run auth:smoke-smtp` и подтвердить получение технического письма.
+4. Запустить feature branch через `npm run dev:auth` / Replit Run.
+5. Проверить `/api/health`.
+6. Убедиться, что SQLite создаётся только в `.data/` и не отдаётся Vite как статический файл.
+7. Проверить отсутствие raw OTP, session secret и SMTP password в логах.
+8. Только после этого включить `VITE_REAL_AUTH_ENABLED=true` в test Replit environment.
+9. Выполнить iPhone E2E: sign-up → OTP → Account → HttpOnly session → refresh restore → logout → sign-in.
+10. Проверить account-local data isolation и session revoke.
+11. После успешного E2E отдельно решить вопрос merge PR в `main`.
 
 ## Production
 
