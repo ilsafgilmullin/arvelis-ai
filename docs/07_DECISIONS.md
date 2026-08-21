@@ -102,6 +102,31 @@
 - Пользователь отдельно разрешил merge PR №10 после полного аудита и исправления критических ошибок. Это разрешение относится к private frontend-preview и **не является production release approval**.
 - После merge дальнейшая работа без подключения AI начинается с нового clean branch и идёт от авторизации/onboarding к Главной, Профилю и остальным product screens.
 
+## 2026-08-21 — App entry / authorization UX
+
+Утверждён пользовательский поток приложения:
+
+`ARVELIS Splash → Вход / Регистрация → Smart Entry → Новый чат`.
+
+- После успешного входного шага пользователь открывает новый пустой Chat, а не Главную.
+- Основная пользовательская навигация остаётся `Главная · Чат · История · Профиль`.
+- `Главная` — product/info hub, а не второй Chat composer.
+- Первый paint должен быть брендированным до загрузки JavaScript; пустой чёрный экран после refresh не является допустимым app experience.
+- В текущем frontend-preview вход/регистрация не выдаются за production account: email/password/OTP/social provider не имитируются как работающие.
+- Реальный auth должен оставаться provider-independent и server-authoritative.
+- Конкретный основной идентификатор, provider, session backend и production DB остаются `OPEN` до отдельного решения.
+
+## 2026-08-21 — ARVELIS CONTROL
+
+Утверждено направление отдельного административного продукта `ARVELIS CONTROL` для владельца/будущих администраторов.
+
+- CONTROL — отдельный control-plane, а не пункт пользовательской нижней навигации ARVELIS AI.
+- Он должен использовать отдельную owner/admin authentication/authorization boundary и не делить пользовательскую session как достаточное административное право.
+- Назначение: operational overview, проблемы, поддержка, процессы, события/audit и административные настройки по мере появления реального backend.
+- Fake users/tickets/incidents/live metrics недопустимы.
+- Реальные owner/admin роли, способ входа, support provider, billing/admin actions, production infrastructure controls и exact domain остаются `OPEN`.
+- Frontend foundation развивается отдельно в `feat/arvelis-control-v1` / Draft PR №12 и не должен смешиваться с пользовательским App bundle.
+
 ## Не утверждено для production
 
 - одна главная проблема первого AI MVP;
@@ -109,7 +134,8 @@
 - AI-провайдер и модель;
 - production technical stack;
 - production database/data model;
-- настоящая авторизация, роли и уровни доступа;
+- настоящий способ авторизации, роли и уровни доступа;
+- конкретный auth provider / identity core;
 - финальные требования по персональным данным;
 - биллинг и тарифы;
 - production-хостинг;
