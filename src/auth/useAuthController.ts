@@ -9,6 +9,7 @@ import type {
   AuthResourceStatus,
   AuthSessionSummary,
   AuthStartRequest,
+  AuthUiState,
 } from './contracts';
 import { authUiReducer, initialAuthUiState } from './reducer';
 
@@ -32,12 +33,21 @@ function preservesCodeChallenge(error: AuthFailure): boolean {
     || error.code === 'unknown';
 }
 
+function hasLiveSession(state: AuthUiState): boolean {
+  return state.status === 'authenticated'
+    || state.status === 'signing_out'
+    || state.status === 'sign_out_error';
+}
+
 export function useAuthController(gateway: AuthGateway | null) {
   const [state, dispatch] = useReducer(authUiReducer, initialAuthUiState);
   const [methods, setMethods] = useState<AuthMethodDescriptor[]>([]);
   const [methodsStatus, setMethodsStatus] = useState<AuthResourceStatus>('idle');
   const [sessions, setSessions] = useState<AuthSessionSummary[]>([]);
   const [sessionsStatus, setSessionsStatus] = useState<AuthResourceStatus>('idle');
+
+  const stateRef = useRef<AuthUiState>(state);
+  stateRef.current = state;
 
   const authSequenceRef = useRef(0);
   const methodsSequenceRef = useRef(0);
@@ -77,8 +87,13 @@ export function useAuthController(gateway: AuthGateway | null) {
   }, [gateway]);
 
   const restore = useCallback(async () => {
+    const stateAtStart = stateRef.current;
+    const preserveLiveSession = hasLiveSession(stateAtStart);
     const sequence = ++authSequenceRef.current;
-    dispatch({ type: 'CHECK_SESSION' });
+
+    if (!preserveLiveSession) {
+      dispatch({ type: 'CHECK_SESSION' });
+    }
 
     // Method discovery is intentionally independent from session restoration.
     // A temporary provider/catalog failure must not invalidate a still-valid
@@ -86,7 +101,9 @@ export function useAuthController(gateway: AuthGateway | null) {
     void refreshMethods();
 
     if (!gateway) {
-      dispatch({ type: 'SESSION_RESTORED', session: null });
+      if (!preserveLiveSession) {
+        dispatch({ type: 'SESSION_RESTORED', session: null });
+      }
       return false;
     }
 
@@ -94,12 +111,16 @@ export function useAuthController(gateway: AuthGateway | null) {
       const session = await gateway.restoreSession();
       if (sequence !== authSequenceRef.current) return false;
 
+      // A trusted null response is authoritative and signs the user out.
+      // A transport failure below is not equivalent to a trusted null.
       dispatch({ type: 'SESSION_RESTORED', session });
       return Boolean(session);
     } catch {
       if (sequence !== authSequenceRef.current) return false;
 
-      dispatch({ type: 'FAILURE', error: unexpectedFailure() });
+      if (!preserveLiveSession) {
+        dispatch({ type: 'FAILURE', error: unexpectedFailure() });
+      }
       return false;
     }
   }, [gateway, refreshMethods]);
@@ -110,11 +131,16 @@ export function useAuthController(gateway: AuthGateway | null) {
   }, [invalidatePending, restore]);
 
   const setIntent = useCallback((intent: AuthIntent) => {
+    if (hasLiveSession(stateRef.current)) return false;
+
     authSequenceRef.current += 1;
     dispatch({ type: 'SET_INTENT', intent });
+    return true;
   }, []);
 
   const start = useCallback(async (request: AuthStartRequest): Promise<AuthChallenge | null> => {
+    if (hasLiveSession(stateRef.current)) return null;
+
     if (!gateway) {
       dispatch({ type: 'FAILURE', error: { code: 'service_unavailable', message: 'Auth backend is not connected' } });
       return null;
@@ -226,8 +252,9 @@ export function useAuthController(gateway: AuthGateway | null) {
   }, [loadSessions, state.status]);
 
   const signOut = useCallback(async () => {
-    const activeSession = state.status === 'authenticated' || state.status === 'sign_out_error'
-      ? state.session
+    const currentState = stateRef.current;
+    const activeSession = currentState.status === 'authenticated' || currentState.status === 'sign_out_error'
+      ? currentState.session
       : null;
 
     if (!activeSession) return false;
@@ -237,10 +264,12 @@ export function useAuthController(gateway: AuthGateway | null) {
     dispatch({ type: 'SIGN_OUT_START', session: activeSession });
 
     if (!gateway) {
-      setSessions([]);
-      setSessionsStatus('idle');
-      dispatch({ type: 'RESET', intent: 'sign_in' });
-      return true;
+      dispatch({
+        type: 'SIGN_OUT_FAILED',
+        session: activeSession,
+        error: { code: 'service_unavailable', message: 'Auth backend is not connected' },
+      });
+      return false;
     }
 
     try {
@@ -257,10 +286,10 @@ export function useAuthController(gateway: AuthGateway | null) {
       dispatch({ type: 'SIGN_OUT_FAILED', session: activeSession, error: unexpectedFailure() });
       return false;
     }
-  }, [gateway, state]);
+  }, [gateway]);
 
   const revokeSession = useCallback(async (sessionId: string) => {
-    if (!gateway || !sessionId || !stateHasLiveSession) return false;
+    if (!gateway || !sessionId || !hasLiveSession(stateRef.current)) return false;
 
     try {
       await gateway.revokeSession(sessionId);
@@ -269,7 +298,7 @@ export function useAuthController(gateway: AuthGateway | null) {
     } catch {
       return false;
     }
-  }, [gateway, loadSessions, stateHasLiveSession]);
+  }, [gateway, loadSessions]);
 
   const expireSession = useCallback(() => {
     authSequenceRef.current += 1;
