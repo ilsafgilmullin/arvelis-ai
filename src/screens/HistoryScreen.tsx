@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { ArrowIcon, SearchIcon, TrashIcon } from '../components/Icons';
+import { ArrowIcon, ChatIcon, SearchIcon, TrashIcon } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
 import { CHAT_SEARCH_MAX_CHARS } from '../domain/chatPolicy';
 import {
@@ -11,19 +11,36 @@ import {
 } from '../domain/chatPresentation';
 import type { DemoThread } from '../types';
 
+function dialogueCountLabel(count: number): string {
+  const mod100 = count % 100;
+  const mod10 = count % 10;
+
+  if (mod100 >= 11 && mod100 <= 14) return `${count} диалогов`;
+  if (mod10 === 1) return `${count} диалог`;
+  if (mod10 >= 2 && mod10 <= 4) return `${count} диалога`;
+  return `${count} диалогов`;
+}
+
 export function HistoryScreen({
   threads,
   onOpen,
   onDelete,
+  onNewChat,
 }: {
   threads: DemoThread[];
   onOpen: (threadId: string) => void;
   onDelete: (threadId: string) => void;
+  onNewChat: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [pendingDelete, setPendingDelete] = useState<DemoThread | null>(null);
 
-  const searchIndex = useMemo(() => threads.map((thread) => ({
+  const orderedThreads = useMemo(
+    () => [...threads].sort((a, b) => b.updatedAt - a.updatedAt),
+    [threads],
+  );
+
+  const searchIndex = useMemo(() => orderedThreads.map((thread) => ({
     thread,
     content: [
       thread.title,
@@ -33,15 +50,15 @@ export function HistoryScreen({
     ]
       .join('\n')
       .toLocaleLowerCase('ru-RU'),
-  })), [threads]);
+  })), [orderedThreads]);
 
+  const normalizedQuery = query.trim().toLocaleLowerCase('ru-RU');
   const filtered = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase('ru-RU');
-    if (!normalized) return threads;
+    if (!normalizedQuery) return orderedThreads;
     return searchIndex
-      .filter((entry) => entry.content.includes(normalized))
+      .filter((entry) => entry.content.includes(normalizedQuery))
       .map((entry) => entry.thread);
-  }, [query, searchIndex, threads]);
+  }, [normalizedQuery, orderedThreads, searchIndex]);
 
   const confirmDelete = () => {
     if (!pendingDelete) return;
@@ -49,13 +66,25 @@ export function HistoryScreen({
     setPendingDelete(null);
   };
 
-  const hasQuery = Boolean(query.trim());
+  const hasQuery = Boolean(normalizedQuery);
+  const summary = hasQuery
+    ? `Найдено ${filtered.length} из ${threads.length}`
+    : dialogueCountLabel(threads.length);
 
   return (
-    <div className="content-page history-v2">
+    <div className="content-page history-v3">
       <Topbar title="История" subtitle="Ваши локальные диалоги на этом устройстве" />
-      <section className="history-section history-v2__section">
-        <div className="search-field history-v2__search" role="search" aria-label="Поиск по истории диалогов">
+
+      <section className="history-section history-v3__section" aria-labelledby="history-list-title">
+        <div className="history-v3__heading">
+          <div>
+            <p className="section-kicker">ЛОКАЛЬНАЯ ИСТОРИЯ</p>
+            <h2 id="history-list-title">Диалоги</h2>
+          </div>
+          <span>PREVIEW</span>
+        </div>
+
+        <div className="search-field history-v3__search" role="search" aria-label="Поиск по истории диалогов">
           <SearchIcon />
           <input
             value={query}
@@ -64,42 +93,56 @@ export function HistoryScreen({
             aria-label="Поиск по истории диалогов"
             maxLength={CHAT_SEARCH_MAX_CHARS}
             autoComplete="off"
+            enterKeyHint="search"
           />
           {hasQuery ? (
-            <button className="history-v2__clear" type="button" onClick={() => setQuery('')} aria-label="Очистить поиск">×</button>
+            <button className="history-v3__clear" type="button" onClick={() => setQuery('')} aria-label="Очистить поиск">×</button>
           ) : null}
         </div>
 
-        <div className="history-summary history-v2__summary">
-          <span>Диалогов: {filtered.length}{hasQuery ? ` из ${threads.length}` : ''}</span>
-          <small>ЛОКАЛЬНО</small>
+        <div className="history-v3__summary" aria-live="polite">
+          <span>{summary}</span>
+          <small>Данные этого устройства</small>
         </div>
 
         {filtered.length ? (
-          <div className="history-list history-list--large history-v2__list">
+          <div className="history-v3__list">
             {filtered.map((thread) => {
               const conversationCount = conversationMessageCount(thread);
               return (
-                <div className="history-row history-row--managed history-v2__row" key={thread.id}>
-                  <button className="history-row__open history-v2__open" type="button" onClick={() => onOpen(thread.id)}>
-                    <div className="history-v2__copy">
+                <div className="history-v3__row" key={thread.id}>
+                  <button className="history-v3__open" type="button" onClick={() => onOpen(thread.id)}>
+                    <div className="history-v3__copy">
                       <strong>{thread.title}</strong>
-                      <span className="history-v2__preview">{conversationPreview(thread)}</span>
+                      <span>{conversationPreview(thread)}</span>
                       <small>{conversationMessageCountLabel(conversationCount)} · {conversationRelativeTime(thread.updatedAt)}</small>
                     </div>
                     <ArrowIcon />
                   </button>
-                  <button className="icon-button icon-button--danger history-v2__delete" type="button" onClick={() => setPendingDelete(thread)} aria-label={`Удалить диалог «${thread.title}»`}><TrashIcon /></button>
+                  <button
+                    className="icon-button icon-button--danger history-v3__delete"
+                    type="button"
+                    onClick={() => setPendingDelete(thread)}
+                    aria-label={`Удалить диалог «${thread.title}»`}
+                  >
+                    <TrashIcon />
+                  </button>
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="empty-state history-v2__empty">
+          <div className="history-v3__empty">
             <p className="section-kicker">{hasQuery ? 'ПОИСК' : 'ИСТОРИЯ'}</p>
             <h2>{hasQuery ? 'Ничего не найдено' : 'Диалогов пока нет'}</h2>
-            <p>{hasQuery ? 'Попробуйте изменить запрос или очистить поиск.' : 'Начните новый диалог — после первого сообщения он появится здесь.'}</p>
-            {hasQuery ? <button className="button button--secondary" type="button" onClick={() => setQuery('')}>Очистить поиск</button> : null}
+            <p>{hasQuery ? 'Попробуйте изменить запрос или очистить поиск.' : 'Начните новый чат — после первого сообщения разговор появится здесь.'}</p>
+            {hasQuery ? (
+              <button className="button button--secondary" type="button" onClick={() => setQuery('')}>Очистить поиск</button>
+            ) : (
+              <button className="button button--primary history-v3__new-chat" type="button" onClick={onNewChat}>
+                <ChatIcon />Новый чат
+              </button>
+            )}
           </div>
         )}
       </section>
