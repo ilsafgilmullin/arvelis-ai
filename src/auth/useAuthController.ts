@@ -95,6 +95,9 @@ export function useAuthController(gateway: AuthGateway | null) {
     }
 
     const sequence = ++sequenceRef.current;
+    if (state.status === 'challenge') {
+      dispatch({ type: 'VERIFY', intent: state.intent, challenge: state.challenge });
+    }
 
     try {
       const result = await gateway.complete(request);
@@ -112,21 +115,24 @@ export function useAuthController(gateway: AuthGateway | null) {
       dispatch({ type: 'FAILURE', error: unexpectedFailure() });
       return false;
     }
-  }, [gateway]);
+  }, [gateway, state]);
 
   const signOut = useCallback(async () => {
     invalidatePending();
 
-    if (gateway) {
-      try {
-        await gateway.signOut();
-      } catch {
-        // Sign-out UX remains safe and local even if server cleanup fails.
-        // The future backend must make sign-out idempotent and expire the cookie server-side.
-      }
+    if (!gateway) {
+      dispatch({ type: 'RESET', intent: 'sign_in' });
+      return true;
     }
 
-    dispatch({ type: 'RESET', intent: 'sign_in' });
+    try {
+      await gateway.signOut();
+      dispatch({ type: 'RESET', intent: 'sign_in' });
+      return true;
+    } catch {
+      dispatch({ type: 'FAILURE', error: unexpectedFailure() });
+      return false;
+    }
   }, [gateway, invalidatePending]);
 
   const revokeSession = useCallback(async (sessionId: string) => {
