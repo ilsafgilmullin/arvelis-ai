@@ -17,7 +17,7 @@ export function normalizeEmailOtpAddress(value: string): string | null {
   if (!value || value.length > EMAIL_OTP_MAX_EMAIL_LENGTH || UNSAFE_TEXT_PATTERN.test(value)) return null;
 
   const trimmed = value.trim();
-  if (!trimmed || trimmed.length > EMAIL_OTP_MAX_EMAIL_LENGTH || trimmed !== value.trim()) return null;
+  if (!trimmed || trimmed.length > EMAIL_OTP_MAX_EMAIL_LENGTH || trimmed !== value) return null;
 
   const at = trimmed.lastIndexOf('@');
   if (at <= 0 || at === trimmed.length - 1 || trimmed.indexOf('@') !== at) return null;
