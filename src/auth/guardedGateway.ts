@@ -1,0 +1,227 @@
+import type {
+  AuthCompleteRequest,
+  AuthCompleteResult,
+  AuthGateway,
+  AuthMethodDescriptor,
+  AuthSession,
+  AuthSessionSummary,
+  AuthStartRequest,
+  AuthStartResult,
+} from './contracts';
+import { AUTH_PROTOCOL_LIMITS } from './protocolLimits';
+import { containsUnsafeProtocolCharacters } from './protocolText';
+import {
+  isAuthChallenge,
+  isAuthFailure,
+  isAuthMethodDescriptor,
+  isAuthSession,
+  isAuthSessionSummary,
+  normalizeAuthMethodCatalog,
+} from './runtimeGuards';
+
+type UnknownRecord = Record<string, unknown>;
+
+const START_SUCCESS_KEYS = new Set(['ok', 'challenge']);
+const START_FAILURE_KEYS = new Set(['ok', 'error']);
+const COMPLETE_SUCCESS_KEYS = new Set(['ok', 'session']);
+const COMPLETE_FAILURE_KEYS = new Set(['ok', 'error']);
+
+export interface AuthTransport {
+  getMethods(): Promise<unknown>;
+  restoreSession(): Promise<unknown>;
+  start(request: AuthStartRequest): Promise<unknown>;
+  complete(request: AuthCompleteRequest): Promise<unknown>;
+  signOut(): Promise<void>;
+  listSessions(): Promise<unknown>;
+  revokeSession(sessionId: string): Promise<void>;
+}
+
+export class AuthProtocolError extends Error {
+  readonly operation: string;
+
+  constructor(operation: string) {
+    super(`Auth protocol violation: ${operation}`);
+    this.name = 'AuthProtocolError';
+    this.operation = operation;
+  }
+}
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasOnlyKeys(value: UnknownRecord, allowedKeys: ReadonlySet<string>): boolean {
+  return Object.keys(value).every((key) => allowedKeys.has(key));
+}
+
+function assertUniqueIds(items: ReadonlyArray<{ id: string }>, operation: string): void {
+  const ids = new Set<string>();
+  for (const item of items) {
+    if (ids.has(item.id)) throw new AuthProtocolError(operation);
+    ids.add(item.id);
+  }
+}
+
+function assertStartRequest(request: AuthStartRequest): AuthStartRequest {
+  const rawMethodId = request.methodId;
+  const rawIdentifier = request.identifier;
+
+  if ((request.intent !== 'sign_in' && request.intent !== 'sign_up')
+    || containsUnsafeProtocolCharacters(rawMethodId)
+    || rawMethodId.trim() !== rawMethodId
+    || (rawIdentifier !== undefined && containsUnsafeProtocolCharacters(rawIdentifier))) {
+    throw new AuthProtocolError('start-request');
+  }
+
+  const identifier = rawIdentifier?.trim();
+
+  if (!rawMethodId
+    || rawMethodId.length > AUTH_PROTOCOL_LIMITS.methodIdLength
+    || (identifier !== undefined && (
+      !identifier
+      || identifier.length > AUTH_PROTOCOL_LIMITS.identifierLength
+    ))) {
+    throw new AuthProtocolError('start-request');
+  }
+
+  return identifier === undefined
+    ? { intent: request.intent, methodId: rawMethodId }
+    : { intent: request.intent, methodId: rawMethodId, identifier };
+}
+
+function assertCompleteRequest(request: AuthCompleteRequest): AuthCompleteRequest {
+  if (containsUnsafeProtocolCharacters(request.challengeId)
+    || request.challengeId.trim() !== request.challengeId
+    || containsUnsafeProtocolCharacters(request.response)) {
+    throw new AuthProtocolError('complete-request');
+  }
+
+  const response = request.response.trim();
+
+  if (!request.challengeId
+    || request.challengeId.length > AUTH_PROTOCOL_LIMITS.idLength
+    || !response
+    || response.length > AUTH_PROTOCOL_LIMITS.challengeResponseLength) {
+    throw new AuthProtocolError('complete-request');
+  }
+
+  return { challengeId: request.challengeId, response };
+}
+
+function parseStartResult(value: unknown): AuthStartResult {
+  if (!isRecord(value) || typeof value.ok !== 'boolean') {
+    throw new AuthProtocolError('start');
+  }
+
+  if (value.ok === true
+    && hasOnlyKeys(value, START_SUCCESS_KEYS)
+    && isAuthChallenge(value.challenge)) {
+    return { ok: true, challenge: value.challenge };
+  }
+
+  if (value.ok === false
+    && hasOnlyKeys(value, START_FAILURE_KEYS)
+    && isAuthFailure(value.error)) {
+    return { ok: false, error: value.error };
+  }
+
+  throw new AuthProtocolError('start');
+}
+
+function parseCompleteResult(value: unknown): AuthCompleteResult {
+  if (!isRecord(value) || typeof value.ok !== 'boolean') {
+    throw new AuthProtocolError('complete');
+  }
+
+  if (value.ok === true
+    && hasOnlyKeys(value, COMPLETE_SUCCESS_KEYS)
+    && isAuthSession(value.session)) {
+    return { ok: true, session: value.session };
+  }
+
+  if (value.ok === false
+    && hasOnlyKeys(value, COMPLETE_FAILURE_KEYS)
+    && isAuthFailure(value.error)) {
+    return { ok: false, error: value.error };
+  }
+
+  throw new AuthProtocolError('complete');
+}
+
+function parseMethods(value: unknown): AuthMethodDescriptor[] {
+  if (!Array.isArray(value)
+    || value.length > AUTH_PROTOCOL_LIMITS.methods
+    || !value.every(isAuthMethodDescriptor)) {
+    throw new AuthProtocolError('methods');
+  }
+
+  assertUniqueIds(value, 'methods');
+  return normalizeAuthMethodCatalog(value);
+}
+
+function parseSession(value: unknown): AuthSession | null {
+  if (value === null) return null;
+  if (isAuthSession(value)) return value;
+  throw new AuthProtocolError('session');
+}
+
+function parseSessions(value: unknown): AuthSessionSummary[] {
+  if (!Array.isArray(value)
+    || value.length > AUTH_PROTOCOL_LIMITS.sessions
+    || !value.every(isAuthSessionSummary)) {
+    throw new AuthProtocolError('sessions');
+  }
+
+  assertUniqueIds(value, 'sessions');
+  if (value.filter((session) => session.current).length > 1) {
+    throw new AuthProtocolError('sessions-current');
+  }
+
+  return value;
+}
+
+/**
+ * Converts an untrusted transport into the typed application auth port.
+ *
+ * Provider SDKs and raw HTTP clients belong behind AuthTransport. Components
+ * and app state consume only this guarded AuthGateway surface.
+ */
+export function createGuardedAuthGateway(transport: AuthTransport): AuthGateway {
+  return {
+    async getMethods() {
+      return parseMethods(await transport.getMethods());
+    },
+
+    async restoreSession() {
+      return parseSession(await transport.restoreSession());
+    },
+
+    async start(request) {
+      const safeRequest = assertStartRequest(request);
+      return parseStartResult(await transport.start(safeRequest));
+    },
+
+    async complete(request) {
+      const safeRequest = assertCompleteRequest(request);
+      return parseCompleteResult(await transport.complete(safeRequest));
+    },
+
+    async signOut() {
+      await transport.signOut();
+    },
+
+    async listSessions() {
+      return parseSessions(await transport.listSessions());
+    },
+
+    async revokeSession(sessionId) {
+      if (containsUnsafeProtocolCharacters(sessionId)
+        || sessionId.trim() !== sessionId
+        || !sessionId
+        || sessionId.length > AUTH_PROTOCOL_LIMITS.idLength) {
+        throw new AuthProtocolError('revoke-session');
+      }
+      await transport.revokeSession(sessionId);
+    },
+  };
+}

@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "lib": ["ES2022", "DOM"],
+    "skipLibCheck": true,
+    "outDir": "tests/.dist-server-auth",
+    "rootDir": "."
+  },
+  "include": [
+    "server/auth/emailOtp/contracts.ts",
+    "server/auth/emailOtp/policy.ts",
+    "server/auth/emailOtp/emailAddress.ts",
+    "server/auth/emailOtp/webCryptoSecurity.ts",
+    "server/auth/emailOtp/service.ts",
+    "server/auth/account/contracts.ts",
+    "server/auth/session/contracts.ts",
+    "server/auth/session/policy.ts",
+    "server/auth/session/webCryptoSecurity.ts",
+    "server/auth/session/service.ts",
+    "tests/email-otp-core-smoke.ts",
+    "tests/session-core-smoke.ts"
+  ]
+}

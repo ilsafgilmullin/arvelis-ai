@@ -6,6 +6,8 @@ node_modules/
 dist/
 build/
 coverage/
+tests/.dist-auth/
+tests/.dist-server-auth/
 
 # Secrets
 .env

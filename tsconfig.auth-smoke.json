@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "lib": ["ES2022", "DOM"],
+    "skipLibCheck": true,
+    "outDir": "tests/.dist-auth",
+    "rootDir": "."
+  },
+  "include": [
+    "src/auth/contracts.ts",
+    "src/auth/protocolLimits.ts",
+    "src/auth/protocolText.ts",
+    "src/auth/reducer.ts",
+    "src/auth/runtimeGuards.ts",
+    "src/auth/guardedGateway.ts",
+    "src/auth/externalFlow.ts",
+    "src/auth/previewProfile.ts",
+    "src/types.ts",
+    "src/data/demo.ts",
+    "src/lib/demoStorage.ts",
+    "tests/auth-core-smoke.ts",
+    "tests/preview-profile-smoke.ts",
+    "tests/demo-storage-profile-smoke.ts",
+    "tests/protocol-text-smoke.ts",
+    "tests/protocol-shape-smoke.ts"
+  ]
+}

@@ -16,6 +16,12 @@ import './chat-features.css';
 import './chat-refactor-v2.css';
 import './chat-history-v2.css';
 import './chat-runtime-hardening-v2.css';
+import './app-foundation-v1.css';
+import './auth-foundation-v2.css';
+import './account-security.css';
+import './home-foundation-v1.css';
+import './profile-foundation-v1.css';
+import './history-foundation-v1.css';
 
 const root = document.getElementById('root');
 
@@ -30,3 +36,9 @@ createRoot(root).render(
     </ErrorBoundary>
   </StrictMode>,
 );
+
+window.requestAnimationFrame(() => {
+  window.requestAnimationFrame(() => {
+    document.getElementById('arvelis-preboot')?.remove();
+  });
+});

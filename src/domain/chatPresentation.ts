@@ -35,9 +35,11 @@ export function conversationPreview(thread: DemoThread, maxLength = 92): string 
 
     const normalized = message.content.replace(/\s+/g, ' ').trim();
     if (!normalized) continue;
-    if (normalized.length <= maxLength) return normalized;
 
-    return `${normalized.slice(0, Math.max(1, maxLength - 1))}…`;
+    const labeled = message.mock ? `MOCK · ${normalized}` : normalized;
+    if (labeled.length <= maxLength) return labeled;
+
+    return `${labeled.slice(0, Math.max(1, maxLength - 1))}…`;
   }
 
   return 'Диалог без содержимого';
