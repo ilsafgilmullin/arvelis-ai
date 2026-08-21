@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 const AUTH_SQLITE_MIGRATION_ID = '001_auth_foundation';
+const AUTH_SQLITE_DATA_ROOT = resolve('.data');
 
 const AUTH_SQLITE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS auth_accounts (
@@ -103,6 +104,19 @@ function rollbackQuietly(database: DatabaseSync): void {
   }
 }
 
+function resolveSafeSqliteLocation(location: string): string {
+  const trimmed = location.trim();
+  if (!trimmed || trimmed.includes('\0')) throw new Error('Invalid AUTH_SQLITE_PATH');
+  if (trimmed === ':memory:') return trimmed;
+
+  const candidate = resolve(trimmed);
+  const relativePath = relative(AUTH_SQLITE_DATA_ROOT, candidate);
+  if (!relativePath || relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
+    throw new Error('AUTH_SQLITE_PATH must point to a file inside .data/');
+  }
+  return candidate;
+}
+
 export function inSqliteTransaction<T>(database: DatabaseSync, work: () => T): T {
   database.exec('BEGIN IMMEDIATE');
   try {
@@ -145,10 +159,7 @@ export function ensureSqliteAuthSchema(database: DatabaseSync): void {
 }
 
 export function openSqliteAuthDatabase(location: string): DatabaseSync {
-  const trimmed = location.trim();
-  if (!trimmed || trimmed.includes('\0')) throw new Error('Invalid AUTH_SQLITE_PATH');
-
-  const databaseLocation = trimmed === ':memory:' ? trimmed : resolve(trimmed);
+  const databaseLocation = resolveSafeSqliteLocation(location);
   if (databaseLocation !== ':memory:') mkdirSync(dirname(databaseLocation), { recursive: true });
 
   const database = new DatabaseSync(databaseLocation);
