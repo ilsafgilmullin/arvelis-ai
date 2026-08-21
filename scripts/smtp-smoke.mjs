@@ -39,9 +39,9 @@ function classifyError(error) {
   const code = typeof error?.code === 'string' ? error.code : 'UNKNOWN';
   const responseCode = Number.isInteger(error?.responseCode) ? String(error.responseCode) : 'none';
   if (code === 'EAUTH' || responseCode === '535') return { category: 'AUTH_REJECTED', code, responseCode };
-  if (code === 'ETIMEDOUT' || code === 'ESOCKET') return { category: 'NETWORK_OR_TLS', code, responseCode };
-  if (code === 'EDNS' || code === 'ENOTFOUND' || code === 'EAI_AGAIN') return { category: 'DNS', code, responseCode };
   if (code === 'ETIMEDOUT') return { category: 'TIMEOUT', code, responseCode };
+  if (code === 'ESOCKET') return { category: 'NETWORK_OR_TLS', code, responseCode };
+  if (code === 'EDNS' || code === 'ENOTFOUND' || code === 'EAI_AGAIN') return { category: 'DNS', code, responseCode };
   return { category: 'OTHER', code, responseCode };
 }
 
