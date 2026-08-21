@@ -38,6 +38,17 @@ function isIsoLikeDate(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && Number.isFinite(Date.parse(value));
 }
 
+export function isSecureAuthorizationUrl(value: unknown): value is string {
+  if (!isNonEmptyString(value)) return false;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function isAuthMethodDescriptor(value: unknown): value is AuthMethodDescriptor {
   if (!isRecord(value)) return false;
   if (!isNonEmptyString(value.id) || !isNonEmptyString(value.label) || typeof value.enabled !== 'boolean') return false;
@@ -121,7 +132,7 @@ export function isAuthChallenge(value: unknown): value is AuthChallenge {
   if (value.kind !== 'code' && value.kind !== 'external_redirect' && value.kind !== 'passkey') return false;
   if (!isOptionalString(value.maskedDestination) || !isOptionalString(value.redirectUrl)) return false;
   if (value.expiresAt !== undefined && !isIsoLikeDate(value.expiresAt)) return false;
-  if (value.kind === 'external_redirect' && !isNonEmptyString(value.redirectUrl)) return false;
+  if (value.kind === 'external_redirect' && !isSecureAuthorizationUrl(value.redirectUrl)) return false;
 
   return true;
 }
