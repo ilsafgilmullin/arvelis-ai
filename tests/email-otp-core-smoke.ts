@@ -25,18 +25,35 @@ function cloneRecord(record: EmailOtpChallengeRecord): EmailOtpChallengeRecord {
 class MemoryChallengeStore implements EmailOtpChallengeStore {
   readonly records = new Map<string, EmailOtpChallengeRecord>();
 
-  async createReplacingActive(record: EmailOtpChallengeRecord): Promise<void> {
+  async createPending(record: EmailOtpChallengeRecord): Promise<void> {
+    this.records.set(record.id, cloneRecord(record));
+  }
+
+  async activateReplacingActive(challengeId: string, activatedAt: number): Promise<boolean> {
+    const candidate = this.records.get(challengeId);
+    if (!candidate
+      || candidate.activatedAt !== null
+      || candidate.consumedAt !== null
+      || candidate.supersededAt !== null
+      || activatedAt >= candidate.expiresAt) {
+      return false;
+    }
+
     for (const [id, current] of this.records) {
       if (
-        current.email === record.email
-        && current.intent === record.intent
+        id !== challengeId
+        && current.email === candidate.email
+        && current.intent === candidate.intent
+        && current.activatedAt !== null
         && current.consumedAt === null
         && current.supersededAt === null
       ) {
-        this.records.set(id, { ...current, supersededAt: record.createdAt });
+        this.records.set(id, { ...current, supersededAt: activatedAt });
       }
     }
-    this.records.set(record.id, cloneRecord(record));
+
+    this.records.set(challengeId, { ...candidate, activatedAt });
+    return true;
   }
 
   async delete(challengeId: string): Promise<void> {
@@ -46,6 +63,7 @@ class MemoryChallengeStore implements EmailOtpChallengeStore {
   async beginAttempt(challengeId: string, now: number): Promise<EmailOtpAttemptResult> {
     const current = this.records.get(challengeId);
     if (!current) return { status: 'missing' };
+    if (current.activatedAt === null) return { status: 'pending' };
     if (current.consumedAt !== null) return { status: 'consumed' };
     if (current.supersededAt !== null) return { status: 'superseded' };
     if (now >= current.expiresAt) return { status: 'expired' };
@@ -59,6 +77,7 @@ class MemoryChallengeStore implements EmailOtpChallengeStore {
   async consume(challengeId: string, expectedAttemptNumber: number, consumedAt: number): Promise<boolean> {
     const current = this.records.get(challengeId);
     if (!current
+      || current.activatedAt === null
       || current.consumedAt !== null
       || current.supersededAt !== null
       || current.attempts !== expectedAttemptNumber
@@ -135,6 +154,7 @@ async function main(): Promise<void> {
 
   const firstRecord = store.records.get(firstStart.challenge.challengeId);
   assert(firstRecord, 'challenge record was not persisted');
+  assert(firstRecord.activatedAt !== null, 'delivered challenge was not activated');
   assert(firstRecord.codeMac !== firstDelivery.code, 'raw OTP was persisted instead of a MAC');
   assert(firstRecord.codeMac.length === 64, 'OTP HMAC length is unexpected');
   assert(firstRecord.attempts === 0, 'new challenge already had attempts');
@@ -176,6 +196,23 @@ async function main(): Promise<void> {
   const newVerify = await service.verify({ challengeId: newStart.challenge.challengeId, code: newCode });
   assert(newVerify.ok, 'replacement challenge did not verify');
 
+  const fallbackStart = await service.start({ intent: 'sign_in', email: 'fallback@example.com' });
+  assert(fallbackStart.ok, 'fallback challenge start failed');
+  const fallbackCode = delivery.deliveries.at(-1)?.code;
+  assert(fallbackCode, 'fallback challenge code missing');
+
+  delivery.failNext = true;
+  const failedReplacement = await service.start({ intent: 'sign_in', email: 'fallback@example.com' });
+  assert(
+    !failedReplacement.ok && failedReplacement.error.code === 'delivery_unavailable',
+    'failed replacement delivery was not surfaced safely',
+  );
+  const fallbackVerify = await service.verify({
+    challengeId: fallbackStart.challenge.challengeId,
+    code: fallbackCode,
+  });
+  assert(fallbackVerify.ok, 'delivery failure incorrectly invalidated the previous active challenge');
+
   const lockedStart = await service.start({ intent: 'sign_in', email: 'lock@example.com' });
   assert(lockedStart.ok, 'lockout challenge start failed');
   const lockedCode = delivery.deliveries.at(-1)?.code;
@@ -205,7 +242,7 @@ async function main(): Promise<void> {
   assert(!deliveryFailure.ok && deliveryFailure.error.code === 'delivery_unavailable', 'delivery failure was not surfaced safely');
   assert(
     [...store.records.values()].every((record) => record.email !== 'delivery@example.com'),
-    'undelivered challenge was left active after rollback',
+    'undelivered pending challenge was left in store after rollback',
   );
 
   rateLimit.denyScope = 'start_email';
