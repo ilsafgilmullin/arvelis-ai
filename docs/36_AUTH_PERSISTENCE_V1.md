@@ -91,26 +91,24 @@ PostgreSQL adapters реализуют:
 - успешный вход обновляет `lastAuthenticatedAt`;
 - raw session secret остаётся только внутри trusted server boundary.
 
-## Email delivery
+## Email delivery — бесплатный test path
 
-Для первого auth release утверждён **Yandex Cloud Postbox**.
+Решение Yandex Cloud Postbox отменено до активации инфраструктуры. Ни cloud resource, ни billing, ни sender/domain, ни API credentials не создавались.
 
-Архитектурно provider подключён через generic `EmailOtpDeliveryPort` и SMTP adapter, поэтому Account/Session/frontend не зависят от Postbox API.
+Для закрытого тестирования используется **обычная бесплатная Яндекс Почта через generic SMTP adapter**:
 
-Runtime preset:
+- SMTP host: `smtp.yandex.ru`;
+- основной тестовый режим: port `465` + SSL/SMTPS;
+- username: отдельный тестовый почтовый ящик ARVELIS;
+- password: отдельный пароль приложения типа «Почта»;
+- sender: тот же тестовый почтовый ящик;
+- transport требует TLS `1.2+`.
 
-- provider: `EMAIL_DELIVERY_PROVIDER=yandex_cloud_postbox`;
-- endpoint: `postbox.cloud.yandex.net`;
-- основной режим: `587` + STARTTLS;
-- альтернатива: `465` + SMTPS;
-- transport требует TLS `1.2+`;
-- SMTP username = Postbox API key ID;
-- SMTP password = secret part API key;
-- sender = подтверждённый Postbox sender/address.
+Отдельный домен, Yandex Cloud billing account и платный transactional-email сервис для этого тестового этапа не требуются.
 
-Для Postbox нужен service account с `postbox.sender` и API key scope `yc.postbox.send`. Реальные ключи не хранятся в GitHub и должны быть добавлены только в protected environment.
+Важно: обычная Яндекс Почта утверждена только для разработки/закрытого тестирования. Production transactional-email provider остаётся `OPEN` и будет выбран отдельно перед публичным запуском.
 
-Generic SMTP fallback остаётся доступным как заменяемый provider path.
+Архитектурно email delivery по-прежнему подключён через generic `EmailOtpDeliveryPort` / SMTP adapter, поэтому Account/Session/frontend не зависят от Яндекса.
 
 ## Same-origin HTTP/BFF
 
@@ -155,7 +153,7 @@ AI по-прежнему не подключён; chat data остаются dem
 - Session Core smoke;
 - Account Auth Application smoke;
 - PostgreSQL persistence integration smoke;
-- runtime config smoke для Yandex Cloud Postbox и generic SMTP fallback;
+- runtime config smoke для generic SMTP;
 - TypeScript frontend/backend build commands;
 - CI PostgreSQL service + migration path.
 
@@ -163,8 +161,8 @@ AI по-прежнему не подключён; chat data остаются dem
 
 ## Что ещё НЕ подключено фактически
 
-- Yandex Cloud Postbox resource/address/domain verification;
-- реальные Postbox API key credentials;
+- отдельный тестовый Яндекс Почта sender mailbox;
+- пароль приложения для SMTP;
 - реальная PostgreSQL instance/production region;
 - фактическое применение migration к рабочей БД;
 - production secrets;
@@ -173,18 +171,21 @@ AI по-прежнему не подключён; chat data остаются dem
 - account recovery/linking;
 - финальные роли/permissions;
 - production privacy/data-retention policy;
+- production transactional-email provider;
 - ARVELIS CONTROL auth;
 - AI.
 
 ## Следующий gate
 
-1. создать/подготовить Yandex Cloud Postbox sender и service account;
-2. создать API key с scope `yc.postbox.send` и сохранить secret только в protected secrets;
-3. подготовить PostgreSQL instance для тестовой auth environment;
-4. создать independent OTP/session peppers;
-5. выполнить migration в тестовой DB;
-6. запустить `npm run check:with-db` в фактической среде;
-7. включить real-auth только в test/Replit environment;
-8. выполнить iPhone E2E: регистрация → email OTP → session → refresh restore → logout → повторный login;
-9. проверить account isolation и session revoke;
-10. только после успешного smoke обсуждать merge PR №21 в `main`.
+1. создать отдельный бесплатный тестовый Яндекс Почта mailbox для ARVELIS;
+2. создать для него отдельный пароль приложения типа «Почта»;
+3. сохранить SMTP credentials только в protected Replit secrets;
+4. подготовить PostgreSQL instance для тестовой auth environment без подключения платного production-сервиса;
+5. создать independent OTP/session peppers;
+6. выполнить migration в тестовой DB;
+7. запустить `npm run check:with-db` в фактической среде;
+8. проверить реальную доставку OTP через Яндекс Почту;
+9. включить real-auth только в test/Replit environment;
+10. выполнить iPhone E2E: регистрация → email OTP → session → refresh restore → logout → повторный login;
+11. проверить account isolation и session revoke;
+12. только после успешного smoke обсуждать merge PR №21 в `main`.
