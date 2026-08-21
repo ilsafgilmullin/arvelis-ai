@@ -24,7 +24,7 @@ await run(node, [tsc, '-p', 'tsconfig.server-runtime.json']);
 await mkdir(runtimeDir, { recursive: true });
 await writeFile(resolve(runtimeDir, 'package.json'), '{"type":"commonjs"}\n', 'utf8');
 
-const api = spawn(node, [resolve(runtimeDir, 'server/runtime/server.js')], {
+const api = spawn(node, ['--experimental-sqlite', resolve(runtimeDir, 'server/runtime/server.js')], {
   cwd: root,
   stdio: 'inherit',
   env: process.env,
