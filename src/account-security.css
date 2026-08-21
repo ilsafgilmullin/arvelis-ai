@@ -87,8 +87,10 @@
 }
 
 .account-security-row__action {
-  min-height: 36px;
-  padding: 0 11px;
+  min-width: 88px;
+  min-height: 44px;
+  justify-self: end;
+  padding: 0 13px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #101216;
@@ -103,7 +105,7 @@
 }
 
 .account-security-row--empty {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 @media (max-width: 780px) {
@@ -137,7 +139,8 @@
     justify-self: start;
   }
 
-  .account-security-row {
+  .account-security-row,
+  .account-security-row--empty {
     grid-template-columns: 1fr;
     gap: 10px;
   }
