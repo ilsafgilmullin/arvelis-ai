@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import type { AuthResourceStatus, AuthSession, AuthSessionSummary } from './auth/contracts';
+import { realAuthGateway } from './auth/httpTransport';
 import {
   DEFAULT_PREVIEW_PROFILE_NAME,
   isDefaultPreviewProfileName,
@@ -20,7 +22,12 @@ import {
   type AppLoadProgress,
   type PreparedCoreModules,
 } from './lib/appPreload';
-import { chatDraftKey, clearChatDrafts, removeChatDraft } from './lib/chatDraftStorage';
+import {
+  chatDraftKey,
+  clearChatDrafts,
+  removeChatDraft,
+  setChatDraftAccountScope,
+} from './lib/chatDraftStorage';
 import {
   DEMO_MAX_MESSAGES_PER_THREAD,
   DEMO_MAX_THREADS,
@@ -30,12 +37,14 @@ import {
   saveDemoWorkspace,
 } from './lib/demoStorage';
 import { AuthScreen } from './screens/AuthScreen';
+import { RealAuthScreen } from './screens/RealAuthScreen';
 import { WelcomeScreen } from './screens/WelcomeScreen';
 import type { AppScreen, DemoMessage, DemoThread, DemoWorkspaceState, EntryScreen } from './types';
 
 const HistoryScreen = lazy(() => loadHistoryModule().then((module) => ({ default: module.HistoryScreen })));
 const ProfileScreen = lazy(() => loadProfileModule().then((module) => ({ default: module.ProfileScreen })));
 const StatesScreen = lazy(() => loadStatesModule().then((module) => ({ default: module.StatesScreen })));
+const REAL_AUTH_ENABLED = import.meta.env.VITE_REAL_AUTH_ENABLED === 'true';
 
 const INITIAL_LOAD_PROGRESS: AppLoadProgress = {
   completed: 0,
@@ -84,17 +93,43 @@ export default function App() {
   const [loadProgress, setLoadProgress] = useState<AppLoadProgress>(INITIAL_LOAD_PROGRESS);
   const [loadError, setLoadError] = useState(false);
   const [pendingProfileName, setPendingProfileName] = useState<string | undefined>();
+  const [realSession, setRealSession] = useState<AuthSession | null>(null);
+  const [sessions, setSessions] = useState<AuthSessionSummary[]>([]);
+  const [sessionsStatus, setSessionsStatus] = useState<AuthResourceStatus>('idle');
+  const [signOutPending, setSignOutPending] = useState(false);
+  const [signOutError, setSignOutError] = useState(false);
   const launchSequenceRef = useRef(0);
+  const storageScopeRef = useRef<string | undefined>();
   const online = useOnlineStatus();
 
   useEffect(() => {
     if (!workspace) return;
-    setPersistenceAvailable(saveDemoWorkspace(workspace));
+    setPersistenceAvailable(saveDemoWorkspace(workspace, storageScopeRef.current));
   }, [workspace]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [entry, screen]);
+
+  useEffect(() => {
+    if (!REAL_AUTH_ENABLED || entry !== 'app' || screen !== 'profile' || !realSession) return;
+
+    let active = true;
+    setSessionsStatus('loading');
+    void realAuthGateway.listSessions().then((nextSessions) => {
+      if (!active) return;
+      setSessions(nextSessions);
+      setSessionsStatus('ready');
+    }).catch(() => {
+      if (!active) return;
+      setSessions([]);
+      setSessionsStatus('error');
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [entry, realSession, screen]);
 
   const activeThread = useMemo(
     () => workspace?.threads.find((thread) => thread.id === workspace.activeThreadId) ?? null,
@@ -104,13 +139,20 @@ export default function App() {
   const threadLimitReached = (workspace?.threads.length ?? 0) >= DEMO_MAX_THREADS;
   const messageLimitReached = Boolean(activeThread && activeThread.messages.length >= DEMO_MAX_MESSAGES_PER_THREAD);
 
-  const launchApp = async (profileName?: string) => {
+  const launchApp = async (profileName?: string, accountScopeId?: string) => {
     if (profileName !== undefined && validatePreviewProfileName(profileName) !== null) {
       setPendingProfileName(undefined);
       setLoadError(false);
       setEntry('auth');
       return;
     }
+
+    if (!setChatDraftAccountScope(accountScopeId)) {
+      setLoadError(true);
+      setEntry('auth');
+      return;
+    }
+    storageScopeRef.current = accountScopeId;
 
     const launchSequence = ++launchSequenceRef.current;
     const normalizedName = profileName === undefined ? undefined : normalizePreviewProfileName(profileName);
@@ -128,6 +170,9 @@ export default function App() {
         if (launchSequence === launchSequenceRef.current) {
           setLoadProgress(progress);
         }
+      }, {
+        ...(accountScopeId === undefined ? {} : { accountScopeId }),
+        ...(normalizedName === undefined ? {} : { profileName: normalizedName }),
       });
       if (launchSequence !== launchSequenceRef.current) return;
 
@@ -157,9 +202,23 @@ export default function App() {
   };
 
   const openAuth = () => {
+    if (REAL_AUTH_ENABLED) {
+      storageScopeRef.current = undefined;
+      setChatDraftAccountScope(undefined);
+      setPendingProfileName(undefined);
+      setEntry('auth');
+      return;
+    }
+
     const storedProfileName = loadDemoWorkspace().profileName;
     setPendingProfileName(isDefaultPreviewProfileName(storedProfileName) ? undefined : storedProfileName);
     setEntry('auth');
+  };
+
+  const handleRealAuthenticated = (session: AuthSession) => {
+    setRealSession(session);
+    setSignOutError(false);
+    void launchApp(session.account.displayName, session.account.id);
   };
 
   const openThread = (threadId: string) => {
@@ -274,7 +333,7 @@ export default function App() {
   };
 
   const saveProfileName = (profileName: string) => {
-    if (validatePreviewProfileName(profileName) !== null) return;
+    if (REAL_AUTH_ENABLED || validatePreviewProfileName(profileName) !== null) return;
     const normalizedName = normalizePreviewProfileName(profileName);
     setWorkspace((current) => current ? { ...current, profileName: normalizedName } : current);
   };
@@ -288,9 +347,67 @@ export default function App() {
     setEntry('auth');
   };
 
-  const resetPreview = () => {
+  const signOutReal = async () => {
+    if (!realSession || signOutPending) return;
+    setSignOutPending(true);
+    setSignOutError(false);
+    try {
+      await realAuthGateway.signOut();
+      ++launchSequenceRef.current;
+      setWorkspace(null);
+      setCore(null);
+      setRealSession(null);
+      setSessions([]);
+      setSessionsStatus('idle');
+      storageScopeRef.current = undefined;
+      setChatDraftAccountScope(undefined);
+      setPendingProfileName(undefined);
+      setLoadError(false);
+      setScreen('chat');
+      setEntry('auth');
+    } catch {
+      setSignOutError(true);
+    } finally {
+      setSignOutPending(false);
+    }
+  };
+
+  const refreshRealSessions = async () => {
+    if (!realSession) return;
+    setSessionsStatus('loading');
+    try {
+      const nextSessions = await realAuthGateway.listSessions();
+      setSessions(nextSessions);
+      setSessionsStatus('ready');
+    } catch {
+      setSessions([]);
+      setSessionsStatus('error');
+    }
+  };
+
+  const revokeRealSession = async (sessionId: string) => {
+    if (!realSession) return;
+    try {
+      await realAuthGateway.revokeSession(sessionId);
+      await refreshRealSessions();
+    } catch {
+      setSessionsStatus('error');
+    }
+  };
+
+  const resetLocalData = () => {
     ++launchSequenceRef.current;
     clearChatDrafts();
+
+    if (REAL_AUTH_ENABLED && realSession) {
+      const next = resetDemoWorkspace(realSession.account.id, realSession.account.displayName);
+      setWorkspace(next);
+      setPersistenceAvailable(saveDemoWorkspace(next, realSession.account.id));
+      setLoadError(false);
+      setScreen('chat');
+      return;
+    }
+
     const next = resetDemoWorkspace();
     setWorkspace(next);
     setPersistenceAvailable(saveDemoWorkspace(next));
@@ -305,6 +422,10 @@ export default function App() {
   }
 
   if (entry === 'auth') {
+    if (REAL_AUTH_ENABLED) {
+      return <RealAuthScreen onAuthenticated={handleRealAuthenticated} />;
+    }
+
     return (
       <AuthScreen
         initialName={pendingProfileName ?? workspace?.profileName ?? DEFAULT_PREVIEW_PROFILE_NAME}
@@ -319,13 +440,13 @@ export default function App() {
         progress={loadProgress}
         profileName={pendingProfileName}
         error={loadError}
-        onRetry={() => { void launchApp(pendingProfileName); }}
+        onRetry={() => { void launchApp(pendingProfileName, realSession?.account.id); }}
       />
     );
   }
 
   if (!workspace || !core) {
-    return <AppBootScreen error onRetry={() => { void launchApp(pendingProfileName); }} />;
+    return <AppBootScreen error onRetry={() => { void launchApp(pendingProfileName, realSession?.account.id); }} />;
   }
 
   const { AppLayout, WorkspaceScreen, ChatScreen } = core;
@@ -378,10 +499,18 @@ export default function App() {
           <ProfileScreen
             profileName={workspace.profileName}
             persistenceAvailable={persistenceAvailable}
+            authMode={REAL_AUTH_ENABLED ? 'server' : 'preview'}
+            primaryEmail={realSession?.account.primaryEmail}
+            sessions={sessions}
+            sessionsStatus={sessionsStatus}
+            signOutPending={signOutPending}
+            signOutError={signOutError}
             onSaveName={saveProfileName}
+            onRefreshSessions={REAL_AUTH_ENABLED ? () => { void refreshRealSessions(); } : undefined}
+            onRevokeSession={REAL_AUTH_ENABLED ? (sessionId) => { void revokeRealSession(sessionId); } : undefined}
             onOpenStates={() => setScreen('states')}
-            onSignOut={signOutPreview}
-            onReset={resetPreview}
+            onSignOut={REAL_AUTH_ENABLED ? () => { void signOutReal(); } : signOutPreview}
+            onReset={resetLocalData}
           />
         </Suspense>
       ) : null}
