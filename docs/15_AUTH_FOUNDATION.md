@@ -2,7 +2,7 @@
 
 Дата начала: 2026-08-21
 Ветка: `feat/auth-foundation-v1`
-Статус: product/security foundation, **без реальной авторизации и backend**.
+Статус: product/security/frontend foundation, **без реальной авторизации и backend**.
 
 ## Утверждённый app-flow — 2026-08-21
 
@@ -13,12 +13,12 @@
 3. после успешного входного шага — существующая Smart Entry с реальными этапами подготовки;
 4. после Smart Entry приложение открывает **новый пустой чат**, а не Главную;
 5. основная навигация: `Главная · Чат · История · Профиль`;
-6. `Главная` — информационно-продуктовый центр: о проекте, как пользоваться, конфиденциальность/безопасность, статус продукта, полезная информация и быстрый доступ к недавним диалогам;
+6. `Главная` — информационно-продуктовый центр;
 7. `Чат` — основной рабочий сценарий;
-8. `История` — управление локальными/в будущем серверными диалогами;
+8. `История` — управление диалогами;
 9. `Профиль` — профиль, настройки, безопасность и account lifecycle.
 
-Splash — **не loading и не фальшивый progress**. Это короткая брендовая заставка. Smart Entry остаётся единственным системным loading-flow и продолжает отражать реальные задачи подготовки.
+Splash — **не loading и не фальшивый progress**. Smart Entry остаётся единственным системным loading-flow и отражает реальные задачи подготовки.
 
 ## Цель этапа
 
@@ -30,22 +30,57 @@ Splash — **не loading и не фальшивый progress**. Это коро
 
 - не создаёт настоящую учётную запись;
 - не создаёт серверную сессию;
-- запрашивает только отображаемое имя для локального preview;
-- хранит его только в browser preview;
-- не запрашивает email, телефон, пароль, токены или другие секреты;
-- явно сообщает пользователю, что защищённая production-авторизация ещё не подключена.
+- использует только один локальный preview-профиль на browser storage;
+- первая регистрация требует валидное отображаемое имя;
+- системное имя `Пользователь ARVELIS` зарезервировано и не может быть пользовательским именем;
+- повторный вход показывает найденный локальный профиль вместо повторного создания профиля;
+- повторная регистрация поверх существующего локального профиля блокируется, чтобы не смешивать два аккаунта в одном localStorage;
+- выход из preview-профиля возвращает в app-entry flow без удаления локальной истории;
+- изменение имени в Профиле использует ту же domain-валидацию, что и регистрация;
+- offline-state явно отделяет локальный preview от будущей сетевой авторизации;
+- не запрашивает email, телефон, пароль, OTP, токены или другие секреты;
+- не имитирует Google/Apple/Yandex/другие provider login как работающие.
 
 Это **frontend auth foundation**, а не production auth.
 
+## Реализованные auth contracts
+
+`src/auth/contracts.ts` определяет provider-independent frontend port:
+
+- доступные auth methods;
+- session restore;
+- start auth flow;
+- complete challenge;
+- sign out;
+- revoke session;
+- account/session/challenge/failure types.
+
+`src/auth/reducer.ts` задаёт детерминированную auth UI state machine.
+
+`src/auth/presentation.ts` отделяет безопасный пользовательский error copy от сырых backend/provider errors.
+
+`src/auth/AuthStatusPanel.tsx` реализует общие UX-состояния:
+
+- checking session;
+- submitting;
+- challenge;
+- session expired;
+- offline;
+- rate limited;
+- safe error presentation.
+
+Эти состояния доступны во внутреннем QA-screen и **не выдаются за реально работающую серверную авторизацию**.
+
 ## Зафиксированные security constraints
 
-- реальные роли и разрешения должны проверяться сервером;
-- секреты и session secrets не хранятся в frontend-коде;
+- реальные роли и разрешения проверяются сервером;
+- секреты и session secrets не хранятся во frontend-коде или localStorage;
 - пользовательские данные минимизируются;
-- чувствительные данные не должны попадать в логи без необходимости;
+- чувствительные данные не попадают в логи без необходимости;
 - должны существовать logout/session revoke, account deletion, data export/delete и recovery policy;
 - требования к персональным данным и регионам хранения проверяются до публичного запуска;
-- frontend не считается источником истины для access control.
+- frontend не является источником истины для access control;
+- ARVELIS CONTROL использует отдельную owner/admin auth boundary и не делит user-session с ARVELIS AI.
 
 ## OPEN — решения, которые нельзя придумывать как утверждённые
 
@@ -56,11 +91,17 @@ Splash — **не loading и не фальшивый progress**. Это коро
 3. Допустимы ли внешние identity providers и какие именно с учётом работы в России без VPN.
 4. Нужна ли обязательная верификация email/телефона до использования продукта.
 5. Возрастные ограничения и требования к согласию/политике конфиденциальности.
-6. Production session model: cookie/session token, rotation, TTL, device sessions, revoke.
+6. Production session model и API topology.
 7. Уровни доступа/роли — сейчас `OPEN` по `docs/06_MVP_GATES.md`.
 8. Account recovery policy.
 9. Account deletion/export/retention contract.
 10. Anti-abuse controls: rate limiting, credential stuffing protection, suspicious login handling.
+
+## Архитектурные документы текущего этапа
+
+- `docs/20_AUTH_ARCHITECTURE.md` — provider-independent auth architecture candidate;
+- `docs/21_AUTH_DATA_MODEL.md` — минимальные Account / Identity / Session / Challenge / Security Event сущности;
+- `docs/22_IPHONE_VIDEO_QA_2026-08-21.md` — фактический iPhone video-audit app-entry/auth flow.
 
 ## Безопасное направление UI до утверждения backend
 
@@ -68,7 +109,7 @@ Splash — **не loading и не фальшивый progress**. Это коро
 
 - Splash / Sign in / Create account information architecture;
 - display name onboarding;
-- loading/error/offline states;
+- loading/error/offline/rate-limit/session-expired states;
 - form accessibility, keyboard/autofill behavior, touch targets;
 - privacy/security explanatory copy;
 - account/security screen layout без имитации работающих server sessions.
@@ -84,19 +125,28 @@ Splash — **не loading и не фальшивый progress**. Это коро
 
 ## Definition of Done для frontend auth foundation
 
-Этап можно считать готовым к следующему решению, когда:
+Текущая реализация закрывает source/UI foundation по следующим пунктам:
 
-- Splash → Auth → Smart Entry → New Chat последователен на iPhone/Android/desktop;
-- Preview и future production auth визуально/семантически не смешиваются;
-- все auth states определены: initial, validation, loading, error, offline, rate-limit, success, session-expired;
-- определён future auth interface между frontend и backend без привязки к одному provider;
-- определены необходимые account/session сущности на уровне contract, но без преждевременной production schema;
-- security/privacy open decisions вынесены отдельно и не маскируются mock-логикой.
+- provider-independent interface — готов;
+- account/session entities candidate — готов;
+- auth UI states — определены и имеют reusable component;
+- локальная registration/sign-in semantics — разделены;
+- shared profile-name validation — готова;
+- preview sign-out без удаления данных — готов;
+- iPhone first-paint/auth copy проблемы из video-QA — исправлены в коде;
+- internal auth-state QA — добавлен.
 
-## Следующий этап после текущего UI-pass
+Остаются фактические runtime gates:
 
-1. фактическая проверка нового app-entry flow;
-2. отдельный проход по `Главной`;
-3. отдельный проход по `Профилю` и account/security UX;
-4. затем решение по реальному способу авторизации и backend contract;
-5. AI не подключается до закрытия соответствующих MVP gates.
+- повторный iPhone smoke после последних изменений;
+- Android/desktop smoke;
+- repository typecheck/build при доступном runner;
+- выбор production auth method/provider/backend — отдельное решение.
+
+## Следующий этап после frontend auth foundation
+
+1. утвердить production identifier/auth method;
+2. выбрать backend/session topology и инфраструктуру;
+3. подключить реальную server-side auth только после security/privacy review;
+4. отдельно пройти Профиль/account-security UX с реальными session capabilities;
+5. AI не подключать до закрытия соответствующих MVP gates.
