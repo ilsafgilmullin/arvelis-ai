@@ -18,6 +18,8 @@
     "src/auth/runtimeGuards.ts",
     "src/auth/guardedGateway.ts",
     "src/auth/externalFlow.ts",
-    "tests/auth-core-smoke.ts"
+    "src/auth/previewProfile.ts",
+    "tests/auth-core-smoke.ts",
+    "tests/preview-profile-smoke.ts"
   ]
 }
