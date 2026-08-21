@@ -15,6 +15,27 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>ARVELIS AI</title>
+    <script>
+      (() => {
+        const url = new URL(window.location.href);
+        const presentationStyle = url.searchParams.get('presentationStyle');
+
+        if (url.pathname !== '/' || !presentationStyle) return;
+
+        const malformedControl = presentationStyle.match(/^(.*)\/control\/?$/i);
+        if (!malformedControl) return;
+
+        const restoredStyle = malformedControl[1];
+        if (restoredStyle) {
+          url.searchParams.set('presentationStyle', restoredStyle);
+        } else {
+          url.searchParams.delete('presentationStyle');
+        }
+
+        url.pathname = '/control/';
+        window.location.replace(url.toString());
+      })();
+    </script>
     <style>
       #arvelis-preboot{position:fixed;inset:0;z-index:2147483647;display:grid;grid-template-rows:1fr auto;place-items:center;min-width:320px;min-height:100vh;min-height:100dvh;padding:max(28px,env(safe-area-inset-top)) 24px max(24px,env(safe-area-inset-bottom));box-sizing:border-box;background:radial-gradient(circle at 50% 44%,rgba(214,170,70,.07),transparent 29%),#090a0c;color:#f4f2ec;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif}
       #arvelis-preboot .preboot-lockup{align-self:center;display:grid;justify-items:center;transform:translateY(3vh)}
