@@ -15,9 +15,19 @@ export type AuthRuntimeConfig = {
   cookieSecureMode: CookieSecureMode;
 };
 
+const CLOSED_TEST_SMTP_HOST = 'smtp.yandex.ru';
+const CLOSED_TEST_SMTP_MAILBOX = 'arvelis.auth@yandex.ru';
+
 function required(name: string): string {
   const value = process.env[name];
   if (!value || value.trim() !== value) throw new Error(`Missing or invalid ${name}`);
+  return value;
+}
+
+function optionalTrimmed(name: string, fallback: string): string {
+  const value = process.env[name];
+  if (value === undefined || value === '') return fallback;
+  if (value.trim() !== value) throw new Error(`Invalid ${name}`);
   return value;
 }
 
@@ -68,12 +78,12 @@ function loadDatabaseConfig(): AuthDatabaseConfig {
 function loadSmtpConfig(): SmtpEmailOtpDeliveryConfig {
   const port = parsePort(process.env.SMTP_PORT, 465);
   return {
-    host: required('SMTP_HOST'),
+    host: optionalTrimmed('SMTP_HOST', CLOSED_TEST_SMTP_HOST),
     port,
     secure: parseBoolean(process.env.SMTP_SECURE, port === 465),
-    username: required('SMTP_USERNAME'),
+    username: optionalTrimmed('SMTP_USERNAME', CLOSED_TEST_SMTP_MAILBOX),
     password: required('SMTP_PASSWORD'),
-    from: required('SMTP_FROM'),
+    from: optionalTrimmed('SMTP_FROM', CLOSED_TEST_SMTP_MAILBOX),
   };
 }
 
