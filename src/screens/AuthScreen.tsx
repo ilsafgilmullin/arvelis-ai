@@ -5,6 +5,7 @@ import {
   PREVIEW_PROFILE_NAME_MAX_LENGTH,
   isDefaultPreviewProfileName,
   normalizePreviewProfileName,
+  resolveStoredPreviewProfileName,
   validatePreviewProfileName,
 } from '../auth/previewProfile';
 
@@ -17,8 +18,8 @@ export function AuthScreen({
   initialName: string;
   onContinue: (name: string) => void;
 }) {
-  const initialProfileName = normalizePreviewProfileName(initialName);
-  const hasLocalProfile = Boolean(initialProfileName) && !isDefaultPreviewProfileName(initialProfileName);
+  const initialProfileName = resolveStoredPreviewProfileName(initialName);
+  const hasLocalProfile = !isDefaultPreviewProfileName(initialProfileName);
   const [mode, setMode] = useState<AuthMode>(hasLocalProfile ? 'signin' : 'signup');
   const [name, setName] = useState(hasLocalProfile ? initialProfileName : '');
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
