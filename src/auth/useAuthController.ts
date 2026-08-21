@@ -5,12 +5,11 @@ import type {
   AuthGateway,
   AuthIntent,
   AuthMethodDescriptor,
+  AuthResourceStatus,
   AuthSessionSummary,
   AuthStartRequest,
 } from './contracts';
 import { authUiReducer, initialAuthUiState } from './reducer';
-
-export type AuthResourceStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 function unexpectedFailure(): AuthFailure {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
