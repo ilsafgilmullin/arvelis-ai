@@ -2,7 +2,12 @@ export type AuthIntent = 'sign_in' | 'sign_up';
 
 export type AuthResourceStatus = 'idle' | 'loading' | 'ready' | 'error';
 
-export type AuthMethodKind = 'identifier' | 'external' | 'passkey';
+/**
+ * Executable v1 auth capabilities only.
+ * Passkeys/WebAuthn remain an architectural candidate until a dedicated
+ * browser/native request-response contract is approved and implemented.
+ */
+export type AuthMethodKind = 'identifier' | 'external';
 
 export type AuthMethodDescriptor = {
   id: string;
@@ -41,7 +46,7 @@ export type AuthSessionSummary = {
 export type AuthChallenge = {
   id: string;
   methodId: string;
-  kind: 'code' | 'external_redirect' | 'passkey';
+  kind: 'code' | 'external_redirect';
   maskedDestination?: string;
   expiresAt?: string;
   redirectUrl?: string;
