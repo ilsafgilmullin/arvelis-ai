@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { ArrowIcon, ChatIcon, SearchIcon, TrashIcon } from '../components/Icons';
+import { ArrowIcon, SearchIcon, TrashIcon } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
 import { CHAT_SEARCH_MAX_CHARS } from '../domain/chatPolicy';
 import {
@@ -25,12 +25,10 @@ export function HistoryScreen({
   threads,
   onOpen,
   onDelete,
-  onNewChat,
 }: {
   threads: DemoThread[];
   onOpen: (threadId: string) => void;
   onDelete: (threadId: string) => void;
-  onNewChat: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [pendingDelete, setPendingDelete] = useState<DemoThread | null>(null);
@@ -135,14 +133,8 @@ export function HistoryScreen({
           <div className="history-v3__empty">
             <p className="section-kicker">{hasQuery ? 'ПОИСК' : 'ИСТОРИЯ'}</p>
             <h2>{hasQuery ? 'Ничего не найдено' : 'Диалогов пока нет'}</h2>
-            <p>{hasQuery ? 'Попробуйте изменить запрос или очистить поиск.' : 'Начните новый чат — после первого сообщения разговор появится здесь.'}</p>
-            {hasQuery ? (
-              <button className="button button--secondary" type="button" onClick={() => setQuery('')}>Очистить поиск</button>
-            ) : (
-              <button className="button button--primary history-v3__new-chat" type="button" onClick={onNewChat}>
-                <ChatIcon />Новый чат
-              </button>
-            )}
+            <p>{hasQuery ? 'Попробуйте изменить запрос или очистить поиск.' : 'Начните новый чат во вкладке «Чат» — после первого сообщения разговор появится здесь.'}</p>
+            {hasQuery ? <button className="button button--secondary" type="button" onClick={() => setQuery('')}>Очистить поиск</button> : null}
           </div>
         )}
       </section>
