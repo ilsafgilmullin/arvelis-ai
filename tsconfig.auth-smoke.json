@@ -19,7 +19,11 @@
     "src/auth/guardedGateway.ts",
     "src/auth/externalFlow.ts",
     "src/auth/previewProfile.ts",
+    "src/types.ts",
+    "src/data/demo.ts",
+    "src/lib/demoStorage.ts",
     "tests/auth-core-smoke.ts",
-    "tests/preview-profile-smoke.ts"
+    "tests/preview-profile-smoke.ts",
+    "tests/demo-storage-profile-smoke.ts"
   ]
 }
