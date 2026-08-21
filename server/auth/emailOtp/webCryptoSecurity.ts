@@ -10,6 +10,18 @@ function toHex(bytes: Uint8Array): string {
   return output;
 }
 
+function fromHex(value: string): Uint8Array | null {
+  if (!value || value.length % 2 !== 0 || !/^[a-f0-9]+$/i.test(value)) return null;
+  const bytes = new Uint8Array(value.length / 2);
+  for (let index = 0; index < bytes.length; index += 1) {
+    const pair = value.slice(index * 2, index * 2 + 2);
+    const parsed = Number.parseInt(pair, 16);
+    if (!Number.isFinite(parsed)) return null;
+    bytes[index] = parsed;
+  }
+  return bytes;
+}
+
 function randomBytes(length: number): Uint8Array {
   const bytes = new Uint8Array(length);
   globalThis.crypto.getRandomValues(bytes);
@@ -29,6 +41,10 @@ function randomInteger(maxExclusive: number): number {
     const value = buffer[0];
     if (value !== undefined && value < cutoff) return value % maxExclusive;
   }
+}
+
+function otpPayload(input: { challengeId: string; email: string; code: string }): Uint8Array {
+  return encoder.encode(`otp:v1\0${input.challengeId}\0${input.email}\0${input.code}`);
 }
 
 /**
@@ -54,7 +70,7 @@ export class WebCryptoEmailOtpSecurity implements EmailOtpSecurityPort {
         keyMaterial,
         { name: 'HMAC', hash: 'SHA-256' },
         false,
-        ['sign'],
+        ['sign', 'verify'],
       );
     } finally {
       keyMaterial.fill(0);
@@ -76,27 +92,42 @@ export class WebCryptoEmailOtpSecurity implements EmailOtpSecurityPort {
 
   async macCode(input: { challengeId: string; email: string; code: string }): Promise<string> {
     const key = await this.keyPromise;
-    const payload = encoder.encode(`otp:v1\0${input.challengeId}\0${input.email}\0${input.code}`);
-    const signature = await globalThis.crypto.subtle.sign('HMAC', key, payload);
-    payload.fill(0);
-    return toHex(new Uint8Array(signature));
+    const payload = otpPayload(input);
+    try {
+      const signature = await globalThis.crypto.subtle.sign('HMAC', key, payload);
+      return toHex(new Uint8Array(signature));
+    } finally {
+      payload.fill(0);
+    }
+  }
+
+  async verifyCodeMac(input: {
+    challengeId: string;
+    email: string;
+    code: string;
+    expectedMac: string;
+  }): Promise<boolean> {
+    const signature = fromHex(input.expectedMac);
+    if (!signature) return false;
+
+    const key = await this.keyPromise;
+    const payload = otpPayload(input);
+    try {
+      return await globalThis.crypto.subtle.verify('HMAC', key, signature, payload);
+    } finally {
+      payload.fill(0);
+      signature.fill(0);
+    }
   }
 
   async derivePrivacyKey(scope: EmailOtpRateLimitScope, value: string): Promise<string> {
     const key = await this.keyPromise;
     const payload = encoder.encode(`rate:v1\0${scope}\0${value}`);
-    const signature = await globalThis.crypto.subtle.sign('HMAC', key, payload);
-    payload.fill(0);
-    return toHex(new Uint8Array(signature));
-  }
-
-  equalsMac(left: string, right: string): boolean {
-    if (left.length !== right.length || left.length === 0) return false;
-
-    let mismatch = 0;
-    for (let index = 0; index < left.length; index += 1) {
-      mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
+    try {
+      const signature = await globalThis.crypto.subtle.sign('HMAC', key, payload);
+      return toHex(new Uint8Array(signature));
+    } finally {
+      payload.fill(0);
     }
-    return mismatch === 0;
   }
 }
