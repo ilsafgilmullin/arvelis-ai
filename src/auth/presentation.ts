@@ -27,6 +27,16 @@ const failureCopy: Record<AuthFailureCode, AuthFailurePresentation> = {
     description: 'Подождите немного перед следующей попыткой.',
     retryable: true,
   },
+  account_exists: {
+    title: 'Аккаунт уже существует',
+    description: 'Этот email уже связан с ARVELIS AI. Перейдите ко входу и получите новый код.',
+    retryable: true,
+  },
+  account_not_found: {
+    title: 'Аккаунт не найден',
+    description: 'Для этого email ещё нет аккаунта ARVELIS AI. Перейдите к регистрации.',
+    retryable: true,
+  },
   account_locked: {
     title: 'Доступ временно ограничен',
     description: 'Для защиты аккаунта вход временно ограничен. Используйте восстановление доступа или обратитесь в поддержку.',
