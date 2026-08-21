@@ -1,4 +1,4 @@
-run = "npm install --include=dev --no-package-lock --no-audit --no-fund && VITE_REAL_AUTH_ENABLED=false npm run auth:verify-setup && VITE_REAL_AUTH_ENABLED=true npm run dev:auth"
+run = "npm install --include=dev --no-package-lock --no-audit --no-fund && npm run dev"
 entrypoint = "index.html"
 modules = ["nodejs-22"]
 
