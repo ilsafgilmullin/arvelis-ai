@@ -147,6 +147,23 @@
 - Account, Session и frontend по-прежнему не зависят от Яндекса: email delivery остаётся за `EmailOtpDeliveryPort` / generic SMTP adapter.
 - Обычная Яндекс Почта утверждена только для development/closed testing. Production transactional-email provider остаётся `OPEN`.
 
+## 2026-08-21 — Бесплатная БД для закрытого auth-теста
+
+Для текущего development/closed-test этапа выбран **SQLite через встроенный `node:sqlite`**.
+
+- Базовый test runtime: `AUTH_DB_PROVIDER=sqlite`.
+- Файл по умолчанию: `.data/arvelis-auth.sqlite`.
+- Внешний DB account, отдельный cloud database и платный DB-сервис для закрытого теста не требуются.
+- SQLite adapter реализует те же Account / Email Identity / OTP Challenge / Rate Limit / Session contracts, что и PostgreSQL adapter.
+- PostgreSQL adapter не удаляется и остаётся заменяемым вариантом для будущего production persistence.
+- SQLite-файл и WAL/SHM исключены из Git и не должны попадать в GitHub, чат или публичные артефакты.
+- Это решение относится только к development/closed testing. Локальный filesystem опубликованного Replit deployment не считается production-persistent storage.
+- Production DB provider/region, backups, retention, migration path и требования по персональным данным остаются `OPEN`.
+
+Основание: пользователь потребовал убрать обязательные платные сервисы на текущем тестовом этапе; SQLite позволяет проверить реальную регистрацию и server session без внешней БД, сохраняя provider-independent persistence boundary.
+
+Следствие: до production ARVELIS обязан перейти на отдельно утверждённое persistent storage решение; текущий SQLite-файл нельзя выдавать за production DB.
+
 ## 2026-08-21 — ARVELIS CONTROL
 
 Утверждено направление отдельного административного продукта `ARVELIS CONTROL` для владельца/будущих администраторов.
