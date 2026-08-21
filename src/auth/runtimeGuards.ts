@@ -23,12 +23,14 @@ const failureCodes = new Set<AuthFailureCode>([
   'unknown',
 ]);
 
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
+
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isBoundedString(value: unknown, maxLength: number, allowEmpty = false): value is string {
-  if (typeof value !== 'string' || value.length > maxLength) return false;
+  if (typeof value !== 'string' || value.length > maxLength || CONTROL_CHARACTER_PATTERN.test(value)) return false;
   return allowEmpty || value.trim().length > 0;
 }
 
@@ -36,8 +38,20 @@ function isOptionalBoundedString(value: unknown, maxLength: number): value is st
   return value === undefined || isBoundedString(value, maxLength, true);
 }
 
+function parseTimestamp(value: unknown): number | null {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 64) return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
 function isIsoLikeDate(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0 && value.length <= 64 && Number.isFinite(Date.parse(value));
+  return parseTimestamp(value) !== null;
+}
+
+function isForwardTimeWindow(createdAt: unknown, expiresAt: unknown): boolean {
+  const created = parseTimestamp(createdAt);
+  const expires = parseTimestamp(expiresAt);
+  return created !== null && expires !== null && expires > created;
 }
 
 export function isSecureAuthorizationUrl(value: unknown): value is string {
@@ -45,7 +59,11 @@ export function isSecureAuthorizationUrl(value: unknown): value is string {
 
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && Boolean(url.hostname);
+    return url.protocol === 'https:'
+      && Boolean(url.hostname)
+      && !url.username
+      && !url.password
+      && !url.hash;
   } catch {
     return false;
   }
@@ -101,20 +119,19 @@ export function isAuthSession(value: unknown): value is AuthSession {
 
   return isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)
     && isAuthAccount(value.account)
-    && isIsoLikeDate(value.createdAt)
-    && isIsoLikeDate(value.expiresAt);
+    && isForwardTimeWindow(value.createdAt, value.expiresAt);
 }
 
 export function isAuthSessionSummary(value: unknown): value is AuthSessionSummary {
   if (!isRecord(value)) return false;
+  if (!isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)) return false;
+  if (typeof value.current !== 'boolean') return false;
+  if (!isForwardTimeWindow(value.createdAt, value.expiresAt)) return false;
+  if (value.lastSeenAt !== undefined && !isIsoLikeDate(value.lastSeenAt)) return false;
+  if (!isOptionalBoundedString(value.deviceLabel, AUTH_PROTOCOL_LIMITS.deviceLabelLength)) return false;
+  if (!isOptionalBoundedString(value.browserLabel, AUTH_PROTOCOL_LIMITS.browserLabelLength)) return false;
 
-  return isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)
-    && typeof value.current === 'boolean'
-    && isIsoLikeDate(value.createdAt)
-    && isIsoLikeDate(value.expiresAt)
-    && (value.lastSeenAt === undefined || isIsoLikeDate(value.lastSeenAt))
-    && isOptionalBoundedString(value.deviceLabel, AUTH_PROTOCOL_LIMITS.deviceLabelLength)
-    && isOptionalBoundedString(value.browserLabel, AUTH_PROTOCOL_LIMITS.browserLabelLength);
+  return true;
 }
 
 export function normalizeAuthSessionSummaries(value: unknown): AuthSessionSummary[] {
@@ -158,5 +175,10 @@ export function isAuthFailure(value: unknown): value is AuthFailure {
   if (!isBoundedString(value.message, AUTH_PROTOCOL_LIMITS.failureMessageLength, true)) return false;
 
   return value.retryAfterSeconds === undefined
-    || (typeof value.retryAfterSeconds === 'number' && Number.isFinite(value.retryAfterSeconds) && value.retryAfterSeconds >= 0);
+    || (
+      typeof value.retryAfterSeconds === 'number'
+      && Number.isFinite(value.retryAfterSeconds)
+      && value.retryAfterSeconds >= 0
+      && value.retryAfterSeconds <= AUTH_PROTOCOL_LIMITS.retryAfterSeconds
+    );
 }
