@@ -54,17 +54,23 @@ function assertUniqueIds(items: ReadonlyArray<{ id: string }>, operation: string
 }
 
 function assertStartRequest(request: AuthStartRequest): AuthStartRequest {
-  const methodId = request.methodId.trim();
-  const identifier = request.identifier?.trim();
+  const rawMethodId = request.methodId;
+  const rawIdentifier = request.identifier;
 
   if ((request.intent !== 'sign_in' && request.intent !== 'sign_up')
-    || !methodId
+    || containsUnsafeProtocolCharacters(rawMethodId)
+    || (rawIdentifier !== undefined && containsUnsafeProtocolCharacters(rawIdentifier))) {
+    throw new AuthProtocolError('start-request');
+  }
+
+  const methodId = rawMethodId.trim();
+  const identifier = rawIdentifier?.trim();
+
+  if (!methodId
     || methodId.length > AUTH_PROTOCOL_LIMITS.methodIdLength
-    || containsUnsafeProtocolCharacters(methodId)
     || (identifier !== undefined && (
       !identifier
       || identifier.length > AUTH_PROTOCOL_LIMITS.identifierLength
-      || containsUnsafeProtocolCharacters(identifier)
     ))) {
     throw new AuthProtocolError('start-request');
   }
@@ -75,15 +81,18 @@ function assertStartRequest(request: AuthStartRequest): AuthStartRequest {
 }
 
 function assertCompleteRequest(request: AuthCompleteRequest): AuthCompleteRequest {
+  if (containsUnsafeProtocolCharacters(request.challengeId)
+    || containsUnsafeProtocolCharacters(request.response)) {
+    throw new AuthProtocolError('complete-request');
+  }
+
   const challengeId = request.challengeId.trim();
   const response = request.response.trim();
 
   if (!challengeId
     || challengeId.length > AUTH_PROTOCOL_LIMITS.idLength
-    || containsUnsafeProtocolCharacters(challengeId)
     || !response
-    || response.length > AUTH_PROTOCOL_LIMITS.challengeResponseLength
-    || containsUnsafeProtocolCharacters(response)) {
+    || response.length > AUTH_PROTOCOL_LIMITS.challengeResponseLength) {
     throw new AuthProtocolError('complete-request');
   }
 
@@ -189,10 +198,12 @@ export function createGuardedAuthGateway(transport: AuthTransport): AuthGateway 
     },
 
     async revokeSession(sessionId) {
+      if (containsUnsafeProtocolCharacters(sessionId)) {
+        throw new AuthProtocolError('revoke-session');
+      }
+
       const normalizedId = sessionId.trim();
-      if (!normalizedId
-        || normalizedId.length > AUTH_PROTOCOL_LIMITS.idLength
-        || containsUnsafeProtocolCharacters(normalizedId)) {
+      if (!normalizedId || normalizedId.length > AUTH_PROTOCOL_LIMITS.idLength) {
         throw new AuthProtocolError('revoke-session');
       }
       await transport.revokeSession(normalizedId);
