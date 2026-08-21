@@ -33,6 +33,10 @@ function isBoundedString(value: unknown, maxLength: number, allowEmpty = false):
   return allowEmpty || value.trim().length > 0;
 }
 
+function isCanonicalProtocolId(value: unknown, maxLength: number): value is string {
+  return isBoundedString(value, maxLength) && value.trim() === value;
+}
+
 function isOptionalNonEmptyBoundedString(value: unknown, maxLength: number): value is string | undefined {
   return value === undefined || isBoundedString(value, maxLength);
 }
@@ -82,7 +86,7 @@ export function isSecureAuthorizationUrl(value: unknown): value is string {
 
 export function isAuthMethodDescriptor(value: unknown): value is AuthMethodDescriptor {
   if (!isRecord(value)) return false;
-  if (!isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.methodIdLength)) return false;
+  if (!isCanonicalProtocolId(value.id, AUTH_PROTOCOL_LIMITS.methodIdLength)) return false;
   if (!isBoundedString(value.label, AUTH_PROTOCOL_LIMITS.labelLength) || typeof value.enabled !== 'boolean') return false;
   if (value.kind !== 'identifier' && value.kind !== 'external') return false;
 
@@ -121,21 +125,21 @@ export function isAuthAccount(value: unknown): value is AuthAccount {
   if (value.emailVerified && !isBoundedString(value.primaryEmail, AUTH_PROTOCOL_LIMITS.emailLength)) return false;
   if (value.phoneVerified && !isBoundedString(value.primaryPhone, AUTH_PROTOCOL_LIMITS.phoneLength)) return false;
 
-  return isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)
+  return isCanonicalProtocolId(value.id, AUTH_PROTOCOL_LIMITS.idLength)
     && isBoundedString(value.displayName, AUTH_PROTOCOL_LIMITS.displayNameLength);
 }
 
 export function isAuthSession(value: unknown): value is AuthSession {
   if (!isRecord(value)) return false;
 
-  return isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)
+  return isCanonicalProtocolId(value.id, AUTH_PROTOCOL_LIMITS.idLength)
     && isAuthAccount(value.account)
     && isForwardTimeWindow(value.createdAt, value.expiresAt);
 }
 
 export function isAuthSessionSummary(value: unknown): value is AuthSessionSummary {
   if (!isRecord(value)) return false;
-  if (!isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)) return false;
+  if (!isCanonicalProtocolId(value.id, AUTH_PROTOCOL_LIMITS.idLength)) return false;
   if (typeof value.current !== 'boolean') return false;
   if (!isForwardTimeWindow(value.createdAt, value.expiresAt)) return false;
   if (value.lastSeenAt !== undefined && !isTimestampInsideWindow(value.lastSeenAt, value.createdAt, value.expiresAt)) return false;
@@ -163,8 +167,8 @@ export function normalizeAuthSessionSummaries(value: unknown): AuthSessionSummar
 
 export function isAuthChallenge(value: unknown): value is AuthChallenge {
   if (!isRecord(value)) return false;
-  if (!isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)) return false;
-  if (!isBoundedString(value.methodId, AUTH_PROTOCOL_LIMITS.methodIdLength)) return false;
+  if (!isCanonicalProtocolId(value.id, AUTH_PROTOCOL_LIMITS.idLength)) return false;
+  if (!isCanonicalProtocolId(value.methodId, AUTH_PROTOCOL_LIMITS.methodIdLength)) return false;
   if (value.expiresAt !== undefined && !isIsoLikeDate(value.expiresAt)) return false;
 
   if (value.kind === 'code') {
