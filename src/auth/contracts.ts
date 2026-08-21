@@ -122,9 +122,11 @@ export type AuthUiState =
   | { status: 'checking_session' }
   | { status: 'signed_out'; intent: AuthIntent }
   | { status: 'submitting'; intent: AuthIntent; methodId: string }
-  | { status: 'challenge'; intent: AuthIntent; challenge: AuthChallenge }
+  | { status: 'challenge'; intent: AuthIntent; challenge: AuthChallenge; error?: AuthFailure }
   | { status: 'verifying'; intent: AuthIntent; challenge: AuthCodeChallenge }
   | { status: 'authenticated'; session: AuthSession }
+  | { status: 'signing_out'; session: AuthSession }
+  | { status: 'sign_out_error'; session: AuthSession; error: AuthFailure }
   | { status: 'session_expired' }
   | { status: 'offline' }
   | { status: 'rate_limited'; retryAfterSeconds?: number }
