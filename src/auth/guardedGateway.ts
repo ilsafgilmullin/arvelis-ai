@@ -9,6 +9,7 @@ import type {
   AuthStartResult,
 } from './contracts';
 import { AUTH_PROTOCOL_LIMITS } from './protocolLimits';
+import { containsUnsafeProtocolCharacters } from './protocolText';
 import {
   isAuthChallenge,
   isAuthFailure,
@@ -19,8 +20,6 @@ import {
 } from './runtimeGuards';
 
 type UnknownRecord = Record<string, unknown>;
-
-const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
 
 export interface AuthTransport {
   getMethods(): Promise<unknown>;
@@ -46,10 +45,6 @@ function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function containsControlCharacters(value: string): boolean {
-  return CONTROL_CHARACTER_PATTERN.test(value);
-}
-
 function assertUniqueIds(items: ReadonlyArray<{ id: string }>, operation: string): void {
   const ids = new Set<string>();
   for (const item of items) {
@@ -65,11 +60,11 @@ function assertStartRequest(request: AuthStartRequest): AuthStartRequest {
   if ((request.intent !== 'sign_in' && request.intent !== 'sign_up')
     || !methodId
     || methodId.length > AUTH_PROTOCOL_LIMITS.methodIdLength
-    || containsControlCharacters(methodId)
+    || containsUnsafeProtocolCharacters(methodId)
     || (identifier !== undefined && (
       !identifier
       || identifier.length > AUTH_PROTOCOL_LIMITS.identifierLength
-      || containsControlCharacters(identifier)
+      || containsUnsafeProtocolCharacters(identifier)
     ))) {
     throw new AuthProtocolError('start-request');
   }
@@ -85,10 +80,10 @@ function assertCompleteRequest(request: AuthCompleteRequest): AuthCompleteReques
 
   if (!challengeId
     || challengeId.length > AUTH_PROTOCOL_LIMITS.idLength
-    || containsControlCharacters(challengeId)
+    || containsUnsafeProtocolCharacters(challengeId)
     || !response
     || response.length > AUTH_PROTOCOL_LIMITS.challengeResponseLength
-    || containsControlCharacters(response)) {
+    || containsUnsafeProtocolCharacters(response)) {
     throw new AuthProtocolError('complete-request');
   }
 
@@ -197,7 +192,7 @@ export function createGuardedAuthGateway(transport: AuthTransport): AuthGateway 
       const normalizedId = sessionId.trim();
       if (!normalizedId
         || normalizedId.length > AUTH_PROTOCOL_LIMITS.idLength
-        || containsControlCharacters(normalizedId)) {
+        || containsUnsafeProtocolCharacters(normalizedId)) {
         throw new AuthProtocolError('revoke-session');
       }
       await transport.revokeSession(normalizedId);
