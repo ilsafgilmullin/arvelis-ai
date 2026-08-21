@@ -26,6 +26,7 @@
     "tests/auth-core-smoke.ts",
     "tests/preview-profile-smoke.ts",
     "tests/demo-storage-profile-smoke.ts",
-    "tests/protocol-text-smoke.ts"
+    "tests/protocol-text-smoke.ts",
+    "tests/protocol-shape-smoke.ts"
   ]
 }
