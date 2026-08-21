@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { AccountSecurityPanel } from '../auth/AccountSecurityPanel';
 import { AuthStatusPanel } from '../auth/AuthStatusPanel';
-import type { AuthSession, AuthUiState } from '../auth/contracts';
+import type { AuthResourceStatus, AuthSession, AuthSessionSummary, AuthUiState } from '../auth/contracts';
 import { Topbar } from '../components/Topbar';
 import type { SystemState } from '../types';
 
@@ -26,6 +27,8 @@ type AuthPreviewState =
   | 'rate'
   | 'error';
 
+type AccountSecurityPreviewState = 'disconnected' | 'idle' | 'loading' | 'error' | 'empty' | 'ready';
+
 const authPreviewLabels: Record<AuthPreviewState, string> = {
   checking: 'Проверка',
   submitting: 'Вход',
@@ -39,6 +42,15 @@ const authPreviewLabels: Record<AuthPreviewState, string> = {
   offline: 'Офлайн',
   rate: 'Лимит',
   error: 'Ошибка',
+};
+
+const accountSecurityPreviewLabels: Record<AccountSecurityPreviewState, string> = {
+  disconnected: 'Не подключено',
+  idle: 'Не загружено',
+  loading: 'Загрузка',
+  error: 'Ошибка',
+  empty: 'Пусто',
+  ready: 'Сессии',
 };
 
 const previewCodeChallenge = { id: 'preview-code-challenge', methodId: 'preview-method', kind: 'code' as const };
@@ -59,6 +71,27 @@ const previewSession: AuthSession = {
   createdAt: '2026-08-21T08:00:00.000Z',
   expiresAt: '2026-08-22T08:00:00.000Z',
 };
+
+const previewAccountSessions: AuthSessionSummary[] = [
+  {
+    id: 'preview-current-session',
+    current: true,
+    createdAt: '2026-08-21T08:00:00.000Z',
+    lastSeenAt: '2026-08-21T09:00:00.000Z',
+    expiresAt: '2026-08-22T08:00:00.000Z',
+    deviceLabel: 'Текущее устройство · PREVIEW',
+    browserLabel: 'Браузер · PREVIEW',
+  },
+  {
+    id: 'preview-other-session',
+    current: false,
+    createdAt: '2026-08-20T08:00:00.000Z',
+    lastSeenAt: '2026-08-20T14:00:00.000Z',
+    expiresAt: '2026-08-23T08:00:00.000Z',
+    deviceLabel: 'Дополнительное устройство · PREVIEW',
+    browserLabel: 'Браузер · PREVIEW',
+  },
+];
 
 const authPreviewStates: Record<AuthPreviewState, AuthUiState> = {
   checking: { status: 'checking_session' },
@@ -103,10 +136,33 @@ const authPreviewStates: Record<AuthPreviewState, AuthUiState> = {
   },
 };
 
+function accountSecurityPreviewProps(state: AccountSecurityPreviewState): {
+  connected: boolean;
+  sessions?: AuthSessionSummary[];
+  sessionsStatus?: AuthResourceStatus;
+} {
+  switch (state) {
+    case 'disconnected':
+      return { connected: false };
+    case 'idle':
+      return { connected: true, sessionsStatus: 'idle' };
+    case 'loading':
+      return { connected: true, sessionsStatus: 'loading' };
+    case 'error':
+      return { connected: true, sessionsStatus: 'error' };
+    case 'empty':
+      return { connected: true, sessionsStatus: 'ready', sessions: [] };
+    case 'ready':
+      return { connected: true, sessionsStatus: 'ready', sessions: previewAccountSessions };
+  }
+}
+
 export function StatesScreen() {
   const [state, setState] = useState<SystemState>('loading');
   const [authState, setAuthState] = useState<AuthPreviewState>('checking');
+  const [accountSecurityState, setAccountSecurityState] = useState<AccountSecurityPreviewState>('disconnected');
   const selected = content[state];
+  const accountSecurityProps = accountSecurityPreviewProps(accountSecurityState);
 
   return (
     <div className="content-page">
@@ -154,6 +210,26 @@ export function StatesScreen() {
           ))}
         </div>
         <AuthStatusPanel state={authPreviewStates[authState]} />
+      </section>
+
+      <section className="auth-state-qa" aria-labelledby="account-security-state-heading">
+        <p className="section-kicker">ACCOUNT SECURITY · PREVIEW</p>
+        <h2 className="state-section-title" id="account-security-state-heading">Устройства и сессии</h2>
+        <p className="auth-state-qa__copy">Это только QA-представление будущего server-session UI. Список ниже не является данными реального аккаунта, а действия отзыва сессии намеренно не подключены.</p>
+        <div className="state-tabs" role="group" aria-label="Состояния устройств и сессий">
+          {(Object.keys(accountSecurityPreviewLabels) as AccountSecurityPreviewState[]).map((item) => (
+            <button
+              type="button"
+              aria-pressed={accountSecurityState === item}
+              key={item}
+              className={accountSecurityState === item ? 'state-tab state-tab--active' : 'state-tab'}
+              onClick={() => setAccountSecurityState(item)}
+            >
+              {accountSecurityPreviewLabels[item]}
+            </button>
+          ))}
+        </div>
+        <AccountSecurityPanel {...accountSecurityProps} />
       </section>
     </div>
   );
