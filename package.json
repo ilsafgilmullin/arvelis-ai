@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
     "dev:auth": "node scripts/dev-with-auth-api.mjs",
+    "auth:readiness": "node scripts/auth-readiness.mjs",
     "start": "vite --host 0.0.0.0 --port 3000",
     "build": "tsc -b && vite build",
     "build:auth-server": "tsc -p tsconfig.server-runtime.json",
