@@ -34,7 +34,7 @@ export class AuthProtocolError extends Error {
   readonly operation: string;
 
   constructor(operation: string) {
-    super(`Invalid auth protocol response: ${operation}`);
+    super(`Auth protocol violation: ${operation}`);
     this.name = 'AuthProtocolError';
     this.operation = operation;
   }
@@ -136,6 +136,10 @@ function parseSessions(value: unknown): AuthSessionSummary[] {
   }
 
   assertUniqueIds(value, 'sessions');
+  if (value.filter((session) => session.current).length > 1) {
+    throw new AuthProtocolError('sessions-current');
+  }
+
   return value;
 }
 
