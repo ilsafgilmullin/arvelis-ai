@@ -26,6 +26,16 @@ export type AuthSession = {
   expiresAt: string;
 };
 
+export type AuthSessionSummary = {
+  id: string;
+  current: boolean;
+  createdAt: string;
+  lastSeenAt?: string;
+  expiresAt: string;
+  deviceLabel?: string;
+  browserLabel?: string;
+};
+
 export type AuthChallenge = {
   id: string;
   methodId: string;
@@ -83,6 +93,7 @@ export interface AuthGateway {
   start(request: AuthStartRequest): Promise<AuthStartResult>;
   complete(request: AuthCompleteRequest): Promise<AuthCompleteResult>;
   signOut(): Promise<void>;
+  listSessions(): Promise<AuthSessionSummary[]>;
   revokeSession(sessionId: string): Promise<void>;
 }
 
