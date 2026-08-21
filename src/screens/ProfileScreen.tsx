@@ -1,4 +1,9 @@
 import { useState } from 'react';
+import {
+  PREVIEW_PROFILE_NAME_MAX_LENGTH,
+  normalizePreviewProfileName,
+  validatePreviewProfileName,
+} from '../auth/previewProfile';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ResetIcon, SignOutIcon, StateIcon } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
@@ -18,13 +23,22 @@ export function ProfileScreen({
 }) {
   const [name, setName] = useState(profileName);
   const [saved, setSaved] = useState(false);
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
-  const normalizedName = name.trim() || 'Пользователь ARVELIS';
+  const normalizedName = normalizePreviewProfileName(name);
   const changed = normalizedName !== profileName;
 
   const save = () => {
+    const error = validatePreviewProfileName(name);
+    if (error) {
+      setValidationMessage(error);
+      setSaved(false);
+      return;
+    }
     if (!changed) return;
+
     onSaveName(normalizedName);
+    setValidationMessage(null);
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1400);
   };
@@ -58,12 +72,19 @@ export function ProfileScreen({
             <input
               aria-label="Отображаемое имя"
               value={name}
-              onChange={(event) => { setName(event.target.value); setSaved(false); }}
-              maxLength={80}
+              onChange={(event) => {
+                setName(event.target.value);
+                setSaved(false);
+                if (validationMessage) setValidationMessage(null);
+              }}
+              maxLength={PREVIEW_PROFILE_NAME_MAX_LENGTH}
               autoComplete="nickname"
+              aria-invalid={Boolean(validationMessage)}
+              aria-describedby={validationMessage ? 'profile-name-error' : undefined}
             />
-            <button className="button button--secondary" type="button" onClick={save} disabled={!changed}>{saved ? 'Сохранено' : 'Сохранить'}</button>
+            <button className="button button--secondary" type="button" onClick={save} disabled={!changed && !validationMessage}>{saved ? 'Сохранено' : 'Сохранить'}</button>
           </div>
+          {validationMessage ? <p className="auth-field-error" id="profile-name-error" role="alert">{validationMessage}</p> : null}
         </div>
 
         <button className="setting-action" type="button" onClick={signOutPreview}>
