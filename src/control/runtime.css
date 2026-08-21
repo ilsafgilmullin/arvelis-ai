@@ -1,0 +1,80 @@
+.control-offline-banner {
+  position: fixed;
+  z-index: 200;
+  top: 0;
+  left: var(--control-sidebar-width);
+  right: 0;
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 7px 14px;
+  border-bottom: 1px solid rgba(217,106,99,.25);
+  background: rgba(52,20,19,.97);
+  color: #e6b0ab;
+  font-size: 9px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.control-offline-banner + .control-shell .control-sidebar {
+  padding-top: 48px;
+}
+
+.control-offline-banner + .control-shell .control-main {
+  padding-top: 34px;
+}
+
+.control-fatal {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+  background: #08090b;
+}
+
+.control-fatal__card {
+  width: min(560px, 100%);
+  padding: clamp(26px, 5vw, 44px);
+  border: 1px solid var(--control-line);
+  border-radius: 18px;
+  background: var(--control-panel);
+}
+
+.control-fatal__card .brand-mark {
+  margin-bottom: 34px;
+}
+
+.control-fatal__card h1 {
+  margin: 10px 0 12px;
+  font-size: clamp(28px, 6vw, 40px);
+  line-height: 1.08;
+  letter-spacing: -.04em;
+  font-weight: 550;
+}
+
+.control-fatal__card > p:not(.control-kicker) {
+  margin: 0;
+  color: var(--control-muted);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.control-fatal__card .control-primary-button {
+  margin-top: 24px;
+}
+
+@media (max-width: 760px) {
+  .control-offline-banner {
+    left: 0;
+    top: 0;
+    padding-top: max(7px, env(safe-area-inset-top));
+  }
+
+  .control-offline-banner + .control-shell .control-main {
+    padding-top: 42px;
+  }
+
+  .control-offline-banner + .control-shell .control-mobile-topbar {
+    top: 42px;
+  }
+}

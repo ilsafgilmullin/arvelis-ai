@@ -5,6 +5,14 @@ const replitHosts = ['.replit.dev', '.repl.co', '.replit.app'];
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      input: {
+        app: 'index.html',
+        control: 'control/index.html',
+      },
+    },
+  },
   server: {
     host: '0.0.0.0',
     port: 3000,
