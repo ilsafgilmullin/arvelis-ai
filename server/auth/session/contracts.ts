@@ -76,6 +76,10 @@ export type SessionAuthenticateResult =
         | 'service_unavailable';
     };
 
+export type SessionListResult =
+  | { ok: true; sessions: SessionSummary[] }
+  | { ok: false; error: 'invalid_request' | 'service_unavailable' };
+
 export interface SessionStore {
   create(record: SessionRecord): Promise<void>;
   findById(sessionId: string): Promise<SessionRecord | null>;
