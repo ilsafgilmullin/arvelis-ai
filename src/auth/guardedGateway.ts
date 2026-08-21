@@ -68,15 +68,16 @@ function assertStartRequest(request: AuthStartRequest): AuthStartRequest {
 
 function assertCompleteRequest(request: AuthCompleteRequest): AuthCompleteRequest {
   const challengeId = request.challengeId.trim();
-  const response = request.response;
+  const response = request.response.trim();
 
   if (!challengeId
     || challengeId.length > AUTH_PROTOCOL_LIMITS.idLength
-    || (response !== undefined && response.length > AUTH_PROTOCOL_LIMITS.challengeResponseLength)) {
+    || !response
+    || response.length > AUTH_PROTOCOL_LIMITS.challengeResponseLength) {
     throw new AuthProtocolError('complete-request');
   }
 
-  return { ...request, challengeId };
+  return { challengeId, response };
 }
 
 function parseStartResult(value: unknown): AuthStartResult {
