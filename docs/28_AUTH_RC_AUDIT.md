@@ -55,6 +55,7 @@ Replit:
 - provider-independent `AuthGateway`;
 - untrusted `AuthTransport` boundary;
 - runtime guards;
+- Unicode protocol-text safety boundary;
 - deterministic auth reducer/state machine;
 - async controller со stale-response protection;
 - code challenge lifecycle;
@@ -121,9 +122,9 @@ Replit:
 
 Исправлено:
 
-- method/session/challenge ids блокируются при control characters;
+- method/session/challenge ids блокируются при unsafe control/format characters;
 - present identifier не может быть blank после trim;
-- identifier/code response блокируются при control characters;
+- identifier/code response проверяются до transport;
 - malformed payload не доходит до transport.
 
 ### 7. Server session/account metadata была недостаточно строгой
@@ -135,7 +136,7 @@ Replit:
 - `expiresAt > createdAt`;
 - `lastSeenAt` должен находиться внутри session window;
 - device/browser labels, если присутствуют, должны быть non-empty;
-- control characters блокируются.
+- unsafe control/format characters блокируются.
 
 ### 8. Runtime JSON нельзя считать доверенным TypeScript-типом
 
@@ -169,13 +170,29 @@ Fail closed для malformed account/session/challenge/failure/method payload.
 
 Исправлено:
 
-- control/format characters проверяются до whitespace normalization;
+- unsafe control/format characters проверяются до whitespace normalization;
 - `DEFAULT_PREVIEW_PROFILE_NAME` вынесен в один source of truth;
 - `resolveStoredPreviewProfileName()` обрабатывает untrusted/legacy storage value;
 - повреждённое имя сбрасывается к системному default, но здоровые threads не удаляются;
 - persistence принимает только canonical пользовательское имя либо internal default reset-state;
 - App/Auth/Home больше не сравнивают системное имя через локальные дубли строк;
 - `AuthScreen` guard-ит existing-profile prop до отображения найденного локального профиля.
+
+### 12. Unicode protocol-text spoofing и trim-bypass
+
+До исправления auth protocol boundary блокировал в основном ASCII C0/DEL. Unicode format controls — например zero-width и bidi override — могли пройти в server-provided labels/display name или outgoing protocol value. Кроме того, outgoing gateway сначала делал `.trim()`, поэтому leading/trailing `\n`/`\t` могли исчезнуть до control-character check.
+
+Исправлено:
+
+- добавлен единый `src/auth/protocolText.ts`;
+- incoming runtime guards и outgoing guarded gateway используют один Unicode safety primitive;
+- блокируется Unicode general category `C*`, включая control/format characters, bidi overrides и zero-width format controls;
+- raw `methodId`, `identifier`, `challengeId`, code response и revoke `sessionId` проверяются **до** trim/normalization;
+- server method label/account display name/device/browser label также fail closed при unsafe format/control text;
+- обычный Unicode-текст без unsafe control/format characters не блокируется;
+- preview-profile validation использует тот же primitive, не дублируя regex policy.
+
+Exact timestamp RFC3339/ISO serialization намеренно **не** ужесточалась: текущий server API contract не фиксирует окончательный timestamp wire-format, поэтому такой формат не выдаётся за утверждённое решение.
 
 ## Фактические проверки
 
@@ -186,6 +203,7 @@ Fail closed для malformed account/session/challenge/failure/method payload.
    - Profile/logout;
    - Auth Core contracts/reducer/controller;
    - runtime guards/gateway;
+   - Unicode protocol-text boundary;
    - OAuth external boundary;
    - Account Security states;
    - local preview profile/storage boundary;
@@ -213,7 +231,8 @@ Fail closed для malformed account/session/challenge/failure/method payload.
 6. `npm run test:auth` включён в `npm run check` и CI. Текущий smoke-suite содержит:
    - `tests/auth-core-smoke.ts`;
    - `tests/preview-profile-smoke.ts`;
-   - `tests/demo-storage-profile-smoke.ts`.
+   - `tests/demo-storage-profile-smoke.ts`;
+   - `tests/protocol-text-smoke.ts`.
 
 7. После restore/challenge race-hardening отдельно повторён isolated controller strict compile-smoke:
    - Node `22.16.0`;
@@ -237,6 +256,18 @@ Fail closed для malformed account/session/challenge/failure/method payload.
    - corrupt/non-canonical persistence отклоняется;
    - internal default reset-state сохраняется;
    - результат: PASS.
+
+10. Unicode/raw protocol-text smoke фактически выполнен локально после raw-before-trim hardening:
+    - normal Cyrillic/Unicode text: PASS;
+    - U+200B zero-width control: rejected;
+    - U+202E bidi override: rejected;
+    - ASCII NUL: rejected;
+    - server method/account text с format controls: rejected;
+    - leading/trailing newline/tab в start/complete/revoke request: rejected **до transport**;
+    - transport call counters для rejected cases: `0`;
+    - Node `22.16.0` / TypeScript `5.8.3` strict compile + behavior: PASS.
+
+11. После перевода `previewProfile` на общий `protocolText` helper отдельно повторён shared profile strict smoke: PASS.
 
 ### Не заявляется как выполненное
 
@@ -300,6 +331,7 @@ ARVELIS CONTROL остаётся отдельной owner/admin security boundar
 - cookie/CSRF topology;
 - recovery/account-linking policy;
 - роли/permissions;
+- exact timestamp wire-format;
 - exact retention/legal data-flow map.
 
 ## RC decision
