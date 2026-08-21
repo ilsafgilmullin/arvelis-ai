@@ -19,6 +19,20 @@ Frontend **не должен**:
 
 Конкретные HTTP paths ниже — рабочий contract candidate и могут измениться после backend topology review.
 
+## Executable v1 capability scope
+
+Текущий TypeScript contract намеренно поддерживает только:
+
+- `identifier` — будущий email/phone-based flow после отдельного решения;
+- `external` — внешний OAuth/OIDC provider через ARVELIS backend/BFF.
+
+Challenge v1:
+
+- `code`;
+- `external_redirect`.
+
+`passkey/WebAuthn` остаётся **OPEN architectural candidate** и не считается реализованным v1 contract. Перед его включением нужен отдельный WebAuthn request/response contract для web/native, challenge/options validation и backend ceremony verification.
+
 ## 1. Capabilities / methods
 
 ### `GET /api/auth/methods`
@@ -28,7 +42,7 @@ Frontend **не должен**:
 Ответ описывает только UI-safe metadata:
 
 - method id;
-- kind: `identifier | external | passkey`;
+- kind: `identifier | external`;
 - display label;
 - enabled/disabled;
 - identifier type, если применимо.
@@ -41,6 +55,8 @@ Frontend **не должен**:
 - приватные routing details.
 
 Это позволяет отключить недоступный provider server-side без релиза нового frontend.
+
+Method catalog не является prerequisite для уже существующей валидной ARVELIS session. Временный сбой `/methods` не должен разлогинивать пользователя.
 
 ## 2. Restore current session
 
@@ -56,7 +72,8 @@ Frontend **не должен**:
 - не считать отсутствие session исключительной ошибкой;
 - session authorization проверяется сервером;
 - frontend account object содержит только необходимые UI-поля;
-- role/permission details выдаются только если они реально нужны клиенту, но server remains authoritative.
+- role/permission details выдаются только если они реально нужны клиенту, но server remains authoritative;
+- restore session обрабатывается независимо от method catalog и device/session list.
 
 ## 3. Start authentication
 
@@ -68,11 +85,10 @@ Frontend **не должен**:
 - method id;
 - identifier, если выбранный method его требует.
 
-Backend отвечает challenge descriptor, например:
+Backend отвечает challenge descriptor:
 
-- `code`;
-- `external_redirect`;
-- `passkey`.
+- `code`; или
+- `external_redirect`.
 
 Security requirements:
 
@@ -111,8 +127,9 @@ Security requirements:
 Требования:
 
 - инвалидировать текущую server session;
-- ответ должен быть idempotent с точки зрения UX: повторный sign-out не создаёт критическую ошибку;
-- frontend после успеха возвращается в signed-out app-entry.
+- операция проектируется idempotent server-side;
+- frontend переходит в signed-out состояние только после подтверждённого результата либо отдельно утверждённой degraded policy;
+- сетевой/серверный сбой не должен визуально выдаваться за подтверждённый revoke.
 
 ## 6. Session management
 
@@ -131,9 +148,26 @@ Security requirements:
 - cookie/session secret;
 - raw fingerprint material сверх реально необходимого UX/security use case.
 
+Frontend различает:
+
+- `loading`;
+- `error`;
+- `idle/not loaded`;
+- `ready + empty`;
+- `ready + sessions`.
+
+Ошибка API **не отображается как отсутствие активных устройств**.
+
 ### `DELETE /api/auth/sessions/:sessionId`
 
 Отзыв конкретной сессии.
+
+Server requirements:
+
+- проверять ownership session id;
+- не позволять отзывать чужую сессию;
+- после успеха клиент перечитывает актуальный список;
+- current-session behavior утверждается отдельно.
 
 ### `POST /api/auth/sessions/revoke-others`
 
@@ -183,6 +217,27 @@ CSRF strategy утверждается вместе с final same-origin/cross-o
 
 Frontend не строится вокруг long-lived bearer token в `localStorage`.
 
+## Runtime protocol boundary
+
+Raw HTTP/provider transport response начинается как `unknown`.
+
+Frontend foundation:
+
+`AuthTransport → guardedGateway → AuthGateway → controller/UI`.
+
+`runtimeGuards.ts` / `guardedGateway.ts` проверяют до попадания данных в application state:
+
+- shape account/session/challenge/failure;
+- bounded protocol field lengths;
+- bounded method/session collection sizes;
+- duplicate ids;
+- максимум одну `current` session;
+- согласованность verified email/phone fields;
+- absolute HTTPS URL для `external_redirect`;
+- outgoing method/challenge ids и response size.
+
+Это defensive frontend boundary. **Backend обязан валидировать всё повторно** и остаётся источником истины.
+
 ## Common response/error contract
 
 Frontend должен получать стабильные коды, совместимые с `src/auth/contracts.ts`:
@@ -217,6 +272,14 @@ Backend logging может содержать внутренний correlation/r
 CONTROL не использует этот пользовательский session realm как достаточную owner/admin authorization.
 
 Для CONTROL требуется отдельный server-side policy/realm или строго отдельный admin authorization layer, включая step-up/MFA policy для опасных действий и обязательный audit.
+
+## Связанные документы
+
+- `docs/20_AUTH_ARCHITECTURE.md`;
+- `docs/21_AUTH_DATA_MODEL.md`;
+- `docs/24_AUTH_PROVIDER_RESEARCH_2026-08-21.md`;
+- `docs/25_AUTH_CORE_BOUNDARY.md`;
+- `docs/26_AUTH_THREAT_MODEL.md`.
 
 ## Не утверждено
 
