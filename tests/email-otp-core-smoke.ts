@@ -131,6 +131,8 @@ async function main(): Promise<void> {
     normalizeEmailOtpAddress('User.Name+tag@Example.COM') === 'User.Name+tag@example.com',
     'email domain was not canonicalized',
   );
+  assert(normalizeEmailOtpAddress(' user@example.com') === null, 'leading whitespace was accepted');
+  assert(normalizeEmailOtpAddress('user@example.com ') === null, 'trailing whitespace was accepted');
   assert(normalizeEmailOtpAddress('bad\n@example.com') === null, 'control-character email was accepted');
   assert(normalizeEmailOtpAddress('a..b@example.com') === null, 'double-dot local part was accepted');
   assert(normalizeEmailOtpAddress('user@localhost') === null, 'non-public single-label domain was accepted');
