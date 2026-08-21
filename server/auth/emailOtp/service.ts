@@ -171,7 +171,20 @@ export class EmailOtpService {
         return { ok: false, error: failure('delivery_unavailable') };
       }
 
-      const activated = await this.store.activateReplacingActive(challengeId, this.now());
+      // A delivery provider can stall long enough for a code to expire. Never
+      // let such a code supersede a still-valid earlier challenge after it is
+      // already unusable itself.
+      const activatedAt = this.now();
+      if (activatedAt >= expiresAt) {
+        try {
+          await this.store.delete(challengeId);
+        } catch {
+          // Best-effort cleanup. The pending challenge is never verifiable.
+        }
+        return { ok: false, error: failure('service_unavailable') };
+      }
+
+      const activated = await this.store.activateReplacingActive(challengeId, activatedAt);
       if (!activated) {
         try {
           await this.store.delete(challengeId);
