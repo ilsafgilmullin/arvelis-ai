@@ -23,12 +23,24 @@ export function AuthStatusPanel({ state }: { state: AuthUiState }) {
   }
 
   if (state.status === 'challenge') {
+    if (state.challenge.kind === 'external_redirect') {
+      return (
+        <section className="auth-status-panel" role="status" aria-live="polite">
+          <span className="auth-status-panel__signal" aria-hidden="true" />
+          <div>
+            <strong>Продолжите вход у выбранного провайдера</strong>
+            <p>После защищённого перехода ARVELIS AI восстановит собственную серверную сессию. Данные авторизации провайдера не должны храниться в интерфейсе приложения.</p>
+          </div>
+        </section>
+      );
+    }
+
     return (
       <section className="auth-status-panel" role="status" aria-live="polite">
         <span className="auth-status-panel__signal" aria-hidden="true" />
         <div>
           <strong>Нужно подтверждение</strong>
-          <p>{state.challenge.maskedDestination ? `Подтверждение отправлено: ${state.challenge.maskedDestination}` : 'Завершите выбранный способ подтверждения, чтобы продолжить.'}</p>
+          <p>{state.challenge.maskedDestination ? `Подтверждение отправлено: ${state.challenge.maskedDestination}` : 'Введите полученный код подтверждения, чтобы продолжить.'}</p>
         </div>
       </section>
     );
