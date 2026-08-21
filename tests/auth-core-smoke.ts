@@ -70,6 +70,7 @@ assert(
   'external challenge accepted maskedDestination',
 );
 assert(!isAuthChallenge({ id: 'c\n2', methodId: 'm2', kind: 'code' }), 'control character in challenge id accepted');
+assert(!isAuthChallenge({ id: 'c3', methodId: 'm3', kind: 'code', maskedDestination: '' }), 'empty destination mask accepted');
 
 // Account/session consistency.
 assert(isAuthSession(validSession), 'valid session rejected');
@@ -78,6 +79,14 @@ assert(!isAuthSession({ ...validSession, expiresAt: '2026-08-20T08:00:00.000Z' }
 assert(
   !isAuthSession({ ...validSession, account: { ...validSession.account, emailVerified: true } }),
   'verified email without email accepted',
+);
+assert(
+  !isAuthSession({ ...validSession, account: { ...validSession.account, primaryEmail: '' } }),
+  'empty present email accepted',
+);
+assert(
+  !isAuthSession({ ...validSession, account: { ...validSession.account, displayName: '   ' } }),
+  'blank display name accepted',
 );
 assert(
   !isAuthSession({ ...validSession, account: { ...validSession.account, displayName: 'bad\nname' } }),
@@ -92,6 +101,16 @@ assert(
   }),
   'backwards session summary accepted',
 );
+assert(
+  !isAuthSessionSummary({
+    id: 's',
+    current: true,
+    createdAt: '2026-08-21T08:00:00Z',
+    lastSeenAt: '2026-08-23T08:00:00Z',
+    expiresAt: '2026-08-22T08:00:00Z',
+  }),
+  'lastSeenAt outside session window accepted',
+);
 
 // Failure metadata ceiling.
 assert(isAuthFailure({ code: 'rate_limited', message: 'wait', retryAfterSeconds: 30 }), 'valid retry-after rejected');
@@ -100,7 +119,7 @@ assert(
   'oversized retry-after accepted',
 );
 
-// Reducer preserves a recoverable challenge and the live session on logout failure.
+// Reducer preserves recoverable challenge/session state and original intent.
 const codeChallenge: AuthCodeChallenge = { id: 'challenge-1', methodId: 'email', kind: 'code' };
 const challengeState = authUiReducer(
   { status: 'verifying', intent: 'sign_in', challenge: codeChallenge },
@@ -117,6 +136,14 @@ assert(
     && challengeState.error?.code === 'invalid_challenge',
   'recoverable challenge was not preserved',
 );
+
+const signUpFailure = authUiReducer(
+  { status: 'submitting', intent: 'sign_up', methodId: 'email' },
+  { type: 'FAILURE', error: { code: 'service_unavailable', message: 'down' } },
+);
+assert(signUpFailure.status === 'error' && signUpFailure.intent === 'sign_up', 'sign-up intent lost on failure');
+const signUpRetry = authUiReducer(signUpFailure, { type: 'RESET' });
+assert(signUpRetry.status === 'signed_out' && signUpRetry.intent === 'sign_up', 'sign-up intent lost on retry');
 
 const signOutStarted = authUiReducer(
   { status: 'authenticated', session: validSession },
@@ -148,8 +175,8 @@ class FakeTransport implements AuthTransport {
 
   getMethods = async () => this.methods;
   restoreSession = async () => this.session;
-  start = async () => ({ ok: true, challenge: codeChallenge });
-  complete = async () => ({ ok: true, session: validSession });
+  start = async (_request: Parameters<AuthTransport['start']>[0]) => ({ ok: true, challenge: codeChallenge });
+  complete = async (_request: Parameters<AuthTransport['complete']>[0]) => ({ ok: true, session: validSession });
   signOut = async () => {};
   listSessions = async () => this.sessions;
   revokeSession = async (_sessionId: string) => {};
@@ -170,6 +197,14 @@ void (async () => {
   }
   assert(emptyCodeRejected, 'empty completion response reached transport');
 
+  let controlCodeRejected = false;
+  try {
+    await gateway.complete({ challengeId: 'challenge-1', response: '12\n34' });
+  } catch (error) {
+    controlCodeRejected = error instanceof AuthProtocolError;
+  }
+  assert(controlCodeRejected, 'control character in completion response reached transport');
+
   let emptyMethodRejected = false;
   try {
     await gateway.start({ intent: 'sign_in', methodId: '   ' });
@@ -177,6 +212,22 @@ void (async () => {
     emptyMethodRejected = error instanceof AuthProtocolError;
   }
   assert(emptyMethodRejected, 'empty method id reached transport');
+
+  let controlMethodRejected = false;
+  try {
+    await gateway.start({ intent: 'sign_in', methodId: 'email\nadmin', identifier: 'person@example.com' });
+  } catch (error) {
+    controlMethodRejected = error instanceof AuthProtocolError;
+  }
+  assert(controlMethodRejected, 'control character in method id reached transport');
+
+  let emptyIdentifierRejected = false;
+  try {
+    await gateway.start({ intent: 'sign_up', methodId: 'email', identifier: '   ' });
+  } catch (error) {
+    emptyIdentifierRejected = error instanceof AuthProtocolError;
+  }
+  assert(emptyIdentifierRejected, 'blank identifier reached transport');
 
   transport.methods = [
     { id: 'same', kind: 'identifier', label: 'A', enabled: true, identifierType: 'email' },
