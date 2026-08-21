@@ -1,5 +1,6 @@
 import type {
   AuthChallenge,
+  AuthCodeChallenge,
   AuthFailure,
   AuthIntent,
   AuthSession,
@@ -12,7 +13,7 @@ export type AuthUiEvent =
   | { type: 'SET_INTENT'; intent: AuthIntent }
   | { type: 'SUBMIT'; intent: AuthIntent; methodId: string }
   | { type: 'CHALLENGE'; intent: AuthIntent; challenge: AuthChallenge }
-  | { type: 'VERIFY'; intent: AuthIntent; challenge: AuthChallenge }
+  | { type: 'VERIFY'; intent: AuthIntent; challenge: AuthCodeChallenge }
   | { type: 'AUTHENTICATED'; session: AuthSession }
   | { type: 'SESSION_EXPIRED' }
   | { type: 'OFFLINE' }
