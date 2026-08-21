@@ -24,8 +24,20 @@ const failureCodes = new Set<AuthFailureCode>([
   'unknown',
 ]);
 
+const METHOD_KEYS = new Set(['id', 'kind', 'label', 'enabled', 'identifierType']);
+const ACCOUNT_KEYS = new Set(['id', 'displayName', 'primaryEmail', 'primaryPhone', 'emailVerified', 'phoneVerified']);
+const SESSION_KEYS = new Set(['id', 'account', 'createdAt', 'expiresAt']);
+const SESSION_SUMMARY_KEYS = new Set(['id', 'current', 'createdAt', 'lastSeenAt', 'expiresAt', 'deviceLabel', 'browserLabel']);
+const CODE_CHALLENGE_KEYS = new Set(['id', 'methodId', 'kind', 'maskedDestination', 'expiresAt']);
+const EXTERNAL_CHALLENGE_KEYS = new Set(['id', 'methodId', 'kind', 'redirectUrl', 'expiresAt']);
+const FAILURE_KEYS = new Set(['code', 'message', 'retryAfterSeconds']);
+
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasOnlyKeys(value: UnknownRecord, allowedKeys: ReadonlySet<string>): boolean {
+  return Object.keys(value).every((key) => allowedKeys.has(key));
 }
 
 function isBoundedString(value: unknown, maxLength: number, allowEmpty = false): value is string {
@@ -85,7 +97,7 @@ export function isSecureAuthorizationUrl(value: unknown): value is string {
 }
 
 export function isAuthMethodDescriptor(value: unknown): value is AuthMethodDescriptor {
-  if (!isRecord(value)) return false;
+  if (!isRecord(value) || !hasOnlyKeys(value, METHOD_KEYS)) return false;
   if (!isCanonicalProtocolId(value.id, AUTH_PROTOCOL_LIMITS.methodIdLength)) return false;
   if (!isBoundedString(value.label, AUTH_PROTOCOL_LIMITS.labelLength) || typeof value.enabled !== 'boolean') return false;
   if (value.kind !== 'identifier' && value.kind !== 'external') return false;
@@ -116,7 +128,7 @@ export function normalizeAuthMethodCatalog(value: unknown): AuthMethodDescriptor
 }
 
 export function isAuthAccount(value: unknown): value is AuthAccount {
-  if (!isRecord(value)) return false;
+  if (!isRecord(value) || !hasOnlyKeys(value, ACCOUNT_KEYS)) return false;
 
   const emailValid = isOptionalNonEmptyBoundedString(value.primaryEmail, AUTH_PROTOCOL_LIMITS.emailLength);
   const phoneValid = isOptionalNonEmptyBoundedString(value.primaryPhone, AUTH_PROTOCOL_LIMITS.phoneLength);
@@ -130,7 +142,7 @@ export function isAuthAccount(value: unknown): value is AuthAccount {
 }
 
 export function isAuthSession(value: unknown): value is AuthSession {
-  if (!isRecord(value)) return false;
+  if (!isRecord(value) || !hasOnlyKeys(value, SESSION_KEYS)) return false;
 
   return isCanonicalProtocolId(value.id, AUTH_PROTOCOL_LIMITS.idLength)
     && isAuthAccount(value.account)
@@ -138,7 +150,7 @@ export function isAuthSession(value: unknown): value is AuthSession {
 }
 
 export function isAuthSessionSummary(value: unknown): value is AuthSessionSummary {
-  if (!isRecord(value)) return false;
+  if (!isRecord(value) || !hasOnlyKeys(value, SESSION_SUMMARY_KEYS)) return false;
   if (!isCanonicalProtocolId(value.id, AUTH_PROTOCOL_LIMITS.idLength)) return false;
   if (typeof value.current !== 'boolean') return false;
   if (!isForwardTimeWindow(value.createdAt, value.expiresAt)) return false;
@@ -172,12 +184,12 @@ export function isAuthChallenge(value: unknown): value is AuthChallenge {
   if (value.expiresAt !== undefined && !isIsoLikeDate(value.expiresAt)) return false;
 
   if (value.kind === 'code') {
-    return value.redirectUrl === undefined
+    return hasOnlyKeys(value, CODE_CHALLENGE_KEYS)
       && isOptionalNonEmptyBoundedString(value.maskedDestination, AUTH_PROTOCOL_LIMITS.maskedDestinationLength);
   }
 
   if (value.kind === 'external_redirect') {
-    return value.maskedDestination === undefined
+    return hasOnlyKeys(value, EXTERNAL_CHALLENGE_KEYS)
       && isSecureAuthorizationUrl(value.redirectUrl);
   }
 
@@ -185,7 +197,7 @@ export function isAuthChallenge(value: unknown): value is AuthChallenge {
 }
 
 export function isAuthFailure(value: unknown): value is AuthFailure {
-  if (!isRecord(value)) return false;
+  if (!isRecord(value) || !hasOnlyKeys(value, FAILURE_KEYS)) return false;
   if (typeof value.code !== 'string' || !failureCodes.has(value.code as AuthFailureCode)) return false;
   if (!isBoundedString(value.message, AUTH_PROTOCOL_LIMITS.failureMessageLength, true)) return false;
 
