@@ -1,16 +1,26 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import type { DatabaseSync } from 'node:sqlite';
 import { Pool } from 'pg';
+import type { AccountAuthenticationReader, AccountIdentityStore } from '../auth/account/contracts';
 import { AccountAuthApplicationService } from '../auth/application/service';
+import type { EmailOtpChallengeStore, EmailOtpFailure, EmailOtpRateLimitPort } from '../auth/emailOtp/contracts';
 import { SmtpEmailOtpDelivery } from '../auth/emailOtp/smtpDelivery';
-import type { EmailOtpFailure } from '../auth/emailOtp/contracts';
 import { EmailOtpService } from '../auth/emailOtp/service';
 import { WebCryptoEmailOtpSecurity } from '../auth/emailOtp/webCryptoSecurity';
+import type { SessionStore } from '../auth/session/contracts';
 import { SessionService } from '../auth/session/service';
 import { WebCryptoSessionSecurity } from '../auth/session/webCryptoSecurity';
 import { PostgresAccountIdentityStore } from '../persistence/postgres/accountIdentityStore';
 import { PostgresEmailOtpChallengeStore } from '../persistence/postgres/emailOtpChallengeStore';
 import { PostgresEmailOtpRateLimitStore } from '../persistence/postgres/rateLimitStore';
 import { PostgresSessionStore } from '../persistence/postgres/sessionStore';
+import {
+  SqliteAccountIdentityStore,
+  SqliteEmailOtpChallengeStore,
+  SqliteEmailOtpRateLimitStore,
+  SqliteSessionStore,
+} from '../persistence/sqlite/authStores';
+import { openSqliteAuthDatabase } from '../persistence/sqlite/database';
 import { loadAuthRuntimeConfig } from './config';
 import {
   getClientKey,
@@ -25,6 +35,8 @@ import {
 } from './http';
 
 const EMAIL_METHOD_ID = 'email_otp';
+
+type RuntimeAccounts = AccountIdentityStore & AccountAuthenticationReader;
 
 function iso(timestamp: number): string {
   return new Date(timestamp).toISOString();
@@ -73,23 +85,40 @@ function mapAccountFailure(code: string) {
 
 async function main(): Promise<void> {
   const config = loadAuthRuntimeConfig();
-  const pool = new Pool({
-    connectionString: config.databaseUrl,
-    max: 10,
-    connectionTimeoutMillis: 5_000,
-    idleTimeoutMillis: 30_000,
-  });
 
-  await pool.query('SELECT 1');
-  const schema = await pool.query<{ accounts: string | null }>("SELECT to_regclass('public.auth_accounts')::text AS accounts");
-  if (!schema.rows[0]?.accounts) {
-    throw new Error('ARVELIS auth database migration is not applied');
+  let pool: Pool | null = null;
+  let sqlite: DatabaseSync | null = null;
+  let accounts: RuntimeAccounts;
+  let challengeStore: EmailOtpChallengeStore;
+  let rateLimits: EmailOtpRateLimitPort;
+  let sessionStore: SessionStore;
+
+  if (config.database.provider === 'postgres') {
+    pool = new Pool({
+      connectionString: config.database.url,
+      max: 10,
+      connectionTimeoutMillis: 5_000,
+      idleTimeoutMillis: 30_000,
+    });
+
+    await pool.query('SELECT 1');
+    const schema = await pool.query<{ accounts: string | null }>("SELECT to_regclass('public.auth_accounts')::text AS accounts");
+    if (!schema.rows[0]?.accounts) {
+      throw new Error('ARVELIS auth database migration is not applied');
+    }
+
+    accounts = new PostgresAccountIdentityStore(pool);
+    challengeStore = new PostgresEmailOtpChallengeStore(pool);
+    rateLimits = new PostgresEmailOtpRateLimitStore(pool);
+    sessionStore = new PostgresSessionStore(pool);
+  } else {
+    sqlite = openSqliteAuthDatabase(config.database.path);
+    accounts = new SqliteAccountIdentityStore(sqlite);
+    challengeStore = new SqliteEmailOtpChallengeStore(sqlite);
+    rateLimits = new SqliteEmailOtpRateLimitStore(sqlite);
+    sessionStore = new SqliteSessionStore(sqlite);
   }
 
-  const accounts = new PostgresAccountIdentityStore(pool);
-  const challengeStore = new PostgresEmailOtpChallengeStore(pool);
-  const rateLimits = new PostgresEmailOtpRateLimitStore(pool);
-  const sessionStore = new PostgresSessionStore(pool);
   const delivery = new SmtpEmailOtpDelivery(config.smtp);
   const otpSecurity = new WebCryptoEmailOtpSecurity(config.otpPepper);
   const sessionSecurity = new WebCryptoSessionSecurity(config.sessionPepper);
@@ -166,7 +195,11 @@ async function main(): Promise<void> {
     }
 
     if (method === 'GET' && url.pathname === '/api/health') {
-      sendJson(response, 200, { ok: true, service: 'arvelis-auth' });
+      sendJson(response, 200, {
+        ok: true,
+        service: 'arvelis-auth',
+        persistence: config.database.provider,
+      });
       return;
     }
 
@@ -396,11 +429,12 @@ async function main(): Promise<void> {
     server.once('error', reject);
     server.listen(config.port, '127.0.0.1', () => resolve());
   });
-  console.log(`ARVELIS auth API listening on 127.0.0.1:${config.port}`);
+  console.log(`ARVELIS auth API listening on 127.0.0.1:${config.port} (${config.database.provider})`);
 
   const shutdown = async () => {
     server.close();
-    await pool.end();
+    if (pool) await pool.end();
+    if (sqlite) sqlite.close();
   };
   process.once('SIGINT', () => { void shutdown().finally(() => process.exit(0)); });
   process.once('SIGTERM', () => { void shutdown().finally(() => process.exit(0)); });
