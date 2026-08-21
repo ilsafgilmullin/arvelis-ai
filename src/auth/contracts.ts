@@ -43,14 +43,23 @@ export type AuthSessionSummary = {
   browserLabel?: string;
 };
 
-export type AuthChallenge = {
+export type AuthCodeChallenge = {
   id: string;
   methodId: string;
-  kind: 'code' | 'external_redirect';
+  kind: 'code';
   maskedDestination?: string;
   expiresAt?: string;
-  redirectUrl?: string;
 };
+
+export type AuthExternalRedirectChallenge = {
+  id: string;
+  methodId: string;
+  kind: 'external_redirect';
+  redirectUrl: string;
+  expiresAt?: string;
+};
+
+export type AuthChallenge = AuthCodeChallenge | AuthExternalRedirectChallenge;
 
 export type AuthFailureCode =
   | 'invalid_input'
@@ -75,9 +84,14 @@ export type AuthStartRequest = {
   identifier?: string;
 };
 
+/**
+ * v1 completion is only for a first-party code challenge.
+ * External OAuth/OIDC callbacks are handled by the trusted ARVELIS backend;
+ * after returning to the app the client restores its ARVELIS server session.
+ */
 export type AuthCompleteRequest = {
   challengeId: string;
-  response?: string;
+  response: string;
 };
 
 export type AuthStartResult =
@@ -109,7 +123,7 @@ export type AuthUiState =
   | { status: 'signed_out'; intent: AuthIntent }
   | { status: 'submitting'; intent: AuthIntent; methodId: string }
   | { status: 'challenge'; intent: AuthIntent; challenge: AuthChallenge }
-  | { status: 'verifying'; intent: AuthIntent; challenge: AuthChallenge }
+  | { status: 'verifying'; intent: AuthIntent; challenge: AuthCodeChallenge }
   | { status: 'authenticated'; session: AuthSession }
   | { status: 'session_expired' }
   | { status: 'offline' }
