@@ -17,6 +17,12 @@
     "server/auth/emailOtp/emailAddress.ts",
     "server/auth/emailOtp/webCryptoSecurity.ts",
     "server/auth/emailOtp/service.ts",
-    "tests/email-otp-core-smoke.ts"
+    "server/auth/account/contracts.ts",
+    "server/auth/session/contracts.ts",
+    "server/auth/session/policy.ts",
+    "server/auth/session/webCryptoSecurity.ts",
+    "server/auth/session/service.ts",
+    "tests/email-otp-core-smoke.ts",
+    "tests/session-core-smoke.ts"
   ]
 }
