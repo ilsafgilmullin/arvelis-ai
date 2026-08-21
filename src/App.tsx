@@ -266,6 +266,15 @@ export default function App() {
     setWorkspace((current) => current ? { ...current, profileName } : current);
   };
 
+  const signOutPreview = () => {
+    ++launchSequenceRef.current;
+    const profileName = workspace?.profileName.trim();
+    setPendingProfileName(profileName && profileName !== DEFAULT_PROFILE_NAME ? profileName : undefined);
+    setLoadError(false);
+    setScreen('chat');
+    setEntry('auth');
+  };
+
   const resetPreview = () => {
     clearChatDrafts();
     const next = resetDemoWorkspace();
@@ -349,7 +358,13 @@ export default function App() {
       ) : null}
       {screen === 'profile' ? (
         <Suspense fallback={secondaryFallback}>
-          <ProfileScreen profileName={workspace.profileName} onSaveName={saveProfileName} onOpenStates={() => setScreen('states')} onReset={resetPreview} />
+          <ProfileScreen
+            profileName={workspace.profileName}
+            onSaveName={saveProfileName}
+            onOpenStates={() => setScreen('states')}
+            onSignOut={signOutPreview}
+            onReset={resetPreview}
+          />
         </Suspense>
       ) : null}
       {screen === 'states' ? (
