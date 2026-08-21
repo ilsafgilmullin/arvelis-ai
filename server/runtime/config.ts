@@ -16,7 +16,8 @@ export type AuthRuntimeConfig = {
 };
 
 const CLOSED_TEST_SMTP_HOST = 'smtp.yandex.ru';
-const CLOSED_TEST_SMTP_MAILBOX = 'arvelis.auth@yandex.ru';
+const CLOSED_TEST_SMTP_LOGIN = 'arvelis.auth';
+const CLOSED_TEST_SMTP_FROM = 'arvelis.auth@yandex.ru';
 
 function required(name: string): string {
   const value = process.env[name];
@@ -81,9 +82,9 @@ function loadSmtpConfig(): SmtpEmailOtpDeliveryConfig {
     host: optionalTrimmed('SMTP_HOST', CLOSED_TEST_SMTP_HOST),
     port,
     secure: parseBoolean(process.env.SMTP_SECURE, port === 465),
-    username: optionalTrimmed('SMTP_USERNAME', CLOSED_TEST_SMTP_MAILBOX),
+    username: optionalTrimmed('SMTP_USERNAME', CLOSED_TEST_SMTP_LOGIN),
     password: required('SMTP_PASSWORD'),
-    from: optionalTrimmed('SMTP_FROM', CLOSED_TEST_SMTP_MAILBOX),
+    from: optionalTrimmed('SMTP_FROM', CLOSED_TEST_SMTP_FROM),
   };
 }
 
