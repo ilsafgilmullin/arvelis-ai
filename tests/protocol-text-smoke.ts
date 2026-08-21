@@ -64,29 +64,54 @@ void (async () => {
   const transport = new CaptureTransport();
   const gateway = createGuardedAuthGateway(transport);
 
-  let startRejected = false;
-  try {
-    await gateway.start({ intent: 'sign_in', methodId: 'email\u200Badmin', identifier: 'person@example.com' });
-  } catch (error) {
-    startRejected = error instanceof AuthProtocolError;
-  }
-  assert(startRejected && transport.startCalls === 0, 'unsafe method id reached start transport');
+  const rejectedStartRequests = [
+    { intent: 'sign_in' as const, methodId: 'email\u200Badmin', identifier: 'person@example.com' },
+    { intent: 'sign_in' as const, methodId: 'email\n', identifier: 'person@example.com' },
+    { intent: 'sign_in' as const, methodId: '\temail', identifier: 'person@example.com' },
+    { intent: 'sign_in' as const, methodId: 'email', identifier: 'person@example.com\t' },
+  ];
 
-  let completeRejected = false;
-  try {
-    await gateway.complete({ challengeId: 'challenge-1', response: '12\u202E34' });
-  } catch (error) {
-    completeRejected = error instanceof AuthProtocolError;
+  for (const request of rejectedStartRequests) {
+    let rejected = false;
+    try {
+      await gateway.start(request);
+    } catch (error) {
+      rejected = error instanceof AuthProtocolError;
+    }
+    assert(rejected, 'unsafe raw start request was accepted');
   }
-  assert(completeRejected && transport.completeCalls === 0, 'unsafe code response reached complete transport');
+  assert(transport.startCalls === 0, 'unsafe raw start request reached transport');
 
-  let revokeRejected = false;
-  try {
-    await gateway.revokeSession('session\u200B1');
-  } catch (error) {
-    revokeRejected = error instanceof AuthProtocolError;
+  const rejectedCompleteRequests = [
+    { challengeId: 'challenge-1', response: '12\u202E34' },
+    { challengeId: 'challenge-1\n', response: '1234' },
+    { challengeId: '\tchallenge-1', response: '1234' },
+    { challengeId: 'challenge-1', response: '1234\n' },
+    { challengeId: 'challenge-1', response: '\t1234' },
+  ];
+
+  for (const request of rejectedCompleteRequests) {
+    let rejected = false;
+    try {
+      await gateway.complete(request);
+    } catch (error) {
+      rejected = error instanceof AuthProtocolError;
+    }
+    assert(rejected, 'unsafe raw complete request was accepted');
   }
-  assert(revokeRejected && transport.revokeCalls === 0, 'unsafe session id reached revoke transport');
+  assert(transport.completeCalls === 0, 'unsafe raw complete request reached transport');
+
+  const rejectedSessionIds = ['session\u200B1', 'session-1\n', '\tsession-1'];
+  for (const sessionId of rejectedSessionIds) {
+    let rejected = false;
+    try {
+      await gateway.revokeSession(sessionId);
+    } catch (error) {
+      rejected = error instanceof AuthProtocolError;
+    }
+    assert(rejected, 'unsafe raw session id was accepted');
+  }
+  assert(transport.revokeCalls === 0, 'unsafe raw session id reached revoke transport');
 
   console.log('ARVELIS protocol text smoke: PASS');
 })();
