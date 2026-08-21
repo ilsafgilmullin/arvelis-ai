@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "outDir": "tests/.dist-server-db",
+    "rootDir": "."
+  },
+  "include": [
+    "server/auth/account/contracts.ts",
+    "server/auth/emailOtp/contracts.ts",
+    "server/auth/session/contracts.ts",
+    "server/persistence/postgres/rows.ts",
+    "server/persistence/postgres/accountIdentityStore.ts",
+    "server/persistence/postgres/emailOtpChallengeStore.ts",
+    "server/persistence/postgres/rateLimitStore.ts",
+    "server/persistence/postgres/sessionStore.ts",
+    "tests/postgres-auth-persistence-smoke.ts"
+  ]
+}

@@ -8,6 +8,7 @@ build/
 coverage/
 tests/.dist-auth/
 tests/.dist-server-auth/
+tests/.dist-server-db/
 
 # Secrets
 .env

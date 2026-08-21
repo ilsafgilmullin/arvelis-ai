@@ -14,7 +14,25 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:18.4
+        env:
+          POSTGRES_DB: arvelis_test
+          POSTGRES_USER: arvelis
+          POSTGRES_PASSWORD: arvelis_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arvelis -d arvelis_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://arvelis:arvelis_test_password@127.0.0.1:5432/arvelis_test
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,6 +58,12 @@ jobs:
 
       - name: Server email OTP smoke
         run: npm run test:server-auth
+
+      - name: Auth database migration
+        run: npm run db:migrate
+
+      - name: PostgreSQL auth persistence smoke
+        run: npm run test:server-db
 
       - name: Build
         run: npm run build

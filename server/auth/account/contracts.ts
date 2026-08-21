@@ -2,6 +2,7 @@ export type AccountStatus = 'active' | 'suspended' | 'pending_deletion' | 'delet
 
 export type AccountRecord = {
   id: string;
+  displayName: string;
   status: AccountStatus;
   securityVersion: number;
   createdAt: number;
@@ -22,6 +23,7 @@ export type EmailIdentityRecord = {
 export type CreateAccountWithEmailIdentityInput = {
   accountId: string;
   identityId: string;
+  displayName: string;
   canonicalEmail: string;
   verifiedAt: number;
   createdAt: number;
@@ -45,6 +47,7 @@ export type CreateAccountWithEmailIdentityResult =
  */
 export interface AccountIdentityStore {
   findEmailIdentity(canonicalEmail: string): Promise<EmailIdentityRecord | null>;
+  findEmailIdentityForAccount(accountId: string): Promise<EmailIdentityRecord | null>;
   getAccount(accountId: string): Promise<AccountRecord | null>;
   createAccountWithEmailIdentity(
     input: CreateAccountWithEmailIdentityInput,
