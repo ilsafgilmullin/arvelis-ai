@@ -102,6 +102,7 @@ export type AuthUiState =
   | { status: 'signed_out'; intent: AuthIntent }
   | { status: 'submitting'; intent: AuthIntent; methodId: string }
   | { status: 'challenge'; intent: AuthIntent; challenge: AuthChallenge }
+  | { status: 'verifying'; intent: AuthIntent; challenge: AuthChallenge }
   | { status: 'authenticated'; session: AuthSession }
   | { status: 'session_expired' }
   | { status: 'offline' }
