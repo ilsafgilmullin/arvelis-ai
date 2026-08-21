@@ -49,7 +49,9 @@ export function WorkspaceScreen({
   onNewChat: () => void;
   onOpenThread: (threadId: string) => void;
 }) {
-  const recentThreads = threads.slice(0, 3);
+  const recentThreads = [...threads]
+    .sort((left, right) => right.updatedAt - left.updatedAt)
+    .slice(0, 3);
 
   return (
     <div className="content-page home-v3">
@@ -103,7 +105,7 @@ export function WorkspaceScreen({
             <p className="section-kicker">ПРОДОЛЖИТЬ</p>
             <h2 id="home-recent-title">Недавние диалоги</h2>
           </div>
-          <span>{threads.length}</span>
+          <span aria-label={`Всего локальных диалогов: ${threads.length}`}>{threads.length}</span>
         </div>
 
         {recentThreads.length ? (
