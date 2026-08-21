@@ -137,13 +137,19 @@ export function isAuthChallenge(value: unknown): value is AuthChallenge {
   if (!isRecord(value)) return false;
   if (!isBoundedString(value.id, AUTH_PROTOCOL_LIMITS.idLength)) return false;
   if (!isBoundedString(value.methodId, AUTH_PROTOCOL_LIMITS.methodIdLength)) return false;
-  if (value.kind !== 'code' && value.kind !== 'external_redirect') return false;
-  if (!isOptionalBoundedString(value.maskedDestination, AUTH_PROTOCOL_LIMITS.maskedDestinationLength)) return false;
-  if (!isOptionalBoundedString(value.redirectUrl, AUTH_PROTOCOL_LIMITS.redirectUrlLength)) return false;
   if (value.expiresAt !== undefined && !isIsoLikeDate(value.expiresAt)) return false;
-  if (value.kind === 'external_redirect' && !isSecureAuthorizationUrl(value.redirectUrl)) return false;
 
-  return true;
+  if (value.kind === 'code') {
+    return value.redirectUrl === undefined
+      && isOptionalBoundedString(value.maskedDestination, AUTH_PROTOCOL_LIMITS.maskedDestinationLength);
+  }
+
+  if (value.kind === 'external_redirect') {
+    return value.maskedDestination === undefined
+      && isSecureAuthorizationUrl(value.redirectUrl);
+  }
+
+  return false;
 }
 
 export function isAuthFailure(value: unknown): value is AuthFailure {
