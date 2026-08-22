@@ -28,9 +28,14 @@
     "server/auth/session/policy.ts",
     "server/auth/session/service.ts",
     "server/auth/session/webCryptoSecurity.ts",
+    "server/chat/contracts.ts",
+    "server/chat/service.ts",
+    "server/persistence/sqlite/chatSchema.ts",
     "server/persistence/sqlite/database.ts",
     "server/persistence/sqlite/authStores.ts",
+    "server/persistence/sqlite/chatStore.ts",
     "tests/sqlite-auth-persistence-smoke.ts",
-    "tests/sqlite-auth-flow-smoke.ts"
+    "tests/sqlite-auth-flow-smoke.ts",
+    "tests/sqlite-chat-persistence-smoke.ts"
   ]
 }
