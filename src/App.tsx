@@ -7,6 +7,11 @@ import {
   normalizePreviewProfileName,
   validatePreviewProfileName,
 } from './auth/previewProfile';
+import {
+  conversationAttachmentIds,
+  createConversation,
+  createLocalUserMessage,
+} from './chat/domain';
 import { AppBootScreen } from './components/AppBootScreen';
 import { normalizeChatMessage, normalizeThreadTitle } from './domain/chatPolicy';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
@@ -46,9 +51,7 @@ import { WelcomeScreen } from './screens/WelcomeScreen';
 import type {
   AppScreen,
   ChatAttachmentMeta,
-  DemoMessage,
-  DemoThread,
-  DemoWorkspaceState,
+  ChatWorkspaceState,
   EntryScreen,
 } from './types';
 
@@ -76,36 +79,10 @@ function waitForBootPaint(): Promise<void> {
   });
 }
 
-function titleFromMessage(content: string, attachments: ChatAttachmentMeta[]): string {
-  const normalized = content.replace(/\s+/g, ' ').trim();
-  if (normalized) return normalized.length > 52 ? `${normalized.slice(0, 49)}…` : normalized;
-
-  const first = attachments[0];
-  if (!first) return 'Новый диалог';
-  if (first.kind === 'audio') return 'Голосовое сообщение';
-  const name = first.name.replace(/\s+/g, ' ').trim();
-  return name.length > 52 ? `${name.slice(0, 49)}…` : name || 'Новый диалог';
-}
-
-function createUserMessage(content: string, attachments: ChatAttachmentMeta[] = []): DemoMessage {
-  return {
-    id: makeId('msg'),
-    role: 'user',
-    content,
-    createdAt: Date.now(),
-    ...(attachments.length ? { attachments } : {}),
-  };
-}
-
-function attachmentIdsFromThread(thread: DemoThread | undefined): string[] {
-  if (!thread) return [];
-  return thread.messages.flatMap((message) => (message.attachments ?? []).map((attachment) => attachment.id));
-}
-
 export default function App() {
   const [entry, setEntry] = useState<EntryScreen>('splash');
   const [screen, setScreen] = useState<AppScreen>('workspace');
-  const [workspace, setWorkspace] = useState<DemoWorkspaceState | null>(null);
+  const [workspace, setWorkspace] = useState<ChatWorkspaceState | null>(null);
   const [core, setCore] = useState<PreparedCoreModules | null>(null);
   const [persistenceAvailable, setPersistenceAvailable] = useState(true);
   const [loadProgress, setLoadProgress] = useState<AppLoadProgress>(INITIAL_LOAD_PROGRESS);
@@ -254,13 +231,17 @@ export default function App() {
     if ((!normalizedContent && !attachments.length) || threadLimitReached) return;
 
     const timestamp = Date.now();
-    const thread: DemoThread = {
-      id: makeId('thread'),
-      title: titleFromMessage(normalizedContent, attachments),
+    const message = createLocalUserMessage({
+      id: makeId('msg'),
+      content: normalizedContent,
+      attachments,
       createdAt: timestamp,
-      updatedAt: timestamp,
-      messages: [createUserMessage(normalizedContent, attachments)],
-    };
+    });
+    const thread = createConversation({
+      id: makeId('thread'),
+      message,
+      createdAt: timestamp,
+    });
 
     setWorkspace((current) => {
       if (!current || current.threads.length >= DEMO_MAX_THREADS) return current;
@@ -284,8 +265,13 @@ export default function App() {
     }
     if (activeThread.messages.length >= DEMO_MAX_MESSAGES_PER_THREAD) return;
 
-    const userMessage = createUserMessage(normalizedContent, attachments);
     const timestamp = Date.now();
+    const userMessage = createLocalUserMessage({
+      id: makeId('msg'),
+      content: normalizedContent,
+      attachments,
+      createdAt: timestamp,
+    });
 
     setWorkspace((current) => current ? {
       ...current,
@@ -343,7 +329,7 @@ export default function App() {
     const pendingAttachmentIds = loadPendingChatAttachments(draftKey).map((attachment) => attachment.id);
     clearPendingChatAttachments(draftKey);
     removeChatDraft(draftKey);
-    void deleteChatAttachmentBlobs([...attachmentIdsFromThread(thread), ...pendingAttachmentIds]);
+    void deleteChatAttachmentBlobs([...conversationAttachmentIds(thread), ...pendingAttachmentIds]);
 
     setWorkspace((current) => {
       if (!current) return current;
@@ -428,7 +414,7 @@ export default function App() {
     ];
     const pendingAttachmentIds = draftKeys.flatMap((key) => loadPendingChatAttachments(key).map((attachment) => attachment.id));
     draftKeys.forEach((key) => clearPendingChatAttachments(key));
-    const messageAttachmentIds = workspace?.threads.flatMap(attachmentIdsFromThread) ?? [];
+    const messageAttachmentIds = workspace?.threads.flatMap((thread) => conversationAttachmentIds(thread)) ?? [];
     void deleteChatAttachmentBlobs([...messageAttachmentIds, ...pendingAttachmentIds]);
     clearChatDrafts();
 
