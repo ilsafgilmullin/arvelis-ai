@@ -37,6 +37,7 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
   const [fieldError, setFieldError] = useState<string | null>(null);
   const deliveredSessionRef = useRef<string | null>(null);
   const online = useOnlineStatus();
+  const checkingSession = controller.state.status === 'checking_session';
   const intent = intentFromState(controller.state);
   const isSignUp = intent === 'sign_up';
   const challenge = controller.state.status === 'challenge' && controller.state.challenge.kind === 'code'
@@ -46,7 +47,7 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
       : null;
   const emailMethodReady = controller.methodsStatus === 'ready'
     && controller.methods.some((method) => method.id === EMAIL_METHOD_ID && method.enabled && method.identifierType === 'email');
-  const busy = controller.state.status === 'checking_session'
+  const busy = checkingSession
     || controller.state.status === 'submitting'
     || controller.state.status === 'verifying';
 
@@ -142,36 +143,40 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
 
         <div className="auth-heading auth-heading--v2">
           <p className="section-kicker">ДОБРО ПОЖАЛОВАТЬ</p>
-          <h1>{isSignUp ? 'Создать аккаунт' : 'Войти в ARVELIS AI'}</h1>
+          <h1>{checkingSession ? 'Проверяем ваш вход' : isSignUp ? 'Создать аккаунт' : 'Войти в ARVELIS AI'}</h1>
           <p>
-            {isSignUp
-              ? 'Создайте аккаунт по email. Пароль не нужен — владение адресом подтверждается одноразовым кодом.'
-              : 'Введите email. Мы отправим одноразовый код для защищённого входа без постоянного пароля.'}
+            {checkingSession
+              ? 'Если защищённая сессия на этом устройстве ещё действует, ARVELIS AI продолжит работу без нового кода.'
+              : isSignUp
+                ? 'Создайте аккаунт по email. Пароль не нужен — владение адресом подтверждается одноразовым кодом.'
+                : 'Введите email. Мы отправим одноразовый код для защищённого входа без постоянного пароля.'}
           </p>
         </div>
 
-        <div className="auth-mode-switch" role="group" aria-label="Режим доступа">
-          <button
-            type="button"
-            aria-pressed={!isSignUp}
-            className={!isSignUp ? 'auth-mode-switch__item auth-mode-switch__item--active' : 'auth-mode-switch__item'}
-            onClick={() => switchIntent('sign_in')}
-            disabled={busy}
-          >
-            Вход
-          </button>
-          <button
-            type="button"
-            aria-pressed={isSignUp}
-            className={isSignUp ? 'auth-mode-switch__item auth-mode-switch__item--active' : 'auth-mode-switch__item'}
-            onClick={() => switchIntent('sign_up')}
-            disabled={busy}
-          >
-            Регистрация
-          </button>
-        </div>
+        {!checkingSession ? (
+          <div className="auth-mode-switch" role="group" aria-label="Режим доступа">
+            <button
+              type="button"
+              aria-pressed={!isSignUp}
+              className={!isSignUp ? 'auth-mode-switch__item auth-mode-switch__item--active' : 'auth-mode-switch__item'}
+              onClick={() => switchIntent('sign_in')}
+              disabled={busy}
+            >
+              Вход
+            </button>
+            <button
+              type="button"
+              aria-pressed={isSignUp}
+              className={isSignUp ? 'auth-mode-switch__item auth-mode-switch__item--active' : 'auth-mode-switch__item'}
+              onClick={() => switchIntent('sign_up')}
+              disabled={busy}
+            >
+              Регистрация
+            </button>
+          </div>
+        ) : null}
 
-        {challenge ? (
+        {!checkingSession && challenge ? (
           <form className="auth-form auth-form--v2" onSubmit={complete} noValidate>
             <label htmlFor="real-auth-code">
               Код из письма
@@ -203,7 +208,7 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
               </button>
             </div>
           </form>
-        ) : controller.state.status !== 'authenticated' ? (
+        ) : !checkingSession && controller.state.status !== 'authenticated' ? (
           <form className="auth-form auth-form--v2" onSubmit={start} noValidate>
             {isSignUp ? (
               <label htmlFor="real-auth-name">
@@ -251,7 +256,7 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
 
         <AuthStatusPanel state={controller.state} />
 
-        {controller.methodsStatus === 'error' ? (
+        {controller.methodsStatus === 'error' && !checkingSession ? (
           <section className="auth-status-panel auth-status-panel--error" role="alert">
             <span className="auth-status-panel__signal" aria-hidden="true" />
             <div><strong>Способ входа временно недоступен</strong><p>Не удалось получить актуальные способы входа с сервера.</p></div>
