@@ -1,10 +1,19 @@
-import assert from 'node:assert/strict';
 import {
   clearPendingEmailOtpHandoff,
   loadPendingEmailOtpHandoff,
   savePendingEmailOtpHandoff,
   type PendingEmailOtpStorage,
 } from '../src/auth/pendingEmailOtpHandoff';
+
+function assert(value: unknown, message: string): asserts value {
+  if (!value) throw new Error(message);
+}
+
+function assertEqual(actual: unknown, expected: unknown, message: string): void {
+  if (actual !== expected) {
+    throw new Error(`${message}: expected ${String(expected)}, got ${String(actual)}`);
+  }
+}
 
 class MemoryStorage implements PendingEmailOtpStorage {
   private readonly values = new Map<string, string>();
@@ -45,54 +54,54 @@ const challenge = {
     challenge,
   }, storage, now);
 
-  assert.equal(saved, true);
+  assertEqual(saved, true, 'sign-up handoff must be persisted');
   const restored = loadPendingEmailOtpHandoff(storage, now + 30_000);
-  assert.ok(restored);
-  assert.equal(restored.intent, 'sign_up');
-  assert.equal(restored.email, 'ilsaf@example.com');
-  assert.equal(restored.displayName, 'Ильсаф');
-  assert.equal(restored.challenge.id, challenge.id);
-  assert.equal(restored.challenge.expiresAt, expiresAt);
-  assert.equal(storage.dump().includes('000000'), false, 'OTP code must never be persisted');
+  assert(restored, 'sign-up handoff must restore after a reload');
+  assertEqual(restored.intent, 'sign_up', 'sign-up intent must survive reload');
+  assertEqual(restored.email, 'ilsaf@example.com', 'email must survive reload for resend support');
+  assertEqual(restored.displayName, 'Ильсаф', 'display name must survive sign-up reload');
+  assertEqual(restored.challenge.id, challenge.id, 'challenge id must survive reload');
+  assertEqual(restored.challenge.expiresAt, expiresAt, 'challenge expiry must survive reload');
+  assertEqual(storage.dump().includes('000000'), false, 'OTP code must never be persisted');
 }
 
 {
   const storage = new MemoryStorage();
-  assert.equal(savePendingEmailOtpHandoff({
+  assertEqual(savePendingEmailOtpHandoff({
     intent: 'sign_in',
     email: 'user@example.com',
     challenge,
-  }, storage, now), true);
+  }, storage, now), true, 'sign-in handoff must be persisted');
 
   const restored = loadPendingEmailOtpHandoff(storage, now + 60_000);
-  assert.ok(restored);
-  assert.equal(restored.intent, 'sign_in');
-  assert.equal('displayName' in restored, false);
+  assert(restored, 'sign-in handoff must restore after a reload');
+  assertEqual(restored.intent, 'sign_in', 'sign-in intent must survive reload');
+  assertEqual('displayName' in restored, false, 'sign-in handoff must not invent profile data');
 
   clearPendingEmailOtpHandoff(storage);
-  assert.equal(loadPendingEmailOtpHandoff(storage, now + 60_000), null);
+  assertEqual(loadPendingEmailOtpHandoff(storage, now + 60_000), null, 'explicit cleanup must remove pending handoff');
 }
 
 {
   const storage = new MemoryStorage();
-  assert.equal(savePendingEmailOtpHandoff({
+  assertEqual(savePendingEmailOtpHandoff({
     intent: 'sign_in',
     email: 'user@example.com',
     challenge,
-  }, storage, now), true);
+  }, storage, now), true, 'handoff setup must succeed');
 
-  assert.equal(loadPendingEmailOtpHandoff(storage, Date.parse(expiresAt) + 1), null, 'expired challenge must not be restored');
-  assert.equal(storage.dump(), '', 'expired challenge must be removed from browser storage');
+  assertEqual(loadPendingEmailOtpHandoff(storage, Date.parse(expiresAt) + 1), null, 'expired challenge must not be restored');
+  assertEqual(storage.dump(), '', 'expired challenge must be removed from browser storage');
 }
 
 {
   const storage = new MemoryStorage();
-  assert.equal(savePendingEmailOtpHandoff({
+  assertEqual(savePendingEmailOtpHandoff({
     intent: 'sign_in',
     email: 'user@example.com',
     challenge: { ...challenge, id: 'not-a-server-challenge-id' },
   }, storage, now), false, 'malformed challenge identifiers must not be persisted');
-  assert.equal(storage.dump(), '');
+  assertEqual(storage.dump(), '', 'invalid handoff must not write browser storage');
 }
 
 console.log('ARVELIS pending email OTP handoff smoke: PASS');
