@@ -21,6 +21,7 @@
     "src/auth/guardedGateway.ts",
     "src/auth/externalFlow.ts",
     "src/auth/previewProfile.ts",
+    "src/auth/pendingEmailOtpHandoff.ts",
     "src/types.ts",
     "src/data/demo.ts",
     "src/lib/demoStorage.ts",
@@ -28,6 +29,7 @@
     "tests/preview-profile-smoke.ts",
     "tests/demo-storage-profile-smoke.ts",
     "tests/protocol-text-smoke.ts",
-    "tests/protocol-shape-smoke.ts"
+    "tests/protocol-shape-smoke.ts",
+    "tests/pending-email-otp-handoff-smoke.ts"
   ]
 }
