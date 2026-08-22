@@ -17,11 +17,15 @@
     "server/auth/account/contracts.ts",
     "server/auth/emailOtp/contracts.ts",
     "server/auth/session/contracts.ts",
+    "server/chat/contracts.ts",
+    "server/chat/service.ts",
     "server/persistence/postgres/rows.ts",
     "server/persistence/postgres/accountIdentityStore.ts",
     "server/persistence/postgres/emailOtpChallengeStore.ts",
     "server/persistence/postgres/rateLimitStore.ts",
     "server/persistence/postgres/sessionStore.ts",
-    "tests/postgres-auth-persistence-smoke.ts"
+    "server/persistence/postgres/chatStore.ts",
+    "tests/postgres-auth-persistence-smoke.ts",
+    "tests/postgres-chat-persistence-smoke.ts"
   ]
 }
