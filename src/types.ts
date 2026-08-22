@@ -57,25 +57,26 @@ export type ChatMessage = {
   mock?: boolean;
 };
 
-export type Conversation = {
+export type ConversationMetadata = {
   id: string;
   title: string;
   createdAt: number;
   updatedAt: number;
-  messages: ChatMessage[];
   modelPreference?: string | null;
+  /** Server revision for conflict detection; local browser records omit it. */
+  version?: number;
+};
+
+/** Current browser-local full conversation shape. */
+export type Conversation = ConversationMetadata & {
+  messages: ChatMessage[];
 };
 
 /**
  * Lightweight server/list representation used by Home and History. It avoids
  * downloading every message just to render a conversation list.
  */
-export type ConversationSummary = {
-  id: string;
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-  modelPreference?: string | null;
+export type ConversationSummary = ConversationMetadata & {
   version: number;
   messageCount: number;
   latestMessageContent: string | null;
