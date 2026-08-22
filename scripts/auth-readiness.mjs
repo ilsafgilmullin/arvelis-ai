@@ -3,6 +3,7 @@ const checks = [];
 const CLOSED_TEST_SMTP_HOST = 'smtp.yandex.ru';
 const CLOSED_TEST_SMTP_LOGIN = 'arvelis.auth';
 const CLOSED_TEST_SMTP_FROM = 'arvelis.auth@yandex.ru';
+const closedTestRuntime = process.argv.includes('--closed-test-runtime');
 
 function add(name, ok, detail) {
   checks.push({ name, ok, detail });
@@ -61,7 +62,15 @@ add('SMTP sender', smtpFrom === CLOSED_TEST_SMTP_FROM, smtpFrom === CLOSED_TEST_
 add('SMTP identity', smtpFrom === `${smtpUsername}@yandex.ru`, 'Yandex SMTP login must correspond to the sender mailbox');
 
 const rolloutEnabled = process.env.VITE_REAL_AUTH_ENABLED === 'true';
-add('Rollout flag', !rolloutEnabled, rolloutEnabled ? 'Disable until E2E gate passes' : 'Safely disabled');
+add(
+  'Global rollout flag',
+  !rolloutEnabled,
+  rolloutEnabled
+    ? 'Do not set VITE_REAL_AUTH_ENABLED globally in the closed-test environment'
+    : closedTestRuntime
+      ? 'Disabled globally; launcher will scope real-auth only to the Vite child process'
+      : 'Safely disabled',
+);
 
 for (const check of checks) {
   console.log(`${check.ok ? 'PASS' : 'WAIT'}  ${check.name}: ${check.detail}`);
@@ -70,7 +79,9 @@ for (const check of checks) {
 const ready = checks.every((check) => check.ok);
 
 console.log(ready
-  ? 'ARVELIS auth test environment: READY FOR SMTP/SQLite SMOKE (real-auth rollout still disabled)'
+  ? (closedTestRuntime
+      ? 'ARVELIS auth test environment: READY FOR DEVELOPMENT/CLOSED-TEST REAL-AUTH RUNTIME'
+      : 'ARVELIS auth test environment: READY FOR SMTP/SQLite SMOKE (real-auth rollout still disabled)')
   : 'ARVELIS auth test environment: NOT READY');
 
 if (!ready) process.exitCode = 1;

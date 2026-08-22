@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type {
   AuthChallenge,
+  AuthCodeChallenge,
   AuthCompleteRequest,
   AuthFailure,
   AuthGateway,
@@ -143,6 +144,14 @@ export function useAuthController(gateway: AuthGateway | null) {
 
     authSequenceRef.current += 1;
     dispatch({ type: 'SET_INTENT', intent });
+    return true;
+  }, []);
+
+  const resumeCodeChallenge = useCallback((intent: AuthIntent, challenge: AuthCodeChallenge) => {
+    if (hasLiveSession(stateRef.current)) return false;
+
+    authSequenceRef.current += 1;
+    dispatch({ type: 'CHALLENGE', intent, challenge });
     return true;
   }, []);
 
@@ -345,6 +354,7 @@ export function useAuthController(gateway: AuthGateway | null) {
     restore,
     refreshMethods,
     setIntent,
+    resumeCodeChallenge,
     start,
     complete,
     loadSessions,

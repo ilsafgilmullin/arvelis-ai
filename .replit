@@ -1,4 +1,4 @@
-run = "npm ci --include=dev --no-audit --no-fund && npm run dev"
+run = "npm ci --include=dev --no-audit --no-fund && npm run dev:auth:closed-test"
 entrypoint = "index.html"
 modules = ["nodejs-22"]
 

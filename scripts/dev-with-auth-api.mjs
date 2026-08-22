@@ -1,12 +1,20 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { spawn } from 'node:child_process';
+import {
+  assertClosedTestLaunchAllowed,
+  buildFrontendEnv,
+  closedTestRealAuthRequested,
+} from './auth-dev-env.mjs';
 
 const root = process.cwd();
 const node = process.execPath;
 const tsc = resolve(root, 'node_modules/typescript/bin/tsc');
 const vite = resolve(root, 'node_modules/vite/bin/vite.js');
 const runtimeDir = resolve(root, 'server-dist');
+const closedTestRealAuth = closedTestRealAuthRequested();
+
+assertClosedTestLaunchAllowed(closedTestRealAuth);
 
 function run(command, args) {
   return new Promise((resolveRun, rejectRun) => {
@@ -24,6 +32,10 @@ await run(node, [tsc, '-p', 'tsconfig.server-runtime.json']);
 await mkdir(runtimeDir, { recursive: true });
 await writeFile(resolve(runtimeDir, 'package.json'), '{"type":"commonjs"}\n', 'utf8');
 
+console.log(closedTestRealAuth
+  ? 'ARVELIS auth UI: ENABLED FOR DEVELOPMENT/CLOSED TEST (server secrets are not forwarded to Vite)'
+  : 'ARVELIS auth UI: DISABLED (preview frontend mode)');
+
 const api = spawn(node, ['--experimental-sqlite', resolve(runtimeDir, 'server/runtime/server.js')], {
   cwd: root,
   stdio: 'inherit',
@@ -32,7 +44,7 @@ const api = spawn(node, ['--experimental-sqlite', resolve(runtimeDir, 'server/ru
 const web = spawn(node, [vite, '--host', '0.0.0.0', '--port', '3000'], {
   cwd: root,
   stdio: 'inherit',
-  env: process.env,
+  env: buildFrontendEnv(process.env, closedTestRealAuth),
 });
 
 let stopping = false;
