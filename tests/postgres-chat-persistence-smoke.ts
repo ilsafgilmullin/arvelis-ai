@@ -75,11 +75,11 @@ async function main(): Promise<void> {
 
     const firstPage = await chat.getConversation('chat_account_a', firstId, { messageLimit: 1 });
     assert(firstPage.ok && firstPage.page.messages[0]?.position === 1, 'PostgreSQL message page must start with latest message');
-    assert(Boolean(firstPage.ok && firstPage.page.nextMessageCursor), 'PostgreSQL message page must expose cursor');
-    if (!firstPage.ok) throw new Error('unreachable');
+    const nextMessageCursor = firstPage.page.nextMessageCursor;
+    assert(nextMessageCursor, 'PostgreSQL message page must expose cursor');
     const olderPage = await chat.getConversation('chat_account_a', firstId, {
       messageLimit: 1,
-      messageCursor: firstPage.page.nextMessageCursor ?? undefined,
+      messageCursor: nextMessageCursor,
     });
     assert(olderPage.ok && olderPage.page.messages[0]?.position === 0, 'PostgreSQL message cursor must load older message');
 
@@ -88,9 +88,9 @@ async function main(): Promise<void> {
     assert(second.ok && third.ok, 'PostgreSQL Chat must create additional conversations');
     const listOne = await chat.listConversations('chat_account_a', { limit: 2 });
     assert(listOne.ok && listOne.page.items.length === 2, 'PostgreSQL conversation page size must be enforced');
-    if (!listOne.ok) throw new Error('unreachable');
-    assert(Boolean(listOne.page.nextCursor), 'PostgreSQL conversation page must expose cursor');
-    const listTwo = await chat.listConversations('chat_account_a', { limit: 2, cursor: listOne.page.nextCursor ?? undefined });
+    const nextConversationCursor = listOne.page.nextCursor;
+    assert(nextConversationCursor, 'PostgreSQL conversation page must expose cursor');
+    const listTwo = await chat.listConversations('chat_account_a', { limit: 2, cursor: nextConversationCursor });
     assert(listTwo.ok && listTwo.page.items.length === 1, 'PostgreSQL conversation cursor must load remaining conversation');
 
     const directMessageLimit = await store.appendUserMessage({
