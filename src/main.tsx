@@ -24,6 +24,7 @@ import './home-foundation-v1.css';
 import './profile-foundation-v1.css';
 import './profile-auth-mobile-qa.css';
 import './history-foundation-v1.css';
+import './chat-foundation-v3.css';
 
 const root = document.getElementById('root');
 
