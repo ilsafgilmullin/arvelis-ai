@@ -7,10 +7,10 @@ function assert(value: unknown, message: string): asserts value {
   if (!value) throw new Error(message);
 }
 
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
   });
 }
 
@@ -180,6 +180,22 @@ async function main(): Promise<void> {
       authMapped = error instanceof ServerChatRepositoryError && error.code === 'authentication_required' && error.status === 401;
     }
     assert(authMapped, 'Server repository must map structured HTTP errors');
+
+    globalThis.fetch = (async () => jsonResponse(
+      { error: { code: 'rate_limited', message: 'Too many chat changes' } },
+      429,
+      { 'Retry-After': '17' },
+    )) as typeof fetch;
+    let rateMapped = false;
+    try {
+      await repository.create({ content: 'Слишком быстро', attachments: [] });
+    } catch (error) {
+      rateMapped = error instanceof ServerChatRepositoryError
+        && error.code === 'rate_limited'
+        && error.status === 429
+        && error.retryAfterSeconds === 17;
+    }
+    assert(rateMapped, 'Server repository must preserve rate-limit retry metadata');
 
     globalThis.fetch = (async () => { throw new Error('offline'); }) as typeof fetch;
     let networkMapped = false;
