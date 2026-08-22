@@ -1,0 +1,435 @@
+/* ARVELIS AI — Chat shell v3.
+   Current modal/sheet primitives and iPhone visualViewport contract only.
+   Historical Chat v1/v2 visual rules must not be reintroduced here. */
+
+.chat-a11y-status {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.chat-overlay {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, .68);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.chat-sheet {
+  width: min(500px, 100%);
+  max-height: min(680px, calc(100dvh - 40px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 24px;
+  background: #121418;
+  padding: 14px;
+  box-shadow: 0 26px 80px rgba(0, 0, 0, .58);
+}
+
+/* Transitional child names are kept only until all sheet content is extracted
+   from ChatScreen. The root sheet contract is already v3/neutral. */
+.chat-v2-sheet__handle {
+  display: none;
+}
+
+.chat-v2-action-list {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 16px;
+  background: #0d0f12;
+}
+
+.chat-v2-action-list > button {
+  width: 100%;
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .055);
+  background: transparent;
+  color: #dcd8d0;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-v2-action-list > button:last-child {
+  border-bottom: 0;
+}
+
+.chat-v2-action-list > button:hover,
+.chat-v2-action-list > button:focus-visible {
+  background: rgba(255, 255, 255, .028);
+}
+
+.chat-v2-action-list > button:disabled {
+  opacity: .42;
+  cursor: default;
+}
+
+.chat-v2-action-list > button > .icon {
+  width: 20px;
+  height: 20px;
+  justify-self: center;
+  color: #8d939c;
+}
+
+.chat-v2-action-list > button > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.chat-v2-action-list strong {
+  font-size: 13px;
+  font-weight: 640;
+}
+
+.chat-v2-action-list small {
+  color: #747a83;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.chat-v2-action-list__danger > .icon,
+.chat-v2-action-list__danger strong {
+  color: #d98881;
+}
+
+.chat-v2-sheet__close {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 9px;
+  border: 0;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, .035);
+  color: #b5b1aa;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chat-v2-form-sheet {
+  display: grid;
+  gap: 10px;
+}
+
+.chat-v2-form-sheet label {
+  color: #777d86;
+  padding: 0 5px;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.chat-v2-form-sheet input,
+.chat-v2-form-sheet textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 14px;
+  outline: 0;
+  background: #0b0d10;
+  color: #f1eee7;
+  padding: 12px 13px;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.chat-v2-form-sheet input {
+  min-height: 50px;
+}
+
+.chat-v2-form-sheet textarea {
+  min-height: 132px;
+  max-height: min(300px, 42dvh);
+  resize: vertical;
+}
+
+.chat-v2-form-sheet input:focus,
+.chat-v2-form-sheet textarea:focus {
+  border-color: rgba(214, 170, 70, .42);
+  box-shadow: 0 0 0 3px rgba(214, 170, 70, .06);
+}
+
+.chat-v2-form-sheet__counter {
+  justify-self: end;
+  color: #656b74;
+  padding-right: 4px;
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-v2-form-sheet__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.chat-v2-form-sheet__actions button {
+  min-height: 48px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, .025);
+  color: #aaa69f;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 620;
+  cursor: pointer;
+}
+
+.chat-v2-form-sheet__actions .chat-v2-primary-action {
+  border-color: rgba(214, 170, 70, .22);
+  background: #8e7439;
+  color: #0a0b0d;
+}
+
+.chat-v2-form-sheet__actions button:disabled {
+  opacity: .4;
+  cursor: default;
+}
+
+.app-shell--chat .app-main {
+  min-width: 0;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .chat-v3-header,
+  .chat-v3-search,
+  .chat-v3-composer,
+  .app-shell--chat .mobile-nav {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .app-shell--chat .mobile-nav {
+    background: #0a0b0d;
+  }
+}
+
+/* Mobile Chat runtime contract validated against iPhone Safari:
+   the document does not scroll while Chat is open; the shell follows the full
+   visualViewport rectangle and only the message stream scrolls. */
+@media (max-width: 780px), (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
+  .chat-sheet {
+    max-height: calc(100% - 12px);
+  }
+
+  .app-shell--chat {
+    position: fixed;
+    z-index: 1;
+    top: var(--visual-viewport-top, 0px);
+    left: var(--visual-viewport-left, 0px);
+    right: auto;
+    bottom: auto;
+    width: var(--visual-viewport-width, 100vw);
+    height: var(--visual-viewport-height, 100dvh);
+    min-height: 0;
+    max-width: none;
+    max-height: var(--visual-viewport-height, 100dvh);
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .app-shell--chat .app-main {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+
+  .app-shell--chat .status-banners {
+    position: relative;
+    top: auto;
+    flex: 0 0 auto;
+  }
+
+  .chat-page.chat-v3 {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    max-height: 100%;
+    flex: 1 1 auto;
+    overflow: hidden;
+    padding-bottom: calc(68px + env(safe-area-inset-bottom));
+    scroll-padding-bottom: 0;
+    overscroll-behavior: none;
+  }
+
+  .chat-v3-header,
+  .chat-v3-search,
+  .chat-v3-composer-wrap {
+    position: relative;
+    top: auto;
+    bottom: auto;
+    flex: 0 0 auto;
+  }
+
+  .chat-v3-thread {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .chat-v3-thread::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+
+  .chat-thread__end {
+    scroll-margin-bottom: 18px;
+  }
+
+  .chat-v3-composer-wrap {
+    width: 100%;
+  }
+
+  .app-shell--chat .mobile-nav {
+    position: absolute;
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(7px, env(safe-area-inset-bottom));
+    background: #0a0b0d;
+  }
+
+  .app-shell--chat:has(.chat-v3-input-row textarea:focus) .chat-page.chat-v3,
+  .app-shell--chat:has(.chat-v3-search) .chat-page.chat-v3 {
+    padding-bottom: max(4px, env(safe-area-inset-bottom));
+  }
+
+  .app-shell--chat:has(.chat-v3-input-row textarea:focus) .mobile-nav,
+  .app-shell--chat:has(.chat-v3-search) .mobile-nav {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(calc(100% + 30px));
+  }
+
+  .app-shell--chat:has(.chat-v3-search) .chat-v3-composer-wrap {
+    display: none;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
+  .chat-v3-header {
+    min-height: 52px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .chat-v3-header__identity > .brand-mark {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+  }
+
+  .chat-v3-header h1 {
+    font-size: 16px;
+  }
+
+  .chat-page.chat-v3 {
+    padding-bottom: calc(52px + env(safe-area-inset-bottom));
+  }
+
+  .chat-v3-composer-wrap {
+    padding-top: 4px;
+    padding-bottom: 1px;
+  }
+
+  .chat-v3-input-row textarea {
+    min-height: 42px;
+    max-height: 82px;
+  }
+
+  .app-shell--chat .mobile-nav {
+    min-height: 48px;
+    padding: 2px 5px;
+  }
+
+  .app-shell--chat .mobile-nav__item {
+    min-height: 44px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+
+  .app-shell--chat .mobile-nav__item span {
+    display: none;
+  }
+
+  .app-shell--chat:has(.chat-v3-input-row textarea:focus) .chat-v3-header,
+  .app-shell--chat:has(.chat-v3-input-row textarea:focus) .chat-v3-search,
+  .app-shell--chat:has(.chat-v3-search input:focus) .chat-v3-header {
+    display: none;
+  }
+
+  .app-shell--chat:has(.chat-v3-input-row textarea:focus) .chat-page.chat-v3,
+  .app-shell--chat:has(.chat-v3-search) .chat-page.chat-v3 {
+    padding-bottom: max(2px, env(safe-area-inset-bottom));
+  }
+
+  .app-shell--chat:has(.chat-v3-input-row textarea:focus) .chat-v3-thread {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .app-shell--chat:has(.chat-v3-input-row textarea:focus) .chat-v3-composer-wrap {
+    padding-top: 3px;
+    padding-bottom: 1px;
+  }
+
+  .app-shell--chat:has(.chat-v3-input-row textarea:focus) .chat-v3-jump {
+    display: none;
+  }
+}
+
+@media (max-width: 780px) {
+  .chat-overlay {
+    align-items: flex-end;
+    padding: 8px;
+  }
+
+  .chat-sheet {
+    width: 100%;
+    max-height: calc(100% - 8px);
+    border-radius: 22px 22px 16px 16px;
+    padding: 12px;
+  }
+
+  .chat-v2-sheet__handle {
+    display: block;
+    width: 38px;
+    height: 4px;
+    margin: 0 auto 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .16);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell--chat .mobile-nav {
+    transition: none !important;
+  }
+}
