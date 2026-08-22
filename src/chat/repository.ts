@@ -1,4 +1,30 @@
-import type { ChatAttachmentMeta, ChatMessage, Conversation } from '../types';
+import type {
+  ChatAttachmentMeta,
+  ChatMessage,
+  ConversationMetadata,
+  ConversationSummary,
+} from '../types';
+
+export type ConversationListOptions = {
+  limit?: number;
+  cursor?: string;
+};
+
+export type ConversationMessagePageOptions = {
+  limit?: number;
+  cursor?: string;
+};
+
+export type ConversationListPage = {
+  items: ConversationSummary[];
+  nextCursor: string | null;
+};
+
+export type ConversationMessagePage = {
+  conversation: ConversationMetadata & { version: number };
+  messages: ChatMessage[];
+  nextMessageCursor: string | null;
+};
 
 export type CreateConversationInput = {
   content: string;
@@ -18,17 +44,24 @@ export type UpdateMessageInput = {
   content: string;
 };
 
+export type ChatMutationResult = {
+  conversation: ConversationMetadata & { version: number };
+  message: ChatMessage;
+};
+
 /**
- * UI-facing persistence boundary. The current closed-test implementation is
- * browser-local; a future server implementation must satisfy the same contract.
+ * UI-facing Chat persistence boundary. List and detail reads are cursor-based
+ * so Home/History never require loading every message in every conversation.
+ * Browser-local compatibility is handled by a separate adapter; server data
+ * must satisfy this contract without exposing persistence internals.
  */
 export interface ConversationRepository {
-  list(): Promise<Conversation[]>;
-  get(conversationId: string): Promise<Conversation | null>;
-  create(input: CreateConversationInput): Promise<Conversation>;
-  appendUserMessage(input: AppendMessageInput): Promise<ChatMessage>;
-  updateUserMessage(input: UpdateMessageInput): Promise<ChatMessage>;
-  rename(conversationId: string, title: string): Promise<void>;
+  listPage(options?: ConversationListOptions): Promise<ConversationListPage>;
+  getPage(conversationId: string, options?: ConversationMessagePageOptions): Promise<ConversationMessagePage | null>;
+  create(input: CreateConversationInput): Promise<ChatMutationResult>;
+  appendUserMessage(input: AppendMessageInput): Promise<ChatMutationResult>;
+  updateUserMessage(input: UpdateMessageInput): Promise<ChatMutationResult>;
+  rename(conversationId: string, title: string): Promise<ConversationMetadata & { version: number }>;
   delete(conversationId: string): Promise<void>;
 }
 

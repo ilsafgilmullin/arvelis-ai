@@ -10,7 +10,13 @@ import { WebCryptoEmailOtpSecurity } from '../auth/emailOtp/webCryptoSecurity';
 import type { SessionStore } from '../auth/session/contracts';
 import { SessionService } from '../auth/session/service';
 import { WebCryptoSessionSecurity } from '../auth/session/webCryptoSecurity';
+import type { ServerConversationStore } from '../chat/contracts';
+import type { ChatRateLimitStore } from '../chat/rateLimit';
+import { ChatRateLimiter } from '../chat/rateLimit';
+import { ChatApplicationService } from '../chat/service';
 import { PostgresAccountIdentityStore } from '../persistence/postgres/accountIdentityStore';
+import { PostgresChatRateLimitStore } from '../persistence/postgres/chatRateLimitStore';
+import { PostgresConversationStore } from '../persistence/postgres/chatStore';
 import { PostgresEmailOtpChallengeStore } from '../persistence/postgres/emailOtpChallengeStore';
 import { PostgresEmailOtpRateLimitStore } from '../persistence/postgres/rateLimitStore';
 import { PostgresSessionStore } from '../persistence/postgres/sessionStore';
@@ -20,7 +26,10 @@ import {
   SqliteEmailOtpRateLimitStore,
   SqliteSessionStore,
 } from '../persistence/sqlite/authStores';
+import { SqliteChatRateLimitStore } from '../persistence/sqlite/chatRateLimitStore';
+import { SqliteConversationStore } from '../persistence/sqlite/chatStore';
 import { openSqliteAuthDatabase } from '../persistence/sqlite/database';
+import { handleChatRoute } from './chatRoutes';
 import { loadAuthRuntimeConfig } from './config';
 import {
   getClientKey,
@@ -92,6 +101,8 @@ async function main(): Promise<void> {
   let challengeStore: EmailOtpChallengeStore;
   let rateLimits: EmailOtpRateLimitPort;
   let sessionStore: SessionStore;
+  let conversationStore: ServerConversationStore;
+  let chatRateLimitStore: ChatRateLimitStore;
 
   if (config.database.provider === 'postgres') {
     pool = new Pool({
@@ -102,21 +113,40 @@ async function main(): Promise<void> {
     });
 
     await pool.query('SELECT 1');
-    const schema = await pool.query<{ accounts: string | null }>("SELECT to_regclass('public.auth_accounts')::text AS accounts");
+    const schema = await pool.query<{
+      accounts: string | null;
+      conversations: string | null;
+      chatRateLimits: string | null;
+    }>(`
+      SELECT
+        to_regclass('public.auth_accounts')::text AS accounts,
+        to_regclass('public.chat_conversations')::text AS conversations,
+        to_regclass('public.chat_rate_limits')::text AS "chatRateLimits"
+    `);
     if (!schema.rows[0]?.accounts) {
       throw new Error('ARVELIS auth database migration is not applied');
+    }
+    if (!schema.rows[0]?.conversations) {
+      throw new Error('ARVELIS chat database migration is not applied');
+    }
+    if (!schema.rows[0]?.chatRateLimits) {
+      throw new Error('ARVELIS chat rate-limit migration is not applied');
     }
 
     accounts = new PostgresAccountIdentityStore(pool);
     challengeStore = new PostgresEmailOtpChallengeStore(pool);
     rateLimits = new PostgresEmailOtpRateLimitStore(pool);
     sessionStore = new PostgresSessionStore(pool);
+    conversationStore = new PostgresConversationStore(pool);
+    chatRateLimitStore = new PostgresChatRateLimitStore(pool);
   } else {
     sqlite = openSqliteAuthDatabase(config.database.path);
     accounts = new SqliteAccountIdentityStore(sqlite);
     challengeStore = new SqliteEmailOtpChallengeStore(sqlite);
     rateLimits = new SqliteEmailOtpRateLimitStore(sqlite);
     sessionStore = new SqliteSessionStore(sqlite);
+    conversationStore = new SqliteConversationStore(sqlite);
+    chatRateLimitStore = new SqliteChatRateLimitStore(sqlite);
   }
 
   const delivery = new SmtpEmailOtpDelivery(config.smtp);
@@ -137,6 +167,8 @@ async function main(): Promise<void> {
     security: sessionSecurity,
   });
   const accountAuth = new AccountAuthApplicationService({ accounts, sessions });
+  const chat = new ChatApplicationService(conversationStore);
+  const chatRateLimiter = new ChatRateLimiter(chatRateLimitStore);
 
   const buildPublicSession = async (sessionId: string, createdAt: number, expiresAt: number, accountId: string) => {
     const account = await accounts.getAccount(accountId);
@@ -197,8 +229,9 @@ async function main(): Promise<void> {
     if (method === 'GET' && url.pathname === '/api/health') {
       sendJson(response, 200, {
         ok: true,
-        service: 'arvelis-auth',
+        service: 'arvelis-api',
         persistence: config.database.provider,
+        capabilities: { auth: true, chatData: true, ai: false, serverAttachments: false },
       });
       return;
     }
@@ -412,13 +445,30 @@ async function main(): Promise<void> {
       return;
     }
 
+    const chatHandled = await handleChatRoute({
+      method,
+      url,
+      request,
+      response,
+      chat,
+      rateLimiter: chatRateLimiter,
+      authenticate: async (chatRequest) => {
+        const current = await authenticateRequest(chatRequest);
+        if (current.kind === 'authenticated') {
+          return { kind: 'authenticated', accountId: current.authenticated.account.id };
+        }
+        return { kind: current.kind };
+      },
+    });
+    if (chatHandled) return;
+
     sendJson(response, 404, { error: authFailure('invalid_input', 'Route not found') });
   };
 
   const server = createServer((request, response) => {
     void handler(request, response).catch(() => {
       if (!response.headersSent) {
-        sendJson(response, 500, { error: authFailure('service_unavailable', 'Auth service unavailable') });
+        sendJson(response, 500, { error: authFailure('service_unavailable', 'ARVELIS API unavailable') });
       } else {
         response.destroy();
       }
@@ -429,7 +479,7 @@ async function main(): Promise<void> {
     server.once('error', reject);
     server.listen(config.port, '127.0.0.1', () => resolve());
   });
-  console.log(`ARVELIS auth API listening on 127.0.0.1:${config.port} (${config.database.provider})`);
+  console.log(`ARVELIS API listening on 127.0.0.1:${config.port} (${config.database.provider})`);
 
   const shutdown = async () => {
     server.close();
@@ -441,6 +491,6 @@ async function main(): Promise<void> {
 }
 
 void main().catch(() => {
-  console.error('ARVELIS auth API failed to start');
+  console.error('ARVELIS API failed to start');
   process.exitCode = 1;
 });
