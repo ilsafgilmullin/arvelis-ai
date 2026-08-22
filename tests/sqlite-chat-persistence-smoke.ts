@@ -52,10 +52,11 @@ async function main(): Promise<void> {
     const pageOne = await chat.getConversation('account-a', firstId, { messageLimit: 1 });
     assert(pageOne.ok, 'Conversation page must load');
     assert(pageOne.page.messages.length === 1 && pageOne.page.messages[0]?.position === 1, 'Latest page must return newest message');
-    assert(Boolean(pageOne.page.nextMessageCursor), 'Latest page must expose older-message cursor');
+    const nextMessageCursor = pageOne.page.nextMessageCursor;
+    assert(nextMessageCursor, 'Latest page must expose older-message cursor');
     const pageTwo = await chat.getConversation('account-a', firstId, {
       messageLimit: 1,
-      messageCursor: pageOne.page.nextMessageCursor ?? undefined,
+      messageCursor: nextMessageCursor,
     });
     assert(pageTwo.ok, 'Older message page must load');
     assert(pageTwo.page.messages[0]?.position === 0, 'Older page must return first message');
@@ -77,8 +78,9 @@ async function main(): Promise<void> {
 
     const listOne = await chat.listConversations('account-a', { limit: 2 });
     assert(listOne.ok && listOne.page.items.length === 2, 'Conversation list must honor page size');
-    assert(Boolean(listOne.page.nextCursor), 'Conversation list must return cursor when page is full');
-    const listTwo = await chat.listConversations('account-a', { limit: 2, cursor: listOne.page.nextCursor ?? undefined });
+    const nextConversationCursor = listOne.page.nextCursor;
+    assert(nextConversationCursor, 'Conversation list must return cursor when page is full');
+    const listTwo = await chat.listConversations('account-a', { limit: 2, cursor: nextConversationCursor });
     assert(listTwo.ok && listTwo.page.items.length === 1, 'Conversation cursor must return remaining item');
     assert(listTwo.page.nextCursor === null, 'Final conversation page must terminate cursor');
 
