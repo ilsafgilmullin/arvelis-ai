@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import {
   CHAT_ATTACHMENT_MAX_COUNT,
-  CHAT_ATTACHMENT_MAX_TOTAL_BYTES,
   attachmentKindForMime,
   formatAttachmentSize,
   formatVoiceDuration,
@@ -49,7 +48,11 @@ assert.equal(validateAttachmentCandidate(valid), null);
 assert.equal(isValidStoredAttachmentMeta(valid), true);
 assert.ok(validateAttachmentCandidate({ kind: 'video', size: 81 * 1024 * 1024 }));
 assert.ok(validateAttachmentBatch([], Array.from({ length: CHAT_ATTACHMENT_MAX_COUNT + 1 }, (_, index) => ({ ...valid, id: `att_${String(index).padStart(12, '0')}` }))));
-assert.ok(validateAttachmentBatch([], [{ ...valid, kind: 'video', size: CHAT_ATTACHMENT_MAX_TOTAL_BYTES }]));
+const videoA: ChatAttachmentMeta = { ...valid, id: 'att_video_a_123456', kind: 'video', mimeType: 'video/mp4', name: 'a.mp4', size: 70 * 1024 * 1024 };
+const videoB: ChatAttachmentMeta = { ...valid, id: 'att_video_b_123456', kind: 'video', mimeType: 'video/mp4', name: 'b.mp4', size: 70 * 1024 * 1024 };
+assert.equal(validateAttachmentCandidate(videoA), null);
+assert.equal(validateAttachmentCandidate(videoB), null);
+assert.ok(validateAttachmentBatch([], [videoA, videoB]), 'combined attachment budget must reject 140 MB');
 
 const draftKey = 'account:12345678:thread:new';
 assert.equal(savePendingChatAttachments(draftKey, [valid]), true);
