@@ -15,8 +15,10 @@
   },
   "include": [
     "src/types.ts",
+    "src/chat/domain.ts",
     "src/chat/attachmentPolicy.ts",
     "src/lib/chatPendingAttachmentStorage.ts",
+    "tests/chat-domain-smoke.ts",
     "tests/chat-attachments-smoke.ts"
   ]
 }
