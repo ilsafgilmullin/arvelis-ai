@@ -1,4 +1,10 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import type {
+  ChatAttachmentRecord,
+  ChatConversationRecord,
+  ChatConversationSummaryRecord,
+  ChatMessageRecord,
+} from '../chat/contracts';
 import type { ChatApplicationService, ChatServiceFailure } from '../chat/service';
 import { readJsonObject, sendJson, sendNoContent } from './http';
 
@@ -18,6 +24,52 @@ type ChatRouteContext = {
 
 function errorBody(code: string, message: string) {
   return { error: { code, message } };
+}
+
+function publicConversation(record: ChatConversationRecord) {
+  return {
+    id: record.id,
+    title: record.title,
+    modelPreference: record.modelPreference,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    version: record.version,
+  };
+}
+
+function publicSummary(record: ChatConversationSummaryRecord) {
+  return {
+    ...publicConversation(record),
+    messageCount: record.messageCount,
+    latestMessageContent: record.latestMessageContent,
+    latestAttachmentKind: record.latestAttachmentKind,
+  };
+}
+
+function publicAttachment(record: ChatAttachmentRecord) {
+  return {
+    id: record.id,
+    kind: record.kind,
+    name: record.name,
+    mimeType: record.mimeType,
+    size: record.sizeBytes,
+    durationMs: record.durationMs,
+    storageState: record.storageState,
+    createdAt: record.createdAt,
+  };
+}
+
+function publicMessage(record: ChatMessageRecord) {
+  return {
+    id: record.id,
+    role: record.role,
+    status: record.status,
+    content: record.content,
+    position: record.position,
+    createdAt: record.createdAt,
+    editedAt: record.editedAt,
+    attachments: record.attachments.map(publicAttachment),
+  };
 }
 
 function parseOptionalPositiveInteger(value: string | null): number | undefined | null {
@@ -92,7 +144,10 @@ export async function handleChatRoute(context: ChatRouteContext): Promise<boolea
       sendServiceFailure(response, result);
       return true;
     }
-    sendJson(response, 200, result.page);
+    sendJson(response, 200, {
+      items: result.page.items.map(publicSummary),
+      nextCursor: result.page.nextCursor,
+    });
     return true;
   }
 
@@ -117,7 +172,10 @@ export async function handleChatRoute(context: ChatRouteContext): Promise<boolea
       sendServiceFailure(response, result);
       return true;
     }
-    sendJson(response, 201, { conversation: result.conversation, message: result.message });
+    sendJson(response, 201, {
+      conversation: publicConversation(result.conversation),
+      message: publicMessage(result.message),
+    });
     return true;
   }
 
@@ -139,7 +197,11 @@ export async function handleChatRoute(context: ChatRouteContext): Promise<boolea
         sendServiceFailure(response, result);
         return true;
       }
-      sendJson(response, 200, result.page);
+      sendJson(response, 200, {
+        conversation: publicConversation(result.page.conversation),
+        messages: result.page.messages.map(publicMessage),
+        nextMessageCursor: result.page.nextMessageCursor,
+      });
       return true;
     }
 
@@ -160,7 +222,7 @@ export async function handleChatRoute(context: ChatRouteContext): Promise<boolea
         sendServiceFailure(response, result);
         return true;
       }
-      sendJson(response, 200, { conversation: result.conversation });
+      sendJson(response, 200, { conversation: publicConversation(result.conversation) });
       return true;
     }
 
@@ -197,7 +259,10 @@ export async function handleChatRoute(context: ChatRouteContext): Promise<boolea
       sendServiceFailure(response, result);
       return true;
     }
-    sendJson(response, 201, { conversation: result.conversation, message: result.message });
+    sendJson(response, 201, {
+      conversation: publicConversation(result.conversation),
+      message: publicMessage(result.message),
+    });
     return true;
   }
 
@@ -219,7 +284,10 @@ export async function handleChatRoute(context: ChatRouteContext): Promise<boolea
       sendServiceFailure(response, result);
       return true;
     }
-    sendJson(response, 200, { conversation: result.conversation, message: result.message });
+    sendJson(response, 200, {
+      conversation: publicConversation(result.conversation),
+      message: publicMessage(result.message),
+    });
     return true;
   }
 
