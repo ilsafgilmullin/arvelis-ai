@@ -14,6 +14,7 @@ export type ChatMessageStatus =
   | 'cancelled';
 
 export type ChatAttachmentKind = 'image' | 'video' | 'audio' | 'file';
+export type ChatAttachmentStorageState = 'pending' | 'ready' | 'failed';
 
 export type ChatAttachmentMeta = {
   id: string;
@@ -23,6 +24,8 @@ export type ChatAttachmentMeta = {
   size: number;
   createdAt: number;
   durationMs?: number;
+  /** Present for server-backed attachments; local IndexedDB attachments omit it. */
+  storageState?: ChatAttachmentStorageState;
 };
 
 export type ChatTextPart = {
@@ -36,7 +39,7 @@ export type ChatAttachmentPart = {
 };
 
 /**
- * Forward-compatible message content contract for the future server Chat API.
+ * Forward-compatible message content contract for the server Chat API.
  * The current closed-test browser persistence still stores `content` and
  * `attachments` separately and is migrated through the legacy storage adapter.
  */
@@ -61,6 +64,22 @@ export type Conversation = {
   updatedAt: number;
   messages: ChatMessage[];
   modelPreference?: string | null;
+};
+
+/**
+ * Lightweight server/list representation used by Home and History. It avoids
+ * downloading every message just to render a conversation list.
+ */
+export type ConversationSummary = {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  modelPreference?: string | null;
+  version: number;
+  messageCount: number;
+  latestMessageContent: string | null;
+  latestAttachmentKind: ChatAttachmentKind | null;
 };
 
 export type ChatWorkspaceState = {
