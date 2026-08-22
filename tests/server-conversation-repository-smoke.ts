@@ -58,7 +58,7 @@ async function main(): Promise<void> {
       if (url.endsWith(`/conversations/${conversation.id}`) && init?.method === 'DELETE') {
         return new Response(null, { status: 204 });
       }
-      if (url.endsWith(`/conversations/${conversation.id}`)) {
+      if (url.endsWith(`/conversations/${conversation.id}`) || url.includes(`/conversations/${conversation.id}?`)) {
         return jsonResponse({
           conversation,
           messages: [{
