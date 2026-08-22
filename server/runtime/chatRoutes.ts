@@ -5,6 +5,8 @@ import type {
   ChatConversationSummaryRecord,
   ChatMessageRecord,
 } from '../chat/contracts';
+import type { ChatRateLimitScope } from '../chat/rateLimit';
+import { ChatRateLimiter } from '../chat/rateLimit';
 import type { ChatApplicationService, ChatServiceFailure } from '../chat/service';
 import { readJsonObject, sendJson, sendNoContent } from './http';
 
@@ -19,11 +21,14 @@ type ChatRouteContext = {
   request: IncomingMessage;
   response: ServerResponse;
   chat: ChatApplicationService;
+  rateLimiter: ChatRateLimiter;
   authenticate: (request: IncomingMessage) => Promise<ChatAuthentication>;
 };
 
-function errorBody(code: string, message: string) {
-  return { error: { code, message } };
+function errorBody(code: string, message: string, retryAfterSeconds?: number) {
+  return retryAfterSeconds === undefined
+    ? { error: { code, message } }
+    : { error: { code, message, retryAfterSeconds } };
 }
 
 function publicConversation(record: ChatConversationRecord) {
@@ -118,12 +123,35 @@ async function requireAccount(
   return null;
 }
 
+async function allowMutation(
+  scope: ChatRateLimitScope,
+  accountId: string,
+  response: ServerResponse,
+  rateLimiter: ChatRateLimiter,
+): Promise<boolean> {
+  try {
+    const decision = await rateLimiter.consume(scope, accountId);
+    if (decision.allowed) return true;
+    const retryAfterSeconds = Math.max(1, decision.retryAfterSeconds ?? 1);
+    sendJson(
+      response,
+      429,
+      errorBody('rate_limited', 'Too many chat changes', retryAfterSeconds),
+      { 'Retry-After': String(retryAfterSeconds) },
+    );
+    return false;
+  } catch {
+    sendJson(response, 503, errorBody('service_unavailable', 'Chat protection unavailable'));
+    return false;
+  }
+}
+
 function containsUnsupportedAttachments(body: Record<string, unknown>): boolean {
   return Object.prototype.hasOwnProperty.call(body, 'attachments');
 }
 
 export async function handleChatRoute(context: ChatRouteContext): Promise<boolean> {
-  const { method, url, request, response, chat, authenticate } = context;
+  const { method, url, request, response, chat, rateLimiter, authenticate } = context;
   if (!url.pathname.startsWith('/api/chat/')) return false;
 
   const accountId = await requireAccount(request, response, authenticate);
@@ -152,6 +180,7 @@ export async function handleChatRoute(context: ChatRouteContext): Promise<boolea
   }
 
   if (method === 'POST' && url.pathname === '/api/chat/conversations') {
+    if (!(await allowMutation('create', accountId, response, rateLimiter))) return true;
     let body: Record<string, unknown>;
     try {
       body = await readJsonObject(request);
@@ -206,6 +235,7 @@ export async function handleChatRoute(context: ChatRouteContext): Promise<boolea
     }
 
     if (method === 'PATCH') {
+      if (!(await allowMutation('mutation', accountId, response, rateLimiter))) return true;
       let body: Record<string, unknown>;
       try {
         body = await readJsonObject(request);
@@ -227,6 +257,7 @@ export async function handleChatRoute(context: ChatRouteContext): Promise<boolea
     }
 
     if (method === 'DELETE') {
+      if (!(await allowMutation('mutation', accountId, response, rateLimiter))) return true;
       const result = await chat.deleteConversation(accountId, conversationId);
       if (!result.ok) {
         sendServiceFailure(response, result);
@@ -239,6 +270,7 @@ export async function handleChatRoute(context: ChatRouteContext): Promise<boolea
 
   const messageCollectionMatch = /^\/api\/chat\/conversations\/([a-f0-9]{32})\/messages$/.exec(url.pathname);
   if (method === 'POST' && messageCollectionMatch?.[1]) {
+    if (!(await allowMutation('mutation', accountId, response, rateLimiter))) return true;
     let body: Record<string, unknown>;
     try {
       body = await readJsonObject(request);
@@ -268,6 +300,7 @@ export async function handleChatRoute(context: ChatRouteContext): Promise<boolea
 
   const messageMatch = /^\/api\/chat\/conversations\/([a-f0-9]{32})\/messages\/([a-f0-9]{32})$/.exec(url.pathname);
   if (method === 'PATCH' && messageMatch?.[1] && messageMatch[2]) {
+    if (!(await allowMutation('mutation', accountId, response, rateLimiter))) return true;
     let body: Record<string, unknown>;
     try {
       body = await readJsonObject(request);
