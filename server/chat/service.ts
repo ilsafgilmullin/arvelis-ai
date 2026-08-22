@@ -107,8 +107,10 @@ export class ChatApplicationService {
     if (options?.cursor && !before) return { ok: false, code: 'invalid_input' };
 
     try {
-      const items = await this.store.listConversations({ accountId, limit, ...(before ? { before } : {}) });
-      const last = items.length === limit ? items.at(-1) : undefined;
+      const fetched = await this.store.listConversations({ accountId, limit: limit + 1, ...(before ? { before } : {}) });
+      const hasMore = fetched.length > limit;
+      const items = hasMore ? fetched.slice(0, limit) : fetched;
+      const last = hasMore ? items.at(-1) : undefined;
       return {
         ok: true,
         page: {
@@ -131,19 +133,21 @@ export class ChatApplicationService {
     try {
       const conversation = await this.store.getConversation(accountId, conversationId);
       if (!conversation) return { ok: false, code: 'not_found' };
-      const messages = await this.store.listMessages({
+      const fetched = await this.store.listMessages({
         accountId,
         conversationId,
-        limit,
+        limit: limit + 1,
         ...(beforePosition === undefined ? {} : { beforePosition }),
       });
-      const oldest = messages.length === limit ? messages[0] : undefined;
+      const hasMore = fetched.length > limit;
+      const messages = hasMore ? fetched.slice(fetched.length - limit) : fetched;
+      const oldest = hasMore ? messages[0] : undefined;
       return {
         ok: true,
         page: {
           conversation,
           messages,
-          nextMessageCursor: oldest && oldest.position > 0 ? encodeMessageCursor(oldest.position) : null,
+          nextMessageCursor: oldest ? encodeMessageCursor(oldest.position) : null,
         },
       };
     } catch {
