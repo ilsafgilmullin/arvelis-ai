@@ -3,6 +3,11 @@ import { AuthStatusPanel } from '../auth/AuthStatusPanel';
 import type { AuthIntent, AuthSession, AuthUiState } from '../auth/contracts';
 import { realAuthGateway } from '../auth/httpTransport';
 import {
+  clearPendingEmailOtpHandoff,
+  loadPendingEmailOtpHandoff,
+  savePendingEmailOtpHandoff,
+} from '../auth/pendingEmailOtpHandoff';
+import {
   PREVIEW_PROFILE_NAME_MAX_LENGTH,
   normalizePreviewProfileName,
   validatePreviewProfileName,
@@ -29,13 +34,24 @@ function intentFromState(state: AuthUiState): AuthIntent {
   }
 }
 
+function terminalPendingChallengeError(state: AuthUiState): boolean {
+  if (state.status !== 'error') return false;
+  return state.error.code === 'challenge_expired'
+    || state.error.code === 'account_exists'
+    || state.error.code === 'account_not_found'
+    || state.error.code === 'account_locked'
+    || state.error.code === 'access_denied';
+}
+
 export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session: AuthSession) => void }) {
   const controller = useAuthController(realAuthGateway);
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [code, setCode] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [handoffPersistenceFailed, setHandoffPersistenceFailed] = useState(false);
   const deliveredSessionRef = useRef<string | null>(null);
+  const pendingRestoreAttemptedRef = useRef(false);
   const online = useOnlineStatus();
   const checkingSession = controller.state.status === 'checking_session';
   const intent = intentFromState(controller.state);
@@ -52,6 +68,34 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
     || controller.state.status === 'verifying';
 
   useEffect(() => {
+    if (controller.state.status !== 'signed_out' || pendingRestoreAttemptedRef.current) return;
+    pendingRestoreAttemptedRef.current = true;
+
+    const pending = loadPendingEmailOtpHandoff();
+    if (!pending) return;
+
+    setEmail(pending.email);
+    setDisplayName(pending.displayName ?? '');
+    setCode('');
+    setFieldError(null);
+    setHandoffPersistenceFailed(false);
+    controller.resumeCodeChallenge(pending.intent, pending.challenge);
+  }, [controller.state.status, controller.resumeCodeChallenge]);
+
+  useEffect(() => {
+    if (controller.state.status === 'authenticated') {
+      clearPendingEmailOtpHandoff();
+      setHandoffPersistenceFailed(false);
+      return;
+    }
+
+    if (terminalPendingChallengeError(controller.state)) {
+      clearPendingEmailOtpHandoff();
+      setHandoffPersistenceFailed(false);
+    }
+  }, [controller.state]);
+
+  useEffect(() => {
     if (controller.state.status !== 'authenticated') return;
     if (deliveredSessionRef.current === controller.state.session.id) return;
     deliveredSessionRef.current = controller.state.session.id;
@@ -62,6 +106,9 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
 
   const switchIntent = (nextIntent: AuthIntent) => {
     if (busy) return;
+    pendingRestoreAttemptedRef.current = true;
+    clearPendingEmailOtpHandoff();
+    setHandoffPersistenceFailed(false);
     controller.setIntent(nextIntent);
     setCode('');
     setFieldError(null);
@@ -77,12 +124,14 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
       return;
     }
 
+    let normalizedDisplayName: string | undefined;
     if (isSignUp) {
       const nameError = validatePreviewProfileName(displayName);
       if (nameError) {
         setFieldError(nameError);
         return;
       }
+      normalizedDisplayName = normalizePreviewProfileName(displayName);
     }
 
     const nextChallenge = await controller.start({
@@ -90,7 +139,16 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
       methodId: EMAIL_METHOD_ID,
       identifier: normalizedEmail,
     });
-    if (nextChallenge?.kind === 'code') setCode('');
+    if (nextChallenge?.kind !== 'code') return;
+
+    const persisted = savePendingEmailOtpHandoff({
+      intent,
+      email: normalizedEmail,
+      challenge: nextChallenge,
+      ...(normalizedDisplayName === undefined ? {} : { displayName: normalizedDisplayName }),
+    });
+    setHandoffPersistenceFailed(!persisted);
+    setCode('');
   };
 
   const complete = async (event: FormEvent<HTMLFormElement>) => {
@@ -114,7 +172,11 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
           challengeId: challenge.id,
           response: normalizedCode,
         };
-    await controller.complete(request);
+    const completed = await controller.complete(request);
+    if (completed) {
+      clearPendingEmailOtpHandoff();
+      setHandoffPersistenceFailed(false);
+    }
   };
 
   const resetToIdentifier = () => {
@@ -196,6 +258,9 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
               />
             </label>
             {fieldError ? <p className="auth-field-error" role="alert">{fieldError}</p> : null}
+            {handoffPersistenceFailed ? (
+              <p className="auth-field-error" role="status">Не удалось сохранить состояние входа на этом устройстве. Не закрывайте вкладку до ввода кода.</p>
+            ) : null}
             <button className="button button--primary auth-submit" type="submit" disabled={busy || code.length !== OTP_LENGTH}>
               {busy ? 'Проверяем…' : 'Подтвердить и продолжить'}
             </button>
