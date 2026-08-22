@@ -1,9 +1,11 @@
 import { DEFAULT_PREVIEW_PROFILE_NAME } from '../src/auth/previewProfile';
 import {
+  DEMO_PREVIEW_NOTICE,
   loadDemoWorkspace,
   resetDemoWorkspace,
   saveDemoWorkspace,
 } from '../src/lib/demoStorage';
+import type { DemoThread } from '../src/types';
 
 function assert(value: unknown, message: string): asserts value {
   if (!value) throw new Error(message);
@@ -27,8 +29,31 @@ Object.defineProperty(globalThis, 'window', {
   value: { localStorage },
 });
 
+const now = Date.now();
+const userThread: DemoThread = {
+  id: 'thread-user-created',
+  title: 'Моя задача',
+  createdAt: now,
+  updatedAt: now,
+  messages: [{
+    id: 'message-user-created',
+    role: 'user',
+    content: 'Это сообщение создал пользователь.',
+    createdAt: now,
+  }],
+};
+
 const base = resetDemoWorkspace();
-assert(saveDemoWorkspace({ ...base, profileName: 'Ильсаф' }), 'valid workspace profile was not persisted');
+assert(base.threads.length === 0, 'clean workspace must not contain seeded conversations');
+assert(base.activeThreadId === null, 'clean workspace must not select a fake active conversation');
+
+const userWorkspace = {
+  ...base,
+  profileName: 'Ильсаф',
+  threads: [userThread],
+  activeThreadId: userThread.id,
+};
+assert(saveDemoWorkspace(userWorkspace), 'valid user workspace was not persisted');
 
 const workspaceKey = [...storage.keys()].find((key) => key.includes('workspace'));
 assert(workspaceKey, 'workspace storage key was not written');
@@ -47,7 +72,7 @@ assert(
 );
 assert(
   recovered.threads.length === originalThreadCount,
-  'corrupt profile name discarded otherwise healthy workspace threads',
+  'corrupt profile name discarded otherwise healthy user threads',
 );
 
 assert(
@@ -60,32 +85,28 @@ assert(
 );
 assert(
   saveDemoWorkspace({ ...base, profileName: DEFAULT_PREVIEW_PROFILE_NAME }),
-  'internal default preview profile was rejected for reset persistence',
+  'internal default profile was rejected for reset persistence',
 );
 
 const extraRoot = {
-  ...base,
-  profileName: 'Ильсаф',
+  ...userWorkspace,
   accessToken: 'must-not-persist',
-} as typeof base;
+} as typeof userWorkspace;
 assert(!saveDemoWorkspace(extraRoot), 'workspace with unexpected root field was persisted');
 
-const firstThread = base.threads[0];
-assert(firstThread, 'starter workspace thread missing');
 const extraThread = {
-  ...firstThread,
+  ...userThread,
   providerToken: 'must-not-persist',
-} as typeof firstThread;
+} as typeof userThread;
 assert(
   !saveDemoWorkspace({
-    ...base,
-    profileName: 'Ильсаф',
-    threads: [extraThread, ...base.threads.slice(1)],
+    ...userWorkspace,
+    threads: [extraThread],
   }),
   'workspace with unexpected thread field was persisted',
 );
 
-assert(saveDemoWorkspace({ ...base, profileName: 'Ильсаф' }), 'valid workspace could not be restored for raw boundary test');
+assert(saveDemoWorkspace(userWorkspace), 'valid workspace could not be restored for raw boundary test');
 const rawForUnknownField = storage.get(workspaceKey);
 assert(rawForUnknownField, 'workspace payload missing before unknown-field injection');
 const unknownFieldPayload = JSON.parse(rawForUnknownField) as {
@@ -100,7 +121,7 @@ assert(
   'unexpected stored thread field reached application workspace',
 );
 
-assert(saveDemoWorkspace({ ...base, profileName: 'Ильсаф' }), 'valid workspace could not be restored for assistant-role test');
+assert(saveDemoWorkspace(userWorkspace), 'valid workspace could not be restored for assistant-role test');
 const rawForAssistant = storage.get(workspaceKey);
 assert(rawForAssistant, 'workspace payload missing before assistant injection');
 const assistantPayload = JSON.parse(rawForAssistant) as {
@@ -120,10 +141,10 @@ assistantThread.messages.push({
 storage.set(workspaceKey, JSON.stringify(assistantPayload));
 assert(
   loadDemoWorkspace().profileName === DEFAULT_PREVIEW_PROFILE_NAME,
-  'untrusted non-mock assistant message reached preview state',
+  'untrusted assistant message reached workspace state',
 );
 
-assert(saveDemoWorkspace({ ...base, profileName: 'Ильсаф' }), 'valid workspace could not be restored for system-role test');
+assert(saveDemoWorkspace(userWorkspace), 'valid workspace could not be restored for system-role test');
 const rawForSystem = storage.get(workspaceKey);
 assert(rawForSystem, 'workspace payload missing before system injection');
 const systemPayload = JSON.parse(rawForSystem) as {
@@ -143,7 +164,49 @@ systemThread.messages.push({
 storage.set(workspaceKey, JSON.stringify(systemPayload));
 assert(
   loadDemoWorkspace().profileName === DEFAULT_PREVIEW_PROFILE_NAME,
-  'untrusted system status reached preview state',
+  'untrusted system status reached workspace state',
 );
 
-console.log('ARVELIS demo storage profile smoke: PASS');
+// Legacy preview data is accepted only long enough to sanitize it. Seeded
+// conversations are removed completely; preview status messages are removed
+// from genuine user-created threads without deleting the user's message.
+const legacyPayload = {
+  threads: [
+    {
+      id: 'demo-study',
+      title: 'Разбор учебного материала',
+      createdAt: now - 1000,
+      updatedAt: now - 1000,
+      messages: [{
+        id: 'demo-study-user',
+        role: 'user',
+        content: 'Старый seeded demo content',
+        createdAt: now - 1000,
+      }],
+    },
+    {
+      ...userThread,
+      messages: [
+        userThread.messages[0],
+        {
+          id: 'legacy-preview-status',
+          role: 'system',
+          content: DEMO_PREVIEW_NOTICE,
+          createdAt: now + 1,
+        },
+      ],
+      updatedAt: now + 1,
+    },
+  ],
+  activeThreadId: 'demo-study',
+  profileName: 'Ильсаф',
+};
+storage.set(workspaceKey, JSON.stringify(legacyPayload));
+const sanitized = loadDemoWorkspace();
+assert(sanitized.threads.length === 1, 'legacy seeded conversation was not removed');
+assert(sanitized.threads[0]?.id === userThread.id, 'real user conversation was not preserved');
+assert(sanitized.threads[0]?.messages.length === 1, 'legacy preview status was not removed');
+assert(sanitized.threads[0]?.messages[0]?.role === 'user', 'user message was lost during legacy cleanup');
+assert(sanitized.activeThreadId === null, 'removed seeded thread remained active');
+
+console.log('ARVELIS workspace storage profile smoke: PASS');

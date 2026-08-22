@@ -3,7 +3,6 @@ import {
   isPersistablePreviewProfileName,
   resolveStoredPreviewProfileName,
 } from '../auth/previewProfile';
-import { DEMO_MOCK_RESPONSE, initialDemoThreads } from '../data/demo';
 import type { DemoMessage, DemoThread, DemoWorkspaceState } from '../types';
 
 const PREVIEW_STORAGE_KEY = 'arvelis.demo.workspace.v1';
@@ -14,9 +13,18 @@ const WORKSPACE_KEYS = new Set(['threads', 'activeThreadId', 'profileName']);
 const THREAD_KEYS = new Set(['id', 'title', 'createdAt', 'updatedAt', 'messages']);
 const MESSAGE_KEYS = new Set(['id', 'role', 'content', 'createdAt', 'editedAt', 'mock']);
 const ACCOUNT_SCOPE_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+
+/** Legacy preview copy is recognized only so old browser data can be cleaned safely. */
 export const DEMO_PREVIEW_NOTICE = 'Сообщение сохранено на этом устройстве. AI-ответы в этой версии пока недоступны.';
 
+const LEGACY_SEEDED_THREAD_IDS = new Set([
+  'demo-project-plan',
+  'demo-study',
+  'demo-compare',
+]);
+
 const LEGACY_SYSTEM_PREVIEW_COPY = new Set<string>([
+  DEMO_PREVIEW_NOTICE,
   'Запрос сохранён локально для тестирования интерфейса. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
   'Запрос добавлен в локальный demo-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
   'Запрос добавлен в локальный preview-сеанс. При доступном localStorage состояние сохраняется в этом браузере. Реальный AI пока не подключён, поэтому ответ модели не генерируется.',
@@ -24,7 +32,7 @@ const LEGACY_SYSTEM_PREVIEW_COPY = new Set<string>([
 ]);
 
 const LEGACY_ASSISTANT_MOCK_COPY = new Set<string>([
-  DEMO_MOCK_RESPONSE,
+  'Для запуска нового цифрового продукта сначала зафиксируйте цель и критерий готовности. Затем выделите критические зависимости, назначьте владельца каждого блока и отдельно проверьте риски, которые могут остановить релиз. После этого соберите короткую последовательность действий: что делаем сейчас, что проверяем перед следующим шагом и какое условие считается достаточным для продолжения.',
   'Это демонстрационный пример структуры ответа. Реальный AI не подключён. В production здесь появится проверяемый разбор цели, ограничений, рисков и последовательности действий.',
   'Это предзаписанный пример структуры ответа. Реальный AI не подключён. В рабочей версии здесь должен появиться проверяемый разбор цели, ограничений, рисков и последовательности действий.',
 ]);
@@ -45,11 +53,8 @@ function workspaceStorageKey(accountScopeId?: string): string | null {
 }
 
 const defaultState = (profileName = DEFAULT_PREVIEW_PROFILE_NAME): DemoWorkspaceState => ({
-  threads: initialDemoThreads.map((thread) => ({
-    ...thread,
-    messages: thread.messages.map((message) => ({ ...message })),
-  })),
-  activeThreadId: initialDemoThreads[0]?.id ?? null,
+  threads: [],
+  activeThreadId: null,
   profileName,
 });
 
@@ -72,10 +77,13 @@ function isValidIdentifier(value: unknown): value is string {
 function hasAllowedPreviewRoleSemantics(message: Partial<DemoMessage>): boolean {
   if (message.role === 'user') return message.mock === undefined;
 
+  // System/assistant preview messages are accepted only as legacy input so
+  // loadDemoWorkspace can remove them. New workspace writes no longer create
+  // either kind of message.
   if (message.role === 'system') {
     return message.mock === undefined
       && typeof message.content === 'string'
-      && (message.content === DEMO_PREVIEW_NOTICE || LEGACY_SYSTEM_PREVIEW_COPY.has(message.content));
+      && LEGACY_SYSTEM_PREVIEW_COPY.has(message.content);
   }
 
   if (message.role === 'assistant') {
@@ -141,38 +149,17 @@ function hasUniqueWorkspaceIds(threads: DemoThread[]): boolean {
   return true;
 }
 
-function normalizeKnownLegacyCopy(thread: DemoThread): DemoThread {
-  let changed = false;
-  let previewStatusSeen = false;
-  const messages: DemoMessage[] = [];
+function removeLegacyFakeContent(thread: DemoThread): DemoThread | null {
+  if (LEGACY_SEEDED_THREAD_IDS.has(thread.id)) return null;
 
-  for (const message of thread.messages) {
-    let normalizedMessage = message;
+  const messages = thread.messages.filter((message) => {
+    if (message.role === 'system' && LEGACY_SYSTEM_PREVIEW_COPY.has(message.content)) return false;
+    if (message.role === 'assistant' && (message.mock === true || LEGACY_ASSISTANT_MOCK_COPY.has(message.content))) return false;
+    return true;
+  });
 
-    if (message.role === 'system' && LEGACY_SYSTEM_PREVIEW_COPY.has(message.content)) {
-      normalizedMessage = message.content === DEMO_PREVIEW_NOTICE
-        ? message
-        : { ...message, content: DEMO_PREVIEW_NOTICE };
-    } else if (message.role === 'assistant' && LEGACY_ASSISTANT_MOCK_COPY.has(message.content)) {
-      normalizedMessage = message.content === DEMO_MOCK_RESPONSE && message.mock === true
-        ? message
-        : { ...message, content: DEMO_MOCK_RESPONSE, mock: true };
-    }
-
-    if (normalizedMessage !== message) changed = true;
-
-    if (normalizedMessage.role === 'system' && normalizedMessage.content === DEMO_PREVIEW_NOTICE) {
-      if (previewStatusSeen) {
-        changed = true;
-        continue;
-      }
-      previewStatusSeen = true;
-    }
-
-    messages.push(normalizedMessage);
-  }
-
-  return changed ? { ...thread, messages } : thread;
+  if (!messages.length) return null;
+  return messages.length === thread.messages.length ? thread : { ...thread, messages };
 }
 
 function isWithinContentBudget(threads: DemoThread[]): boolean {
@@ -234,10 +221,12 @@ export function loadDemoWorkspace(accountScopeId?: string, fallbackProfileName =
       return defaultState(fallbackProfileName);
     }
 
-    const threads = storedThreads.map(normalizeKnownLegacyCopy);
+    const threads = storedThreads
+      .map(removeLegacyFakeContent)
+      .filter((thread): thread is DemoThread => thread !== null);
     const activeThreadId = typeof parsed.activeThreadId === 'string' && threads.some((thread) => thread.id === parsed.activeThreadId)
       ? parsed.activeThreadId
-      : threads[0]?.id ?? null;
+      : null;
     const storedProfileName = resolveStoredPreviewProfileName(parsed.profileName);
 
     return {

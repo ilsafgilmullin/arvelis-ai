@@ -1,6 +1,5 @@
 import { isDefaultPreviewProfileName, normalizePreviewProfileName } from '../auth/previewProfile';
-import { BrandMark } from '../components/Brand';
-import { ArrowIcon, ChatIcon } from '../components/Icons';
+import { ArrowIcon, ChatIcon, HistoryIcon } from '../components/Icons';
 import { Topbar } from '../components/Topbar';
 import {
   conversationMessageCount,
@@ -8,24 +7,6 @@ import {
   conversationRelativeTime,
 } from '../domain/chatPresentation';
 import type { DemoThread } from '../types';
-
-const productDirections = [
-  {
-    index: '01',
-    title: 'Работа',
-    copy: 'Разбирать задачи, ограничения и варианты решения в понятной профессиональной структуре.',
-  },
-  {
-    index: '02',
-    title: 'Учёба',
-    copy: 'Помогать выстраивать сложный материал последовательно и сохранять контекст разбора в одном диалоге.',
-  },
-  {
-    index: '03',
-    title: 'Сложные задачи',
-    copy: 'Превращать неструктурированный запрос в более точный, ясный и практически применимый результат.',
-  },
-] as const;
 
 function greetingFor(profileName: string): string {
   const hour = new Date().getHours();
@@ -42,78 +23,85 @@ export function WorkspaceScreen({
   threadLimitReached,
   onNewChat,
   onOpenThread,
+  onOpenHistory,
 }: {
   profileName: string;
   threads: DemoThread[];
   threadLimitReached: boolean;
   onNewChat: () => void;
   onOpenThread: (threadId: string) => void;
+  onOpenHistory: () => void;
 }) {
   const recentThreads = [...threads]
     .sort((left, right) => right.updatedAt - left.updatedAt)
     .slice(0, 3);
+  const latestThread = recentThreads[0] ?? null;
 
   return (
-    <div className="content-page home-v3">
-      <Topbar title="Главная" subtitle={`${greetingFor(profileName)}.`} />
+    <div className="content-page home-v4">
+      <Topbar title="Главная" subtitle={`${greetingFor(profileName)}.`} demo={false} />
 
-      <section className="home-v3__hero" aria-labelledby="home-primary-title">
-        <div className="home-v3__hero-copy">
-          <p className="section-kicker">ARVELIS AI</p>
-          <h2 id="home-primary-title">Профессиональный ассистент вокруг вашей задачи.</h2>
-          <p>
-            ARVELIS AI создаётся для работы, учёбы и решения сложных повседневных задач — с понятным диалогом, историей и контролем данных.
-          </p>
-          <div className="home-v3__hero-actions">
+      <section className="home-v4__hero" aria-labelledby="home-primary-title">
+        <div className="home-v4__hero-copy">
+          <p className="section-kicker">РАБОЧЕЕ ПРОСТРАНСТВО</p>
+          <h2 id="home-primary-title">С чего начнём?</h2>
+          <p>Начните новый диалог или продолжите работу с последнего места.</p>
+        </div>
+
+        <div className="home-v4__actions" aria-label="Основные действия">
+          <button
+            className="button button--primary home-v4__new-chat"
+            type="button"
+            onClick={onNewChat}
+            disabled={threadLimitReached}
+          >
+            <ChatIcon />
+            <span>Новый диалог</span>
+          </button>
+
+          {latestThread ? (
             <button
-              className="button button--primary home-v3__primary"
+              className="home-v4__continue"
               type="button"
-              onClick={onNewChat}
-              disabled={threadLimitReached}
+              onClick={() => onOpenThread(latestThread.id)}
             >
-              <ChatIcon />Новый чат
+              <span className="home-v4__continue-label">ПРОДОЛЖИТЬ</span>
+              <span className="home-v4__continue-title">{latestThread.title}</span>
+              <span className="home-v4__continue-meta">
+                {conversationMessageCountLabel(conversationMessageCount(latestThread))} · {conversationRelativeTime(latestThread.updatedAt)}
+              </span>
+              <ArrowIcon />
             </button>
-          </div>
-          {threadLimitReached ? (
-            <p className="home-v3__limit" role="status">
-              Достигнут локальный лимит диалогов. Удалите ненужный диалог в Истории, чтобы начать новый.
-            </p>
           ) : null}
         </div>
 
-        <aside className="home-v3__preview" aria-label="Статус текущей версии">
-          <div className="home-v3__preview-brand" aria-hidden="true">
-            <BrandMark size="default" />
-          </div>
-          <div className="home-v3__preview-copy">
-            <div className="home-v3__preview-heading">
-              <span className="home-v3__preview-dot" aria-hidden="true" />
-              <strong>PRODUCT PREVIEW</strong>
-            </div>
-            <p>Сейчас работает интерфейс и локальная история. Реальная авторизация, серверное хранение и AI ещё не подключены.</p>
-          </div>
-          <dl className="home-v3__preview-facts">
-            <div><dt>Данные</dt><dd>Локально</dd></div>
-            <div><dt>AI</dt><dd>Не подключён</dd></div>
-          </dl>
-        </aside>
+        {threadLimitReached ? (
+          <p className="home-v4__limit" role="status">
+            Достигнут лимит сохранённых диалогов. Удалите ненужный диалог в Истории, чтобы начать новый.
+          </p>
+        ) : null}
       </section>
 
-      <section className="home-v3__recent" aria-labelledby="home-recent-title">
-        <div className="home-v3__section-heading">
+      <section className="home-v4__recent" aria-labelledby="home-recent-title">
+        <div className="home-v4__section-heading">
           <div>
-            <p className="section-kicker">ПРОДОЛЖИТЬ</p>
-            <h2 id="home-recent-title">Недавние диалоги</h2>
+            <p className="section-kicker">НЕДАВНЕЕ</p>
+            <h2 id="home-recent-title">Последние диалоги</h2>
           </div>
-          <span aria-label={`Всего локальных диалогов: ${threads.length}`}>{threads.length}</span>
+          {threads.length ? (
+            <button className="home-v4__history-link" type="button" onClick={onOpenHistory}>
+              <HistoryIcon />
+              <span>Вся история</span>
+            </button>
+          ) : null}
         </div>
 
         {recentThreads.length ? (
-          <div className="home-v3__recent-list">
+          <div className="home-v4__recent-list">
             {recentThreads.map((thread) => {
               const conversationCount = conversationMessageCount(thread);
               return (
-                <button className="home-v3__recent-row" type="button" key={thread.id} onClick={() => onOpenThread(thread.id)}>
+                <button className="home-v4__recent-row" type="button" key={thread.id} onClick={() => onOpenThread(thread.id)}>
                   <div>
                     <strong>{thread.title}</strong>
                     <span>{conversationMessageCountLabel(conversationCount)} · {conversationRelativeTime(thread.updatedAt)}</span>
@@ -124,53 +112,14 @@ export function WorkspaceScreen({
             })}
           </div>
         ) : (
-          <div className="home-v3__empty">
-            <strong>Здесь появятся ваши недавние диалоги</strong>
-            <p>Начните новый чат — после этого к разговору можно будет быстро вернуться с Главной.</p>
+          <div className="home-v4__empty">
+            <div className="home-v4__empty-mark" aria-hidden="true"><ChatIcon /></div>
+            <div>
+              <strong>История пока пуста</strong>
+              <p>Созданные вами диалоги будут появляться здесь автоматически.</p>
+            </div>
           </div>
         )}
-      </section>
-
-      <section className="home-v3__directions" aria-labelledby="home-directions-title">
-        <div className="home-v3__section-heading">
-          <div>
-            <p className="section-kicker">НАПРАВЛЕНИЯ</p>
-            <h2 id="home-directions-title">Для чего создаётся ARVELIS AI</h2>
-          </div>
-        </div>
-        <div className="home-v3__direction-grid">
-          {productDirections.map((direction) => (
-            <article className="home-v3__direction" key={direction.index}>
-              <span>{direction.index}</span>
-              <h3>{direction.title}</h3>
-              <p>{direction.copy}</p>
-            </article>
-          ))}
-        </div>
-        <p className="home-v3__direction-note">
-          Это продуктовые направления, а не обещание уже работающих AI-функций в текущем preview.
-        </p>
-      </section>
-
-      <section className="home-v3__info" aria-labelledby="home-info-title">
-        <div className="home-v3__section-heading">
-          <div>
-            <p className="section-kicker">О ПРОЕКТЕ</p>
-            <h2 id="home-info-title">Полезная информация</h2>
-          </div>
-        </div>
-        <div className="home-v3__info-grid">
-          <article>
-            <span>КАК ПОЛЬЗОВАТЬСЯ</span>
-            <h3>Один диалог — один контекст задачи.</h3>
-            <p>Начните новый чат, сформулируйте задачу обычными словами и продолжайте уточнять её в том же разговоре. Диалог останется в локальной Истории.</p>
-          </article>
-          <article>
-            <span>КОНФИДЕНЦИАЛЬНОСТЬ</span>
-            <h3>Текущие данные остаются на этом устройстве.</h3>
-            <p>В preview нет production-базы и реального AI. Не вводите пароли, секреты и чувствительные персональные данные до подключения защищённой серверной инфраструктуры.</p>
-          </article>
-        </div>
       </section>
     </div>
   );
