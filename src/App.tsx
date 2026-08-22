@@ -22,12 +22,17 @@ import {
   type AppLoadProgress,
   type PreparedCoreModules,
 } from './lib/appPreload';
+import { deleteChatAttachmentBlobs } from './lib/chatAttachmentStorage';
 import {
   chatDraftKey,
   clearChatDrafts,
   removeChatDraft,
   setChatDraftAccountScope,
 } from './lib/chatDraftStorage';
+import {
+  clearPendingChatAttachments,
+  loadPendingChatAttachments,
+} from './lib/chatPendingAttachmentStorage';
 import {
   DEMO_MAX_MESSAGES_PER_THREAD,
   DEMO_MAX_THREADS,
@@ -38,7 +43,14 @@ import {
 import { AuthScreen } from './screens/AuthScreen';
 import { RealAuthScreen } from './screens/RealAuthScreen';
 import { WelcomeScreen } from './screens/WelcomeScreen';
-import type { AppScreen, DemoMessage, DemoThread, DemoWorkspaceState, EntryScreen } from './types';
+import type {
+  AppScreen,
+  ChatAttachmentMeta,
+  DemoMessage,
+  DemoThread,
+  DemoWorkspaceState,
+  EntryScreen,
+} from './types';
 
 const HistoryScreen = lazy(() => loadHistoryModule().then((module) => ({ default: module.HistoryScreen })));
 const ProfileScreen = lazy(() => loadProfileModule().then((module) => ({ default: module.ProfileScreen })));
@@ -64,14 +76,30 @@ function waitForBootPaint(): Promise<void> {
   });
 }
 
-function titleFromPrompt(prompt: string): string {
-  const normalized = prompt.replace(/\s+/g, ' ').trim();
-  if (!normalized) return 'Новый диалог';
-  return normalized.length > 52 ? `${normalized.slice(0, 49)}…` : normalized;
+function titleFromMessage(content: string, attachments: ChatAttachmentMeta[]): string {
+  const normalized = content.replace(/\s+/g, ' ').trim();
+  if (normalized) return normalized.length > 52 ? `${normalized.slice(0, 49)}…` : normalized;
+
+  const first = attachments[0];
+  if (!first) return 'Новый диалог';
+  if (first.kind === 'audio') return 'Голосовое сообщение';
+  const name = first.name.replace(/\s+/g, ' ').trim();
+  return name.length > 52 ? `${name.slice(0, 49)}…` : name || 'Новый диалог';
 }
 
-function createUserMessage(content: string): DemoMessage {
-  return { id: makeId('msg'), role: 'user', content, createdAt: Date.now() };
+function createUserMessage(content: string, attachments: ChatAttachmentMeta[] = []): DemoMessage {
+  return {
+    id: makeId('msg'),
+    role: 'user',
+    content,
+    createdAt: Date.now(),
+    ...(attachments.length ? { attachments } : {}),
+  };
+}
+
+function attachmentIdsFromThread(thread: DemoThread | undefined): string[] {
+  if (!thread) return [];
+  return thread.messages.flatMap((message) => (message.attachments ?? []).map((attachment) => attachment.id));
 }
 
 export default function App() {
@@ -221,17 +249,17 @@ export default function App() {
     setScreen('chat');
   };
 
-  const createThreadFromPrompt = (prompt: string) => {
-    const normalizedPrompt = normalizeChatMessage(prompt);
-    if (!normalizedPrompt || threadLimitReached) return;
+  const createThreadFromMessage = (content: string, attachments: ChatAttachmentMeta[] = []) => {
+    const normalizedContent = normalizeChatMessage(content);
+    if ((!normalizedContent && !attachments.length) || threadLimitReached) return;
 
     const timestamp = Date.now();
     const thread: DemoThread = {
       id: makeId('thread'),
-      title: titleFromPrompt(normalizedPrompt),
+      title: titleFromMessage(normalizedContent, attachments),
       createdAt: timestamp,
       updatedAt: timestamp,
-      messages: [createUserMessage(normalizedPrompt)],
+      messages: [createUserMessage(normalizedContent, attachments)],
     };
 
     setWorkspace((current) => {
@@ -245,18 +273,18 @@ export default function App() {
     setScreen('chat');
   };
 
-  const sendMessage = (content: string) => {
+  const sendMessage = (content: string, attachments: ChatAttachmentMeta[] = []) => {
     if (!workspace) return;
     const normalizedContent = normalizeChatMessage(content);
-    if (!normalizedContent) return;
+    if (!normalizedContent && !attachments.length) return;
 
     if (!activeThread) {
-      createThreadFromPrompt(normalizedContent);
+      createThreadFromMessage(normalizedContent, attachments);
       return;
     }
     if (activeThread.messages.length >= DEMO_MAX_MESSAGES_PER_THREAD) return;
 
-    const userMessage = createUserMessage(normalizedContent);
+    const userMessage = createUserMessage(normalizedContent, attachments);
     const timestamp = Date.now();
 
     setWorkspace((current) => current ? {
@@ -310,10 +338,16 @@ export default function App() {
   };
 
   const deleteThread = (threadId: string) => {
-    removeChatDraft(chatDraftKey(threadId));
+    const thread = workspace?.threads.find((item) => item.id === threadId);
+    const draftKey = chatDraftKey(threadId);
+    const pendingAttachmentIds = loadPendingChatAttachments(draftKey).map((attachment) => attachment.id);
+    clearPendingChatAttachments(draftKey);
+    removeChatDraft(draftKey);
+    void deleteChatAttachmentBlobs([...attachmentIdsFromThread(thread), ...pendingAttachmentIds]);
+
     setWorkspace((current) => {
       if (!current) return current;
-      const threads = current.threads.filter((thread) => thread.id !== threadId);
+      const threads = current.threads.filter((item) => item.id !== threadId);
       return {
         ...current,
         threads,
@@ -387,6 +421,15 @@ export default function App() {
 
   const resetLocalData = () => {
     ++launchSequenceRef.current;
+
+    const draftKeys = [
+      chatDraftKey(null),
+      ...(workspace?.threads.map((thread) => chatDraftKey(thread.id)) ?? []),
+    ];
+    const pendingAttachmentIds = draftKeys.flatMap((key) => loadPendingChatAttachments(key).map((attachment) => attachment.id));
+    draftKeys.forEach((key) => clearPendingChatAttachments(key));
+    const messageAttachmentIds = workspace?.threads.flatMap(attachmentIdsFromThread) ?? [];
+    void deleteChatAttachmentBlobs([...messageAttachmentIds, ...pendingAttachmentIds]);
     clearChatDrafts();
 
     if (REAL_AUTH_ENABLED && realSession) {
