@@ -1,20 +1,11 @@
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import type {
   ChatRateLimitDecision,
   ChatRateLimitRequest,
   ChatRateLimitStore,
 } from '../../chat/rateLimit';
 
-async function rollback(client: PoolClient): Promise<void> {
-  try {
-    await client.query('ROLLBACK');
-  } catch {
-    // Preserve the original database failure.
-  }
-}
-
 type RateLimitRow = {
-  window_started_at: string | number;
   consumed_count: number;
   expires_at: string | number;
 };
@@ -31,58 +22,48 @@ export class PostgresChatRateLimitStore implements ChatRateLimitStore {
   constructor(private readonly pool: Pool) {}
 
   async consume(request: ChatRateLimitRequest): Promise<ChatRateLimitDecision> {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-      const existing = await client.query<RateLimitRow>(`
-        SELECT window_started_at, consumed_count, expires_at
-        FROM chat_rate_limits
-        WHERE scope = $1 AND account_id = $2
-        FOR UPDATE
-      `, [request.scope, request.accountId]);
-      const row = existing.rows[0];
+    const result = await this.pool.query<RateLimitRow>(`
+      INSERT INTO chat_rate_limits (
+        scope, account_id, window_started_at, consumed_count, expires_at
+      ) VALUES ($1, $2, $3, 1, $4)
+      ON CONFLICT (scope, account_id) DO UPDATE
+      SET
+        window_started_at = CASE
+          WHEN chat_rate_limits.expires_at <= EXCLUDED.window_started_at
+            THEN EXCLUDED.window_started_at
+          ELSE chat_rate_limits.window_started_at
+        END,
+        consumed_count = CASE
+          WHEN chat_rate_limits.expires_at <= EXCLUDED.window_started_at
+            THEN 1
+          ELSE LEAST(chat_rate_limits.consumed_count + 1, $5 + 1)
+        END,
+        expires_at = CASE
+          WHEN chat_rate_limits.expires_at <= EXCLUDED.window_started_at
+            THEN EXCLUDED.expires_at
+          ELSE chat_rate_limits.expires_at
+        END
+      RETURNING consumed_count, expires_at
+    `, [
+      request.scope,
+      request.accountId,
+      request.now,
+      request.now + request.windowMs,
+      request.limit,
+    ]);
 
-      if (!row) {
-        await client.query(`
-          INSERT INTO chat_rate_limits (
-            scope, account_id, window_started_at, consumed_count, expires_at
-          ) VALUES ($1, $2, $3, 1, $4)
-        `, [request.scope, request.accountId, request.now, request.now + request.windowMs]);
-        await client.query('COMMIT');
-        return { allowed: true };
-      }
-
-      const expiresAt = asSafeInteger(row.expires_at, 'expires_at');
-      if (request.now >= expiresAt) {
-        await client.query(`
-          UPDATE chat_rate_limits
-          SET window_started_at = $3, consumed_count = 1, expires_at = $4
-          WHERE scope = $1 AND account_id = $2
-        `, [request.scope, request.accountId, request.now, request.now + request.windowMs]);
-        await client.query('COMMIT');
-        return { allowed: true };
-      }
-
-      if (row.consumed_count >= request.limit) {
-        await client.query('COMMIT');
-        return {
-          allowed: false,
-          retryAfterSeconds: Math.max(1, Math.ceil((expiresAt - request.now) / 1000)),
-        };
-      }
-
-      await client.query(`
-        UPDATE chat_rate_limits
-        SET consumed_count = consumed_count + 1
-        WHERE scope = $1 AND account_id = $2
-      `, [request.scope, request.accountId]);
-      await client.query('COMMIT');
-      return { allowed: true };
-    } catch (error) {
-      await rollback(client);
-      throw error;
-    } finally {
-      client.release();
+    const row = result.rows[0];
+    if (!row) throw new Error('PostgreSQL Chat rate-limit UPSERT returned no row');
+    const consumedCount = Number(row.consumed_count);
+    const expiresAt = asSafeInteger(row.expires_at, 'expires_at');
+    if (!Number.isSafeInteger(consumedCount) || consumedCount < 1) {
+      throw new Error('Invalid PostgreSQL Chat rate-limit field: consumed_count');
     }
+
+    if (consumedCount <= request.limit) return { allowed: true };
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((expiresAt - request.now) / 1000)),
+    };
   }
 }
