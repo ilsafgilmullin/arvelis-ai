@@ -71,7 +71,10 @@ async function main(): Promise<void> {
       body: JSON.stringify({ content: 'HTTP smoke message' }),
     });
     assert(create.status === 201, 'Authenticated account must create conversation');
-    const created = await create.json() as { conversation?: { id?: string }; message?: { id?: string } };
+    const createdText = await create.text();
+    assert(!createdText.includes('accountId'), 'Public create response must not expose account ownership field');
+    assert(!createdText.includes('storageKey'), 'Public create response must not expose storage internals');
+    const created = JSON.parse(createdText) as { conversation?: { id?: string }; message?: { id?: string } };
     const conversationId = created.conversation?.id;
     const messageId = created.message?.id;
     assert(typeof conversationId === 'string' && conversationId.length === 32, 'Create route must return conversation id');
@@ -79,7 +82,9 @@ async function main(): Promise<void> {
 
     const list = await fetch(`${base}/api/chat/conversations?limit=20`, { headers: headersA });
     assert(list.status === 200, 'Owner must list conversations');
-    const listed = await list.json() as { items?: unknown[] };
+    const listText = await list.text();
+    assert(!listText.includes('accountId'), 'Public list must not expose account ownership field');
+    const listed = JSON.parse(listText) as { items?: unknown[] };
     assert(listed.items?.length === 1, 'Owner list must include created conversation');
 
     const foreignGet = await fetch(`${base}/api/chat/conversations/${conversationId}`, { headers: headersB });
@@ -93,6 +98,22 @@ async function main(): Promise<void> {
     assert(attachmentAttempt.status === 409, 'Client attachments must be rejected before server upload pipeline');
     const attachmentError = await attachmentAttempt.json() as { error?: { code?: string } };
     assert(attachmentError.error?.code === 'attachments_not_ready', 'Attachment rejection must be explicit');
+
+    const internalAttachmentId = 'a'.repeat(32);
+    database.prepare(`
+      INSERT INTO chat_attachments (
+        id, message_id, kind, name, mime_type, size_bytes, duration_ms,
+        storage_state, storage_key, created_at
+      ) VALUES (?, ?, 'file', 'private.txt', 'text/plain', 7, NULL, 'ready', ?, ?)
+    `).run(internalAttachmentId, messageId, 'internal/private/storage-key', 2_000);
+    const attachmentRead = await fetch(`${base}/api/chat/conversations/${conversationId}`, { headers: headersA });
+    assert(attachmentRead.status === 200, 'Owner must read conversation containing stored attachment metadata');
+    const attachmentReadText = await attachmentRead.text();
+    assert(attachmentReadText.includes(internalAttachmentId), 'Public conversation must include safe attachment metadata');
+    assert(attachmentReadText.includes('storageState'), 'Public attachment must expose processing state');
+    assert(!attachmentReadText.includes('storageKey'), 'Public attachment must never expose storageKey property');
+    assert(!attachmentReadText.includes('internal/private/storage-key'), 'Public attachment must never expose internal storage key value');
+    assert(!attachmentReadText.includes('accountId'), 'Public conversation detail must not expose account ownership field');
 
     const append = await fetch(`${base}/api/chat/conversations/${conversationId}/messages`, {
       method: 'POST',
