@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { ensureSqliteChatSchema } from './chatSchema';
 
 const AUTH_SQLITE_MIGRATION_ID = '001_auth_foundation';
 const AUTH_SQLITE_DATA_ROOT = resolve('.data');
@@ -168,5 +169,6 @@ export function openSqliteAuthDatabase(location: string): DatabaseSync {
   if (databaseLocation !== ':memory:') database.exec('PRAGMA journal_mode = WAL;');
   database.exec('PRAGMA synchronous = NORMAL;');
   ensureSqliteAuthSchema(database);
+  ensureSqliteChatSchema(database);
   return database;
 }
