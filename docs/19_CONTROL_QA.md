@@ -1,6 +1,5 @@
 # ARVELIS CONTROL — Preview QA
 
-Ветка: `feat/arvelis-control-v1`
 URL preview: `/control/`
 
 ## Entry / security disclosure
@@ -10,6 +9,18 @@ URL preview: `/control/`
 3. Первый экран прямо сообщает, что это **не защищённый административный вход**.
 4. На preview нет реальных пользователей, писем, production incidents, API keys или secrets.
 5. Переход `Открыть локальный прототип` не должен восприниматься как production authentication.
+
+## Replit preview routing
+
+Правильный путь CONTROL находится **до query string**:
+
+`https://<replit-host>/control/?presentationStyle=fullScreen`
+
+Некорректный мобильный ввод вида:
+
+`https://<replit-host>/?presentationStyle=fullScreen/control`
+
+должен автоматически восстановиться в `/control/`, сохранив `presentationStyle=fullScreen`.
 
 ## Navigation
 
