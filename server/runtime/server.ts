@@ -11,8 +11,11 @@ import type { SessionStore } from '../auth/session/contracts';
 import { SessionService } from '../auth/session/service';
 import { WebCryptoSessionSecurity } from '../auth/session/webCryptoSecurity';
 import type { ServerConversationStore } from '../chat/contracts';
+import type { ChatRateLimitStore } from '../chat/rateLimit';
+import { ChatRateLimiter } from '../chat/rateLimit';
 import { ChatApplicationService } from '../chat/service';
 import { PostgresAccountIdentityStore } from '../persistence/postgres/accountIdentityStore';
+import { PostgresChatRateLimitStore } from '../persistence/postgres/chatRateLimitStore';
 import { PostgresConversationStore } from '../persistence/postgres/chatStore';
 import { PostgresEmailOtpChallengeStore } from '../persistence/postgres/emailOtpChallengeStore';
 import { PostgresEmailOtpRateLimitStore } from '../persistence/postgres/rateLimitStore';
@@ -23,6 +26,7 @@ import {
   SqliteEmailOtpRateLimitStore,
   SqliteSessionStore,
 } from '../persistence/sqlite/authStores';
+import { SqliteChatRateLimitStore } from '../persistence/sqlite/chatRateLimitStore';
 import { SqliteConversationStore } from '../persistence/sqlite/chatStore';
 import { openSqliteAuthDatabase } from '../persistence/sqlite/database';
 import { handleChatRoute } from './chatRoutes';
@@ -98,6 +102,7 @@ async function main(): Promise<void> {
   let rateLimits: EmailOtpRateLimitPort;
   let sessionStore: SessionStore;
   let conversationStore: ServerConversationStore;
+  let chatRateLimitStore: ChatRateLimitStore;
 
   if (config.database.provider === 'postgres') {
     pool = new Pool({
@@ -108,10 +113,15 @@ async function main(): Promise<void> {
     });
 
     await pool.query('SELECT 1');
-    const schema = await pool.query<{ accounts: string | null; conversations: string | null }>(`
+    const schema = await pool.query<{
+      accounts: string | null;
+      conversations: string | null;
+      chatRateLimits: string | null;
+    }>(`
       SELECT
         to_regclass('public.auth_accounts')::text AS accounts,
-        to_regclass('public.chat_conversations')::text AS conversations
+        to_regclass('public.chat_conversations')::text AS conversations,
+        to_regclass('public.chat_rate_limits')::text AS "chatRateLimits"
     `);
     if (!schema.rows[0]?.accounts) {
       throw new Error('ARVELIS auth database migration is not applied');
@@ -119,12 +129,16 @@ async function main(): Promise<void> {
     if (!schema.rows[0]?.conversations) {
       throw new Error('ARVELIS chat database migration is not applied');
     }
+    if (!schema.rows[0]?.chatRateLimits) {
+      throw new Error('ARVELIS chat rate-limit migration is not applied');
+    }
 
     accounts = new PostgresAccountIdentityStore(pool);
     challengeStore = new PostgresEmailOtpChallengeStore(pool);
     rateLimits = new PostgresEmailOtpRateLimitStore(pool);
     sessionStore = new PostgresSessionStore(pool);
     conversationStore = new PostgresConversationStore(pool);
+    chatRateLimitStore = new PostgresChatRateLimitStore(pool);
   } else {
     sqlite = openSqliteAuthDatabase(config.database.path);
     accounts = new SqliteAccountIdentityStore(sqlite);
@@ -132,6 +146,7 @@ async function main(): Promise<void> {
     rateLimits = new SqliteEmailOtpRateLimitStore(sqlite);
     sessionStore = new SqliteSessionStore(sqlite);
     conversationStore = new SqliteConversationStore(sqlite);
+    chatRateLimitStore = new SqliteChatRateLimitStore(sqlite);
   }
 
   const delivery = new SmtpEmailOtpDelivery(config.smtp);
@@ -153,6 +168,7 @@ async function main(): Promise<void> {
   });
   const accountAuth = new AccountAuthApplicationService({ accounts, sessions });
   const chat = new ChatApplicationService(conversationStore);
+  const chatRateLimiter = new ChatRateLimiter(chatRateLimitStore);
 
   const buildPublicSession = async (sessionId: string, createdAt: number, expiresAt: number, accountId: string) => {
     const account = await accounts.getAccount(accountId);
@@ -435,6 +451,7 @@ async function main(): Promise<void> {
       request,
       response,
       chat,
+      rateLimiter: chatRateLimiter,
       authenticate: async (chatRequest) => {
         const current = await authenticateRequest(chatRequest);
         if (current.kind === 'authenticated') {
