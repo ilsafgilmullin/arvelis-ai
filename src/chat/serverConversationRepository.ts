@@ -27,6 +27,7 @@ export type ServerChatRepositoryErrorCode =
   | 'conversation_limit'
   | 'message_limit'
   | 'conflict'
+  | 'rate_limited'
   | 'attachments_not_ready'
   | 'models_not_ready'
   | 'service_unavailable'
@@ -38,6 +39,7 @@ export class ServerChatRepositoryError extends Error {
     readonly code: ServerChatRepositoryErrorCode,
     message: string,
     readonly status?: number,
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = 'ServerChatRepositoryError';
@@ -177,7 +179,9 @@ function parseErrorCode(value: unknown): ServerChatRepositoryErrorCode {
     'conversation_limit',
     'message_limit',
     'conflict',
+    'rate_limited',
     'attachments_not_ready',
+    'models_not_ready',
     'service_unavailable',
   ]);
   return typeof value === 'string' && known.has(value as ServerChatRepositoryErrorCode)
@@ -197,6 +201,18 @@ function ensureCursor(value: unknown, field: string): string | null {
   if (value === null) return null;
   if (typeof value !== 'string' || !value || value.length > 256) throw invalidResponse(`Invalid ${field}`);
   return value;
+}
+
+function parseRetryAfterSeconds(response: Response, error: JsonRecord | null): number | undefined {
+  const bodyValue = error?.retryAfterSeconds;
+  if (typeof bodyValue === 'number' && Number.isSafeInteger(bodyValue) && bodyValue >= 1) return bodyValue;
+
+  const headerValue = response.headers.get('Retry-After');
+  if (headerValue && /^\d+$/.test(headerValue)) {
+    const parsed = Number(headerValue);
+    if (Number.isSafeInteger(parsed) && parsed >= 1) return parsed;
+  }
+  return undefined;
 }
 
 export class ServerConversationRepository implements ConversationRepository {
@@ -230,7 +246,8 @@ export class ServerConversationRepository implements ConversationRepository {
       const message = typeof error?.message === 'string' && error.message.length <= 500
         ? error.message
         : 'Chat request failed';
-      throw new ServerChatRepositoryError(code, message, response.status);
+      const retryAfterSeconds = parseRetryAfterSeconds(response, error);
+      throw new ServerChatRepositoryError(code, message, response.status, retryAfterSeconds);
     }
     return payload;
   }
