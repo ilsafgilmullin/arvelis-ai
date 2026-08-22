@@ -5,10 +5,10 @@ const CHAT_SQLITE_MIGRATION_ID = '002_chat_foundation';
 
 const CHAT_SQLITE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS chat_conversations (
-  id TEXT PRIMARY KEY,
+  id TEXT PRIMARY KEY CHECK (length(id) = 32),
   account_id TEXT NOT NULL REFERENCES auth_accounts(id) ON DELETE RESTRICT,
-  title TEXT NOT NULL CHECK (length(title) BETWEEN 1 AND 160),
-  model_preference TEXT,
+  title TEXT NOT NULL CHECK (length(title) BETWEEN 1 AND 160 AND title = trim(title)),
+  model_preference TEXT CHECK (model_preference IS NULL OR length(model_preference) BETWEEN 1 AND 160),
   created_at INTEGER NOT NULL CHECK (created_at >= 0),
   updated_at INTEGER NOT NULL CHECK (updated_at >= created_at),
   version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1)
@@ -18,7 +18,7 @@ CREATE INDEX IF NOT EXISTS chat_conversations_account_updated_idx
   ON chat_conversations(account_id, updated_at DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS chat_messages (
-  id TEXT PRIMARY KEY,
+  id TEXT PRIMARY KEY CHECK (length(id) = 32),
   conversation_id TEXT NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
   status TEXT NOT NULL CHECK (status IN ('pending', 'sending', 'streaming', 'completed', 'failed', 'cancelled')),
@@ -34,7 +34,7 @@ CREATE INDEX IF NOT EXISTS chat_messages_conversation_position_idx
   ON chat_messages(conversation_id, position ASC);
 
 CREATE TABLE IF NOT EXISTS chat_attachments (
-  id TEXT PRIMARY KEY,
+  id TEXT PRIMARY KEY CHECK (length(id) = 32),
   message_id TEXT NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
   kind TEXT NOT NULL CHECK (kind IN ('image', 'video', 'audio', 'file')),
   name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 240),
@@ -42,10 +42,13 @@ CREATE TABLE IF NOT EXISTS chat_attachments (
   size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
   duration_ms INTEGER,
   storage_state TEXT NOT NULL CHECK (storage_state IN ('pending', 'ready', 'failed')),
-  storage_key TEXT,
+  storage_key TEXT CHECK (storage_key IS NULL OR length(storage_key) BETWEEN 1 AND 512),
   created_at INTEGER NOT NULL CHECK (created_at >= 0),
   CHECK (duration_ms IS NULL OR duration_ms >= 0),
-  CHECK ((storage_state = 'ready' AND storage_key IS NOT NULL) OR storage_state <> 'ready')
+  CHECK (
+    (storage_state = 'ready' AND storage_key IS NOT NULL)
+    OR (storage_state <> 'ready' AND storage_key IS NULL)
+  )
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS chat_attachments_message_idx
