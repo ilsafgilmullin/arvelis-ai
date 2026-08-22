@@ -8,6 +8,7 @@ const connectionString = process.env.DATABASE_URL;
 const migrations = [
   { id: '001_auth_foundation', path: resolve('server/db/migrations/001_auth_foundation.sql') },
   { id: '002_chat_foundation', path: resolve('server/db/migrations/002_chat_foundation.sql') },
+  { id: '003_chat_rate_limits', path: resolve('server/db/migrations/003_chat_rate_limits.sql') },
 ];
 
 if (!connectionString) {
