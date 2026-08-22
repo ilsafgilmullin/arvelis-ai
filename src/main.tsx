@@ -13,9 +13,7 @@ import './smart-entry.css';
 import './smart-entry-responsive.css';
 import './chat-experience.css';
 import './chat-features.css';
-import './chat-refactor-v2.css';
 import './chat-history-v2.css';
-import './chat-runtime-hardening-v2.css';
 import './app-foundation-v1.css';
 import './auth-foundation-v2.css';
 import './real-auth-v1.css';
@@ -25,6 +23,7 @@ import './profile-foundation-v1.css';
 import './profile-auth-mobile-qa.css';
 import './history-foundation-v1.css';
 import './chat-foundation-v3.css';
+import './chat-shell-v3.css';
 
 const root = document.getElementById('root');
 
