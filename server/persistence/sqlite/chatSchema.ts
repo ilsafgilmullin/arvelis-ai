@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
-import { inSqliteTransaction } from './database';
 
 const CHAT_SQLITE_MIGRATION_ID = '002_chat_foundation';
 
@@ -57,6 +56,25 @@ function migrationChecksum(): string {
   return createHash('sha256').update(CHAT_SQLITE_SCHEMA, 'utf8').digest('hex');
 }
 
+function rollbackQuietly(database: DatabaseSync): void {
+  try {
+    database.exec('ROLLBACK');
+  } catch {
+    // Preserve the original migration failure.
+  }
+}
+
+function inMigrationTransaction(database: DatabaseSync, work: () => void): void {
+  database.exec('BEGIN IMMEDIATE');
+  try {
+    work();
+    database.exec('COMMIT');
+  } catch (error) {
+    rollbackQuietly(database);
+    throw error;
+  }
+}
+
 export function ensureSqliteChatSchema(database: DatabaseSync): void {
   const checksum = migrationChecksum();
   const existing = database.prepare(
@@ -70,7 +88,7 @@ export function ensureSqliteChatSchema(database: DatabaseSync): void {
     return;
   }
 
-  inSqliteTransaction(database, () => {
+  inMigrationTransaction(database, () => {
     database.exec(CHAT_SQLITE_SCHEMA);
     database.prepare(
       'INSERT INTO auth_schema_migrations (id, checksum, applied_at) VALUES (?, ?, ?)',
