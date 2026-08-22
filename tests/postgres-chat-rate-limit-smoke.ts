@@ -12,7 +12,7 @@ async function main(): Promise<void> {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error('DATABASE_URL is required for PostgreSQL Chat rate-limit smoke');
 
-  const pool = new Pool({ connectionString, max: 4, application_name: 'arvelis-chat-rate-limit-smoke' });
+  const pool = new Pool({ connectionString, max: 6, application_name: 'arvelis-chat-rate-limit-smoke' });
   try {
     await pool.query(`
       TRUNCATE TABLE
@@ -75,6 +75,24 @@ async function main(): Promise<void> {
     assert(row.rows[0]?.consumed_count === 1, 'PostgreSQL reset must restart consumed count at one');
     assert(Number(row.rows[0]?.window_started_at) === 11_000, 'PostgreSQL reset must replace window start');
     assert(Number(row.rows[0]?.expires_at) === 12_000, 'PostgreSQL reset must replace expiry');
+
+    await pool.query("DELETE FROM chat_rate_limits WHERE account_id = 'pg-limit-account-b'");
+    const concurrent = await Promise.all([
+      store.consume({ ...base, accountId: 'pg-limit-account-b', now: 20_000 }),
+      store.consume({ ...base, accountId: 'pg-limit-account-b', now: 20_000 }),
+      store.consume({ ...base, accountId: 'pg-limit-account-b', now: 20_000 }),
+      store.consume({ ...base, accountId: 'pg-limit-account-b', now: 20_000 }),
+    ]);
+    const allowedCount = concurrent.filter((decision) => decision.allowed).length;
+    const deniedCount = concurrent.filter((decision) => !decision.allowed).length;
+    assert(allowedCount === 2, 'Concurrent PostgreSQL requests must allow exactly the configured limit');
+    assert(deniedCount === 2, 'Concurrent PostgreSQL requests above the limit must be denied, not fail');
+    const concurrentRow = await pool.query<{ consumed_count: number }>(`
+      SELECT consumed_count
+      FROM chat_rate_limits
+      WHERE scope = 'create' AND account_id = 'pg-limit-account-b'
+    `);
+    assert(concurrentRow.rows[0]?.consumed_count === 3, 'Denied PostgreSQL counter must be capped at limit + 1');
 
     console.log('ARVELIS PostgreSQL chat rate-limit smoke: PASS');
   } finally {
