@@ -29,17 +29,21 @@
     "server/auth/session/service.ts",
     "server/auth/session/webCryptoSecurity.ts",
     "server/chat/contracts.ts",
+    "server/chat/rateLimit.ts",
     "server/chat/service.ts",
     "server/persistence/sqlite/chatSchema.ts",
+    "server/persistence/sqlite/chatRateLimitSchema.ts",
     "server/persistence/sqlite/database.ts",
     "server/persistence/sqlite/authStores.ts",
     "server/persistence/sqlite/chatStore.ts",
+    "server/persistence/sqlite/chatRateLimitStore.ts",
     "server/runtime/chatRoutes.ts",
     "server/runtime/http.ts",
     "server/runtime/config.ts",
     "tests/sqlite-auth-persistence-smoke.ts",
     "tests/sqlite-auth-flow-smoke.ts",
     "tests/sqlite-chat-persistence-smoke.ts",
+    "tests/sqlite-chat-rate-limit-smoke.ts",
     "tests/chat-routes-smoke.ts"
   ]
 }
