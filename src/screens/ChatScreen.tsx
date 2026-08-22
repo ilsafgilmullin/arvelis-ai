@@ -3,33 +3,26 @@ import type { ChangeEvent, KeyboardEvent } from 'react';
 import { CHAT_MODEL_UNAVAILABLE_LABEL, CONNECTED_CHAT_MODELS } from '../ai/chatModelCatalog';
 import {
   attachmentKindForMime,
-  formatAttachmentSize,
-  formatVoiceDuration,
   normalizeAttachmentName,
   validateAttachmentBatch,
   validateAttachmentCandidate,
 } from '../chat/attachmentPolicy';
+import { ChatComposer } from '../chat/components/ChatComposer';
+import { ChatMessageList, type ChatCopyFeedback } from '../chat/components/ChatMessageList';
+import { renderableMessages } from '../chat/domain';
 import { BrandMark } from '../components/Brand';
-import { ChatAttachmentView } from '../components/ChatAttachmentView';
 import { ChatSheet } from '../components/ChatSheet';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import {
-  AttachmentIcon,
   CheckIcon,
   ChevronDownIcon,
-  CloseIcon,
-  CopyIcon,
   EditIcon,
-  MicIcon,
   ModelIcon,
   PlusIcon,
   SearchIcon,
-  SendIcon,
-  StopIcon,
   TrashIcon,
 } from '../components/Icons';
 import {
-  CHAT_COMPOSER_COUNTER_THRESHOLD,
   CHAT_MESSAGE_MAX_CHARS,
   CHAT_SEARCH_MAX_CHARS,
   CHAT_THREAD_TITLE_MAX_CHARS,
@@ -48,7 +41,7 @@ import {
   loadPendingChatAttachments,
   savePendingChatAttachments,
 } from '../lib/chatPendingAttachmentStorage';
-import type { ChatAttachmentMeta, DemoMessage, DemoThread } from '../types';
+import type { ChatAttachmentMeta, ChatMessage, Conversation } from '../types';
 
 const VOICE_MAX_DURATION_MS = 5 * 60 * 1000;
 
@@ -65,21 +58,6 @@ function motionSafeBehavior(behavior: ScrollBehavior): ScrollBehavior {
 function createAttachmentId(): string {
   const random = globalThis.crypto?.randomUUID?.().replace(/-/g, '');
   return random ? `att_${random}` : `att_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
-}
-
-function attachmentLabel(kind: ChatAttachmentMeta['kind']): string {
-  if (kind === 'image') return 'Фото';
-  if (kind === 'video') return 'Видео';
-  if (kind === 'audio') return 'Аудио';
-  return 'Файл';
-}
-
-function formatMessageTime(timestamp: number): string {
-  try {
-    return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(timestamp);
-  } catch {
-    return '';
-  }
 }
 
 async function copyText(content: string): Promise<boolean> {
@@ -110,11 +88,6 @@ async function copyText(content: string): Promise<boolean> {
   }
 }
 
-type CopyFeedback = {
-  id: string;
-  status: 'copied' | 'error';
-};
-
 type IncomingAttachment = {
   blob: Blob;
   name: string;
@@ -132,7 +105,7 @@ export function ChatScreen({
   onRenameThread,
   onDeleteThread,
 }: {
-  thread: DemoThread | null;
+  thread: Conversation | null;
   threadLimitReached: boolean;
   messageLimitReached: boolean;
   onNewChat: () => void;
@@ -145,7 +118,7 @@ export function ChatScreen({
   const [editingMessage, setEditingMessage] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
-  const [copyFeedback, setCopyFeedback] = useState<CopyFeedback | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<ChatCopyFeedback | null>(null);
   const [isAtEnd, setIsAtEnd] = useState(true);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -183,7 +156,7 @@ export function ChatScreen({
   const modelLabel = selectedModel?.label ?? CHAT_MODEL_UNAVAILABLE_LABEL;
   const aiConnected = CONNECTED_CHAT_MODELS.length > 0;
   const sendLimitReached = thread ? messageLimitReached : threadLimitReached;
-  const visibleMessages = useMemo(() => (thread?.messages ?? []).filter((item) => item.role !== 'system' && !(item.role === 'assistant' && item.mock)), [thread?.messages]);
+  const visibleMessages = useMemo(() => renderableMessages(thread), [thread]);
   const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase('ru-RU');
   const searchableMessages = useMemo(() => visibleMessages
     .filter((item) => item.content.trim())
@@ -407,7 +380,7 @@ export function ChatScreen({
     await deleteChatAttachmentBlob(attachment.id);
   };
 
-  const startEditing = (item: DemoMessage) => {
+  const startEditing = (item: ChatMessage) => {
     if (item.role !== 'user' || !item.content.trim()) return;
     closeSearch();
     setMenuOpen(false);
@@ -454,7 +427,7 @@ export function ChatScreen({
     saveRename();
   };
 
-  const handleCopy = async (item: DemoMessage) => {
+  const handleCopy = async (item: ChatMessage) => {
     if (!item.content.trim()) return;
     const requestSequence = ++copyRequestSequenceRef.current;
     const copied = await copyText(item.content);
@@ -535,82 +508,53 @@ export function ChatScreen({
         </section>
       ) : null}
 
-      <div ref={threadRef} className="chat-v3-thread" role="log" aria-live="polite" aria-relevant="additions text">
-        {visibleMessages.length ? visibleMessages.map((item) => {
-          const searchHit = item.id === activeSearchMessageId;
-          const registerNode = (node: HTMLElement | null) => {
-            if (node) messageNodesRef.current.set(item.id, node);
-            else messageNodesRef.current.delete(item.id);
-          };
-          const user = item.role === 'user';
-          return (
-            <article key={item.id} ref={registerNode} className={`chat-v3-message ${user ? 'chat-v3-message--user' : 'chat-v3-message--assistant'}${searchHit ? ' is-search-hit' : ''}`}>
-              {!user ? <div className="chat-v3-assistant-label"><BrandMark size="compact" /><span>ARVELIS AI</span></div> : null}
-              <ChatAttachmentView attachments={item.attachments} />
-              {item.content.trim() ? <div className="chat-v3-message__text"><p>{item.content}</p></div> : null}
-              <footer className="chat-v3-message__footer">
-                <span>{formatMessageTime(item.createdAt)}</span>
-                {item.content.trim() ? <button type="button" onClick={() => { void handleCopy(item); }}>{copyFeedback?.id === item.id && copyFeedback.status === 'copied' ? <CheckIcon /> : <CopyIcon />}<span>{copyLabel(item.id)}</span></button> : null}
-                {user && item.content.trim() ? <button type="button" onClick={() => startEditing(item)}><EditIcon /><span>Изменить</span></button> : null}
-              </footer>
-            </article>
-          );
-        }) : (
-          <section className="chat-v3-empty">
-            <BrandMark size="default" />
-            <p className="section-kicker">НОВЫЙ ДИАЛОГ</p>
-            <h2>{threadLimitReached ? 'Освободите место для нового диалога' : 'Что нужно сделать?'}</h2>
-            <p>{threadLimitReached ? 'Удалите ненужный диалог в Истории, чтобы начать новый.' : 'Напишите запрос или добавьте фото, видео, файл либо голосовое сообщение.'}</p>
-            {!aiConnected ? <span className="chat-v3-empty__status">AI-модель пока не подключена. Сообщения и вложения сохраняются на этом устройстве без искусственных ответов.</span> : null}
-          </section>
-        )}
-        <div ref={endRef} className="chat-thread__end" aria-hidden="true" />
-      </div>
+      <ChatMessageList
+        messages={visibleMessages}
+        activeSearchMessageId={activeSearchMessageId}
+        copyFeedback={copyFeedback}
+        copyLabel={copyLabel}
+        threadLimitReached={threadLimitReached}
+        aiConnected={aiConnected}
+        threadRef={threadRef}
+        endRef={endRef}
+        onRegisterMessageNode={(messageId, node) => {
+          if (node) messageNodesRef.current.set(messageId, node);
+          else messageNodesRef.current.delete(messageId);
+        }}
+        onCopy={(item) => { void handleCopy(item); }}
+        onEdit={startEditing}
+      />
 
       <div className="chat-v3-composer-wrap">
         {!isAtEnd && visibleMessages.length ? <button className="chat-v3-jump" type="button" onClick={() => scrollToLatest('smooth')}><ChevronDownIcon /><span>К последнему</span></button> : null}
 
-        {pendingAttachments.length ? (
-          <div className="chat-v3-pending" aria-label="Подготовленные вложения">
-            {pendingAttachments.map((attachment) => (
-              <div className="chat-v3-pending__item" key={attachment.id}>
-                <div><span>{attachmentLabel(attachment.kind)}</span><strong>{attachment.kind === 'audio' ? `Голосовое · ${formatVoiceDuration(attachment.durationMs)}` : attachment.name}</strong><small>{formatAttachmentSize(attachment.size)}</small></div>
-                <button type="button" onClick={() => { void removePendingAttachment(attachment); }} aria-label={`Удалить ${attachment.name}`}><CloseIcon /></button>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {voiceRecorder.recording ? (
-          <div className="chat-v3-recording" role="status">
-            <span className="chat-v3-recording__pulse" aria-hidden="true" />
-            <div><strong>Запись голоса</strong><span>{formatVoiceDuration(voiceRecorder.elapsedMs)} / 5:00</span></div>
-            <button type="button" onClick={voiceRecorder.cancel}>Отмена</button>
-            <button className="chat-v3-recording__stop" type="button" onClick={voiceRecorder.stop}><StopIcon /><span>Готово</span></button>
-          </div>
-        ) : null}
-
-        {(attachmentError || voiceRecorder.error) ? <div className="chat-v3-error" role="alert">{attachmentError ?? voiceRecorder.error}</div> : null}
-
-        <div className="chat-v3-composer">
-          <div className="chat-v3-tools">
-            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={sendLimitReached || attachmentBusy || voiceRecorder.recording} aria-label="Добавить фото, видео или файл"><AttachmentIcon /><span>Добавить</span></button>
-            <button type="button" onClick={() => { setAttachmentError(null); void voiceRecorder.start(); }} disabled={sendLimitReached || attachmentBusy || voiceRecorder.recording} aria-label="Записать голосовое сообщение"><MicIcon /><span>Голос</span></button>
-            <button type="button" onClick={() => setModelOpen(true)} className="chat-v3-model-button"><ModelIcon /><span>{modelLabel}</span><ChevronDownIcon /></button>
-          </div>
-
-          <input ref={fileInputRef} className="chat-v3-file-input" type="file" multiple accept="image/*,video/*,audio/*,.pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onChange={handleFileInput} />
-
-          <div className="chat-v3-input-row">
-            <textarea ref={textareaRef} value={message} onChange={(event) => updateComposerMessage(event.target.value)} onKeyDown={handleKeyDown} onBlur={flushDraft} placeholder={sendLimitReached ? 'Новый диалог недоступен' : 'Сообщение'} aria-label="Сообщение" rows={1} maxLength={CHAT_MESSAGE_MAX_CHARS} disabled={sendLimitReached || voiceRecorder.recording} />
-            <button className="chat-v3-send" type="button" disabled={!canSubmit} onClick={submit} aria-label={aiConnected ? 'Отправить сообщение' : 'Сохранить сообщение в диалоге'}><SendIcon /></button>
-          </div>
-
-          <div className="chat-v3-composer-meta">
-            {draftSaveFailed ? <span role="status">Черновик текста не удалось сохранить.</span> : !aiConnected ? <span>AI-провайдер не подключён</span> : <span>{selectedModel?.providerLabel}</span>}
-            {message.length >= CHAT_COMPOSER_COUNTER_THRESHOLD ? <span>{message.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')}</span> : null}
-          </div>
-        </div>
+        <ChatComposer
+          message={message}
+          pendingAttachments={pendingAttachments}
+          attachmentError={attachmentError}
+          attachmentBusy={attachmentBusy}
+          draftSaveFailed={draftSaveFailed}
+          sendLimitReached={sendLimitReached}
+          aiConnected={aiConnected}
+          modelLabel={modelLabel}
+          selectedModelProviderLabel={selectedModel?.providerLabel}
+          voiceRecording={voiceRecorder.recording}
+          voiceElapsedMs={voiceRecorder.elapsedMs}
+          voiceError={voiceRecorder.error}
+          canSubmit={canSubmit}
+          textareaRef={textareaRef}
+          fileInputRef={fileInputRef}
+          onMessageChange={updateComposerMessage}
+          onMessageKeyDown={handleKeyDown}
+          onMessageBlur={flushDraft}
+          onFileInput={handleFileInput}
+          onRemoveAttachment={(attachment) => { void removePendingAttachment(attachment); }}
+          onStartVoice={() => { setAttachmentError(null); void voiceRecorder.start(); }}
+          onCancelVoice={voiceRecorder.cancel}
+          onStopVoice={voiceRecorder.stop}
+          onOpenModel={() => setModelOpen(true)}
+          onSubmit={submit}
+        />
       </div>
 
       <span className="chat-a11y-status" aria-live="polite">{copyFeedback ? (copyFeedback.status === 'copied' ? 'Сообщение скопировано' : 'Не удалось скопировать сообщение') : ''}</span>
@@ -657,7 +601,15 @@ export function ChatScreen({
         </ChatSheet>
       ) : null}
 
-      <ConfirmDialog open={deleteOpen} title="Удалить диалог?" description={thread ? `«${thread.title}» и связанные с ним локальные вложения будут удалены с этого устройства. Отменить действие после подтверждения нельзя.` : ''} confirmLabel="Удалить" danger onConfirm={() => { if (thread) onDeleteThread(thread.id); setDeleteOpen(false); }} onCancel={() => setDeleteOpen(false)} />
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Удалить диалог?"
+        description={thread ? `«${thread.title}» и связанные с ним локальные вложения будут удалены с этого устройства. Отменить действие после подтверждения нельзя.` : ''}
+        confirmLabel="Удалить"
+        danger
+        onConfirm={() => { if (thread) onDeleteThread(thread.id); setDeleteOpen(false); }}
+        onCancel={() => setDeleteOpen(false)}
+      />
     </div>
   );
 }
