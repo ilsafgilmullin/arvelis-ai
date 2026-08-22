@@ -1,6 +1,8 @@
 import { createServer } from 'node:http';
+import { ChatRateLimiter } from '../server/chat/rateLimit';
 import { ChatApplicationService } from '../server/chat/service';
 import { SqliteAccountIdentityStore } from '../server/persistence/sqlite/authStores';
+import { SqliteChatRateLimitStore } from '../server/persistence/sqlite/chatRateLimitStore';
 import { SqliteConversationStore } from '../server/persistence/sqlite/chatStore';
 import { openSqliteAuthDatabase } from '../server/persistence/sqlite/database';
 import { handleChatRoute } from '../server/runtime/chatRoutes';
@@ -29,6 +31,8 @@ async function main(): Promise<void> {
   }
 
   const chat = new ChatApplicationService(new SqliteConversationStore(database));
+  let rateNow = 50_000;
+  const rateLimiter = new ChatRateLimiter(new SqliteChatRateLimitStore(database), () => rateNow);
   const server = createServer((request, response) => {
     const method = request.method ?? 'GET';
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
@@ -38,6 +42,7 @@ async function main(): Promise<void> {
       request,
       response,
       chat,
+      rateLimiter,
       authenticate: async () => {
         const authorization = request.headers.authorization;
         if (authorization === 'Bearer account-a') return { kind: 'authenticated', accountId: 'route-account-a' };
@@ -154,6 +159,29 @@ async function main(): Promise<void> {
     assert(remove.status === 204, 'Owner delete must return 204');
     const missing = await fetch(`${base}/api/chat/conversations/${conversationId}`, { headers: headersA });
     assert(missing.status === 404, 'Deleted conversation must not be readable');
+
+    for (let index = 0; index < 20; index += 1) {
+      const decision = await rateLimiter.consume('create', 'route-account-b');
+      assert(decision.allowed, 'Create rate limit must allow requests within the window');
+    }
+    const limitedCreate = await fetch(`${base}/api/chat/conversations`, {
+      method: 'POST',
+      headers: headersB,
+      body: JSON.stringify({ content: 'Rate limited conversation' }),
+    });
+    assert(limitedCreate.status === 429, 'Create route must enforce persistent rate limit');
+    assert(Number(limitedCreate.headers.get('retry-after')) >= 1, 'Rate-limited route must return Retry-After');
+    const limitedBody = await limitedCreate.json() as { error?: { code?: string; retryAfterSeconds?: number } };
+    assert(limitedBody.error?.code === 'rate_limited', 'Rate-limited route must return stable error code');
+    assert((limitedBody.error?.retryAfterSeconds ?? 0) >= 1, 'Rate-limited route must expose retry delay');
+
+    rateNow += 10 * 60 * 1000;
+    const resetCreate = await fetch(`${base}/api/chat/conversations`, {
+      method: 'POST',
+      headers: headersB,
+      body: JSON.stringify({ content: 'Rate window reset' }),
+    });
+    assert(resetCreate.status === 201, 'Expired create rate-limit window must reset');
 
     console.log('ARVELIS Chat HTTP routes smoke: PASS');
   } finally {
