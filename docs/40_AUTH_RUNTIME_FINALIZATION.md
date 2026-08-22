@@ -63,15 +63,21 @@ Pending OTP handoff хранится локально только для вос
 
 ## Проверки перед merge
 
-Обязательны:
+GitHub Actions run #552 на Safari-fix HEAD: PASS.
+
+Фактически прошли:
 
 - `npm ci`;
 - `npm audit --audit-level=high`;
-- `npm run check`;
+- TypeScript typecheck;
 - closed-test auth dev environment smoke;
-- pending Email OTP handoff smoke;
-- SQLite auth persistence/flow smoke;
-- PostgreSQL compatibility job;
-- Replit iPhone E2E: request OTP → открыть Почту → вернуться в Safari → ввести уже полученный код → session restore → refresh.
+- pending Email OTP handoff regression smoke;
+- auth core/server auth smoke;
+- SQLite auth persistence + full flow smoke;
+- auth server runtime build;
+- frontend production build;
+- PostgreSQL 18.4 migration + persistence smoke.
+
+Остаётся фактический Replit iPhone E2E: request OTP → открыть Почту → вернуться в Safari → ввести уже полученный код → session restore → refresh.
 
 Merge в `main` выполняется только после отдельного подтверждения пользователя.
