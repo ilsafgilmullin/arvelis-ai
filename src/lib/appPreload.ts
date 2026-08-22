@@ -1,6 +1,6 @@
 import { canUseDemoStorage, loadDemoWorkspace } from './demoStorage';
 import { loadAppLayoutModule, loadChatModule, loadWorkspaceModule } from './appModules';
-import type { DemoWorkspaceState } from '../types';
+import type { ChatWorkspaceState } from '../types';
 
 export const APP_LOAD_TASKS = [
   { id: 'shell', label: 'Интерфейс' },
@@ -24,7 +24,7 @@ export type PreparedCoreModules = {
 };
 
 export type PreparedApp = {
-  workspace: DemoWorkspaceState;
+  workspace: ChatWorkspaceState;
   persistenceAvailable: boolean;
   core: PreparedCoreModules;
 };
