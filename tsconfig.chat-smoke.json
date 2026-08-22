@@ -8,6 +8,7 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "lib": ["ES2022", "DOM"],
+    "types": ["node"],
     "skipLibCheck": true,
     "outDir": "tests/.dist-chat",
     "rootDir": "."
