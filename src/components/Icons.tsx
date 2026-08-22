@@ -20,3 +20,8 @@ export const CheckIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="m5 1
 export const TrashIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="M5.5 7.2h13M9 7.2V4.8h6v2.4M7.4 7.2l.7 12h7.8l.7-12M10 10.2v6M14 10.2v6" /></svg></IconFrame>;
 export const ResetIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="M4.5 8.2V4.5h3.7M4.6 4.7a8.8 8.8 0 1 1-1.4 10.1" /></svg></IconFrame>;
 export const SignOutIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="M10 5H5.8A1.8 1.8 0 0 0 4 6.8v10.4A1.8 1.8 0 0 0 5.8 19H10" /><path d="M13 8.2 16.8 12 13 15.8M8.5 12h8.3" /></svg></IconFrame>;
+export const AttachmentIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="m8.4 12.7 6.7-6.7a3.2 3.2 0 0 1 4.5 4.5l-8.4 8.4a5 5 0 0 1-7.1-7.1l8-8" /><path d="m6.9 13.2 6.8-6.8" /></svg></IconFrame>;
+export const MicIcon = () => <IconFrame><svg viewBox="0 0 24 24"><rect x="8.3" y="3" width="7.4" height="12" rx="3.7" /><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7" /></svg></IconFrame>;
+export const StopIcon = () => <IconFrame><svg viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5" /></svg></IconFrame>;
+export const ModelIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="M7.2 5.2h9.6a2 2 0 0 1 2 2v9.6a2 2 0 0 1-2 2H7.2a2 2 0 0 1-2-2V7.2a2 2 0 0 1 2-2Z" /><path d="M9 9h6M9 12h6M9 15h3" /></svg></IconFrame>;
+export const CloseIcon = () => <IconFrame><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></svg></IconFrame>;

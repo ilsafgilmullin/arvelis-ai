@@ -9,7 +9,7 @@ import {
   conversationPreview,
   conversationRelativeTime,
 } from '../domain/chatPresentation';
-import type { DemoThread } from '../types';
+import type { Conversation } from '../types';
 
 function dialogueCountLabel(count: number): string {
   const mod100 = count % 100;
@@ -26,12 +26,12 @@ export function HistoryScreen({
   onOpen,
   onDelete,
 }: {
-  threads: DemoThread[];
+  threads: Conversation[];
   onOpen: (threadId: string) => void;
   onDelete: (threadId: string) => void;
 }) {
   const [query, setQuery] = useState('');
-  const [pendingDelete, setPendingDelete] = useState<DemoThread | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Conversation | null>(null);
 
   const orderedThreads = useMemo(
     () => [...threads].sort((a, b) => b.updatedAt - a.updatedAt),

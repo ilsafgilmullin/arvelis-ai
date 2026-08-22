@@ -1,34 +1,49 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent, ReactNode } from 'react';
+import type { ChangeEvent, KeyboardEvent } from 'react';
+import { CHAT_MODEL_UNAVAILABLE_LABEL, CONNECTED_CHAT_MODELS } from '../ai/chatModelCatalog';
+import {
+  attachmentKindForMime,
+  normalizeAttachmentName,
+  validateAttachmentBatch,
+  validateAttachmentCandidate,
+} from '../chat/attachmentPolicy';
+import { ChatComposer } from '../chat/components/ChatComposer';
+import { ChatMessageList, type ChatCopyFeedback } from '../chat/components/ChatMessageList';
+import { renderableMessages } from '../chat/domain';
 import { BrandMark } from '../components/Brand';
 import { ChatSheet } from '../components/ChatSheet';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import {
   CheckIcon,
   ChevronDownIcon,
-  CopyIcon,
   EditIcon,
+  ModelIcon,
   PlusIcon,
   SearchIcon,
-  SendIcon,
   TrashIcon,
 } from '../components/Icons';
 import {
-  CHAT_COMPOSER_COUNTER_THRESHOLD,
   CHAT_MESSAGE_MAX_CHARS,
   CHAT_SEARCH_MAX_CHARS,
   CHAT_THREAD_TITLE_MAX_CHARS,
 } from '../domain/chatPolicy';
 import { useChatDraft } from '../hooks/useChatDraft';
+import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
+import {
+  deleteChatAttachmentBlob,
+  deleteChatAttachmentBlobs,
+  loadChatAttachmentBlob,
+  saveChatAttachmentBlob,
+} from '../lib/chatAttachmentStorage';
 import { chatDraftKey } from '../lib/chatDraftStorage';
-import type { DemoMessage, DemoThread } from '../types';
+import {
+  clearPendingChatAttachments,
+  loadPendingChatAttachments,
+  savePendingChatAttachments,
+} from '../lib/chatPendingAttachmentStorage';
+import type { ChatAttachmentMeta, ChatMessage, Conversation } from '../types';
 
-const QUICK_STARTS = [
-  { label: 'Разобрать задачу', prompt: 'Помоги разобраться в задаче: ' },
-  { label: 'Объяснить тему', prompt: 'Объясни понятным языком: ' },
-  { label: 'Сравнить варианты', prompt: 'Помоги сравнить варианты: ' },
-  { label: 'Составить план', prompt: 'Помоги составить план: ' },
-] as const;
+const VOICE_MAX_DURATION_MS = 5 * 60 * 1000;
 
 function isCoarsePointer(): boolean {
   return typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches ?? false);
@@ -40,12 +55,9 @@ function motionSafeBehavior(behavior: ScrollBehavior): ScrollBehavior {
   return reducedMotion ? 'auto' : 'smooth';
 }
 
-function displaySystemMessage(content: string): string {
-  const normalized = content.toLocaleLowerCase('ru-RU');
-  if (normalized.includes('сохран') && (normalized.includes('ai-ответ') || normalized.includes('ai пока'))) {
-    return 'Сохранено локально · AI пока не подключён';
-  }
-  return content;
+function createAttachmentId(): string {
+  const random = globalThis.crypto?.randomUUID?.().replace(/-/g, '');
+  return random ? `att_${random}` : `att_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
 }
 
 async function copyText(content: string): Promise<boolean> {
@@ -76,9 +88,11 @@ async function copyText(content: string): Promise<boolean> {
   }
 }
 
-type CopyFeedback = {
-  id: string;
-  status: 'copied' | 'error';
+type IncomingAttachment = {
+  blob: Blob;
+  name: string;
+  mimeType: string;
+  durationMs?: number;
 };
 
 export function ChatScreen({
@@ -91,11 +105,11 @@ export function ChatScreen({
   onRenameThread,
   onDeleteThread,
 }: {
-  thread: DemoThread | null;
+  thread: Conversation | null;
   threadLimitReached: boolean;
   messageLimitReached: boolean;
   onNewChat: () => void;
-  onSend: (content: string) => void;
+  onSend: (content: string, attachments?: ChatAttachmentMeta[]) => void;
   onEditMessage: (threadId: string, messageId: string, content: string) => void;
   onRenameThread: (threadId: string, title: string) => void;
   onDeleteThread: (threadId: string) => void;
@@ -104,15 +118,21 @@ export function ChatScreen({
   const [editingMessage, setEditingMessage] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
-  const [copyFeedback, setCopyFeedback] = useState<CopyFeedback | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<ChatCopyFeedback | null>(null);
   const [isAtEnd, setIsAtEnd] = useState(true);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchIndex, setSearchIndex] = useState(0);
+  const [modelOpen, setModelOpen] = useState(false);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(CONNECTED_CHAT_MODELS[0]?.id ?? null);
+  const [pendingAttachments, setPendingAttachments] = useState<ChatAttachmentMeta[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -132,25 +152,104 @@ export function ChatScreen({
     clear: clearDraft,
   } = useChatDraft(draftKey);
 
+  const selectedModel = CONNECTED_CHAT_MODELS.find((model) => model.id === selectedModelId) ?? null;
+  const modelLabel = selectedModel?.label ?? CHAT_MODEL_UNAVAILABLE_LABEL;
+  const aiConnected = CONNECTED_CHAT_MODELS.length > 0;
   const sendLimitReached = thread ? messageLimitReached : threadLimitReached;
+  const visibleMessages = useMemo(() => renderableMessages(thread), [thread]);
   const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase('ru-RU');
-  const searchableMessages = useMemo(() => (thread?.messages ?? [])
-    .filter((item) => item.role !== 'system')
-    .map((item) => ({
-      id: item.id,
-      content: item.content.toLocaleLowerCase('ru-RU'),
-    })), [thread?.messages]);
-
+  const searchableMessages = useMemo(() => visibleMessages
+    .filter((item) => item.content.trim())
+    .map((item) => ({ id: item.id, content: item.content.toLocaleLowerCase('ru-RU') })), [visibleMessages]);
   const searchMatches = useMemo(() => {
     if (!normalizedSearchQuery) return [];
-    return searchableMessages
-      .filter((item) => item.content.includes(normalizedSearchQuery))
-      .map((item) => item.id);
+    return searchableMessages.filter((item) => item.content.includes(normalizedSearchQuery)).map((item) => item.id);
   }, [normalizedSearchQuery, searchableMessages]);
+  const activeSearchMessageId = searchMatches.length ? searchMatches[Math.min(searchIndex, searchMatches.length - 1)] ?? null : null;
 
-  const activeSearchMessageId = searchMatches.length
-    ? searchMatches[Math.min(searchIndex, searchMatches.length - 1)] ?? null
-    : null;
+  const addIncomingAttachments = async (incoming: IncomingAttachment[]) => {
+    if (!incoming.length || attachmentBusy) return;
+    setAttachmentError(null);
+    setAttachmentBusy(true);
+
+    const nextMetas: ChatAttachmentMeta[] = [];
+    for (const item of incoming) {
+      const kind = attachmentKindForMime(item.mimeType);
+      const meta: ChatAttachmentMeta = {
+        id: createAttachmentId(),
+        kind,
+        name: normalizeAttachmentName(item.name, kind === 'audio' ? 'Голосовое сообщение' : 'Файл'),
+        mimeType: item.mimeType.slice(0, 180),
+        size: item.blob.size,
+        createdAt: Date.now(),
+        ...(item.durationMs === undefined ? {} : { durationMs: item.durationMs }),
+      };
+      const validationError = validateAttachmentCandidate(meta);
+      if (validationError) {
+        setAttachmentError(validationError);
+        setAttachmentBusy(false);
+        return;
+      }
+      nextMetas.push(meta);
+    }
+
+    const batchError = validateAttachmentBatch(pendingAttachments, nextMetas);
+    if (batchError) {
+      setAttachmentError(batchError);
+      setAttachmentBusy(false);
+      return;
+    }
+
+    const savedIds: string[] = [];
+    for (let index = 0; index < incoming.length; index += 1) {
+      const meta = nextMetas[index];
+      const item = incoming[index];
+      if (!meta || !item || !(await saveChatAttachmentBlob(meta.id, item.blob))) {
+        await deleteChatAttachmentBlobs(savedIds);
+        setAttachmentError('Не удалось сохранить вложение на этом устройстве.');
+        setAttachmentBusy(false);
+        return;
+      }
+      savedIds.push(meta.id);
+    }
+
+    const next = [...pendingAttachments, ...nextMetas];
+    if (!savePendingChatAttachments(draftKey, next)) {
+      await deleteChatAttachmentBlobs(savedIds);
+      setAttachmentError('Не удалось сохранить состояние вложений.');
+      setAttachmentBusy(false);
+      return;
+    }
+
+    setPendingAttachments(next);
+    setAttachmentBusy(false);
+  };
+
+  const voiceRecorder = useVoiceRecorder((result) => {
+    const extension = result.mimeType.includes('mp4') ? 'm4a' : result.mimeType.includes('webm') ? 'webm' : 'audio';
+    void addIncomingAttachments([{
+      blob: result.blob,
+      mimeType: result.mimeType,
+      name: `Голосовое сообщение.${extension}`,
+      durationMs: result.durationMs,
+    }]);
+  });
+
+  useEffect(() => {
+    if (voiceRecorder.recording && voiceRecorder.elapsedMs >= VOICE_MAX_DURATION_MS) voiceRecorder.stop();
+  }, [voiceRecorder.elapsedMs, voiceRecorder.recording, voiceRecorder.stop]);
+
+  useEffect(() => {
+    let active = true;
+    const stored = loadPendingChatAttachments(draftKey);
+    void Promise.all(stored.map(async (attachment) => ({ attachment, exists: Boolean(await loadChatAttachmentBlob(attachment.id)) }))).then((results) => {
+      if (!active) return;
+      const available = results.filter((item) => item.exists).map((item) => item.attachment);
+      setPendingAttachments(available);
+      if (available.length !== stored.length) savePendingChatAttachments(draftKey, available);
+    });
+    return () => { active = false; };
+  }, [draftKey]);
 
   const setEndState = (next: boolean) => {
     isAtEndRef.current = next;
@@ -158,18 +257,11 @@ export function ChatScreen({
   };
 
   const scrollToLatest = (behavior: ScrollBehavior = 'smooth') => {
-    window.requestAnimationFrame(() => {
-      endRef.current?.scrollIntoView({ block: 'end', behavior: motionSafeBehavior(behavior) });
-    });
+    window.requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: 'end', behavior: motionSafeBehavior(behavior) }));
   };
 
   const scrollToMessage = (messageId: string) => {
-    window.requestAnimationFrame(() => {
-      messageNodesRef.current.get(messageId)?.scrollIntoView({
-        block: 'center',
-        behavior: motionSafeBehavior('smooth'),
-      });
-    });
+    window.requestAnimationFrame(() => messageNodesRef.current.get(messageId)?.scrollIntoView({ block: 'center', behavior: motionSafeBehavior('smooth') }));
   };
 
   const closeSearch = () => {
@@ -193,6 +285,8 @@ export function ChatScreen({
     setSearchQuery('');
     setSearchIndex(0);
     setCopyFeedback(null);
+    setAttachmentError(null);
+    setModelOpen(false);
     copyRequestSequenceRef.current += 1;
     if (copyFeedbackTimerRef.current !== null) {
       window.clearTimeout(copyFeedbackTimerRef.current);
@@ -211,7 +305,7 @@ export function ChatScreen({
   }, [message]);
 
   useEffect(() => {
-    if (!thread?.messages.length) {
+    if (!visibleMessages.length) {
       setEndState(true);
       return;
     }
@@ -219,67 +313,47 @@ export function ChatScreen({
   }, [thread?.id]);
 
   useEffect(() => {
-    if (!thread?.messages.length) return;
+    if (!visibleMessages.length) return;
     if (!pendingOwnSendRef.current && !isAtEndRef.current) return;
     scrollToLatest('smooth');
     pendingOwnSendRef.current = false;
-  }, [thread?.id, thread?.messages.length]);
+  }, [thread?.id, visibleMessages.length]);
 
   useEffect(() => {
     const end = endRef.current;
     const root = threadRef.current;
     if (!end || !root || typeof IntersectionObserver === 'undefined') return;
-
     const observer = new IntersectionObserver((entries) => {
       const entry = entries[0];
-      if (!entry) return;
-      setEndState(entry.isIntersecting);
-    }, {
-      root,
-      rootMargin: '0px 0px 96px 0px',
-      threshold: 0.01,
-    });
-
+      if (entry) setEndState(entry.isIntersecting);
+    }, { root, rootMargin: '0px 0px 96px 0px', threshold: 0.01 });
     observer.observe(end);
     return () => observer.disconnect();
   }, [thread?.id]);
 
   useEffect(() => () => {
     copyRequestSequenceRef.current += 1;
-    if (copyFeedbackTimerRef.current !== null) {
-      window.clearTimeout(copyFeedbackTimerRef.current);
-    }
+    if (copyFeedbackTimerRef.current !== null) window.clearTimeout(copyFeedbackTimerRef.current);
   }, []);
 
   useEffect(() => {
-    if (!searchOpen || !activeSearchMessageId) return;
-    scrollToMessage(activeSearchMessageId);
+    if (searchOpen && activeSearchMessageId) scrollToMessage(activeSearchMessageId);
   }, [searchOpen, activeSearchMessageId]);
 
   useEffect(() => {
-    if (!searchMatches.length) {
-      if (searchIndex !== 0) setSearchIndex(0);
-      return;
-    }
-    if (searchIndex >= searchMatches.length) setSearchIndex(0);
+    if (!searchMatches.length && searchIndex !== 0) setSearchIndex(0);
+    else if (searchMatches.length && searchIndex >= searchMatches.length) setSearchIndex(0);
   }, [searchIndex, searchMatches.length]);
-
-  const focusComposerWith = (content: string) => {
-    if (sendLimitReached) return;
-    updateComposerMessage(content);
-    window.requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-      textareaRef.current?.setSelectionRange(content.length, content.length);
-    });
-  };
 
   const submit = () => {
     const content = message.trim();
-    if (!content || sendLimitReached) return;
-
+    if ((!content && !pendingAttachments.length) || sendLimitReached || attachmentBusy || voiceRecorder.recording) return;
     pendingOwnSendRef.current = true;
     clearDraft();
-    onSend(content);
+    clearPendingChatAttachments(draftKey);
+    const attachments = pendingAttachments;
+    setPendingAttachments([]);
+    onSend(content, attachments);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -288,8 +362,26 @@ export function ChatScreen({
     submit();
   };
 
-  const startEditing = (item: DemoMessage) => {
-    if (item.role !== 'user') return;
+  const handleFileInput = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (!files.length) return;
+    void addIncomingAttachments(files.map((file) => ({
+      blob: file,
+      name: file.name,
+      mimeType: file.type || 'application/octet-stream',
+    })));
+  };
+
+  const removePendingAttachment = async (attachment: ChatAttachmentMeta) => {
+    const next = pendingAttachments.filter((item) => item.id !== attachment.id);
+    setPendingAttachments(next);
+    savePendingChatAttachments(draftKey, next);
+    await deleteChatAttachmentBlob(attachment.id);
+  };
+
+  const startEditing = (item: ChatMessage) => {
+    if (item.role !== 'user' || !item.content.trim()) return;
     closeSearch();
     setMenuOpen(false);
     setRenaming(false);
@@ -335,17 +427,13 @@ export function ChatScreen({
     saveRename();
   };
 
-  const handleCopy = async (item: DemoMessage) => {
+  const handleCopy = async (item: ChatMessage) => {
+    if (!item.content.trim()) return;
     const requestSequence = ++copyRequestSequenceRef.current;
     const copied = await copyText(item.content);
     if (requestSequence !== copyRequestSequenceRef.current) return;
-
     setCopyFeedback({ id: item.id, status: copied ? 'copied' : 'error' });
-
-    if (copyFeedbackTimerRef.current !== null) {
-      window.clearTimeout(copyFeedbackTimerRef.current);
-    }
-
+    if (copyFeedbackTimerRef.current !== null) window.clearTimeout(copyFeedbackTimerRef.current);
     copyFeedbackTimerRef.current = window.setTimeout(() => {
       setCopyFeedback(null);
       copyFeedbackTimerRef.current = null;
@@ -367,35 +455,17 @@ export function ChatScreen({
   };
 
   const moveSearch = (direction: 1 | -1) => {
-    if (!searchMatches.length) return;
-    setSearchIndex((current) => (current + direction + searchMatches.length) % searchMatches.length);
+    if (searchMatches.length) setSearchIndex((current) => (current + direction + searchMatches.length) % searchMatches.length);
   };
 
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Escape') {
       event.preventDefault();
       closeSearch();
-      return;
-    }
-    if (event.key === 'Enter' && searchMatches.length) {
+    } else if (event.key === 'Enter' && searchMatches.length) {
       event.preventDefault();
       moveSearch(event.shiftKey ? -1 : 1);
     }
-  };
-
-  const openDelete = () => {
-    closeSearch();
-    setMenuOpen(false);
-    setRenaming(false);
-    cancelEditing();
-    setDeleteOpen(true);
-  };
-
-  const confirmDelete = () => {
-    if (!thread) return;
-    clearDraft();
-    onDeleteThread(thread.id);
-    setDeleteOpen(false);
   };
 
   const handleNewChat = () => {
@@ -406,209 +476,106 @@ export function ChatScreen({
     onNewChat();
   };
 
-  const pageClassName = thread?.messages.length
-    ? 'chat-page chat-experience chat-experience-v2'
-    : 'chat-page chat-experience chat-experience-v2 chat-experience-v2--empty';
+  const pageClassName = visibleMessages.length ? 'chat-page chat-v3' : 'chat-page chat-v3 chat-v3--empty';
+  const canSubmit = !sendLimitReached && !attachmentBusy && !voiceRecorder.recording && Boolean(message.trim() || pendingAttachments.length);
 
   return (
     <div className={pageClassName}>
-      <header className="chat-v2-header">
-        <div className="chat-v2-header__identity">
+      <header className="chat-v3-header">
+        <div className="chat-v3-header__identity">
           <BrandMark size="compact" />
-          <div className="chat-v2-header__copy">
-            <span className="chat-v2-header__product">ARVELIS AI</span>
+          <div>
+            <span>ARVELIS AI</span>
             <h1 title={title}>{title}</h1>
-            <span className="chat-v2-header__status">Локальный preview · AI пока не подключён</span>
           </div>
         </div>
-
         {thread ? (
-          <div className="chat-v2-header__actions">
-            <button
-              className={searchOpen ? 'chat-v2-icon-button chat-v2-icon-button--active' : 'chat-v2-icon-button'}
-              type="button"
-              onClick={searchOpen ? closeSearch : openSearch}
-              aria-label={searchOpen ? 'Закрыть поиск по диалогу' : 'Поиск по диалогу'}
-              aria-expanded={searchOpen}
-              aria-controls="chat-search-panel"
-            >
-              <SearchIcon />
-            </button>
-            <button
-              className={menuOpen ? 'chat-v2-icon-button chat-v2-icon-button--active' : 'chat-v2-icon-button'}
-              type="button"
-              onClick={() => setMenuOpen((current) => !current)}
-              aria-label="Действия с диалогом"
-              aria-expanded={menuOpen}
-            >
-              <span className="chat-v2-more" aria-hidden="true">•••</span>
-            </button>
+          <div className="chat-v3-header__actions">
+            <button type="button" className={searchOpen ? 'chat-v3-icon-button is-active' : 'chat-v3-icon-button'} onClick={searchOpen ? closeSearch : openSearch} aria-label="Поиск по диалогу"><SearchIcon /></button>
+            <button type="button" className={menuOpen ? 'chat-v3-icon-button is-active' : 'chat-v3-icon-button'} onClick={() => setMenuOpen((current) => !current)} aria-label="Действия с диалогом"><span aria-hidden="true">•••</span></button>
           </div>
         ) : null}
       </header>
 
       {searchOpen && thread ? (
-        <section id="chat-search-panel" className="chat-v2-search" role="search" aria-label="Поиск по текущему диалогу">
-          <div className="chat-v2-search__field">
-            <SearchIcon />
-            <input
-              ref={searchInputRef}
-              value={searchQuery}
-              onChange={(event) => {
-                setSearchQuery(event.target.value.slice(0, CHAT_SEARCH_MAX_CHARS));
-                setSearchIndex(0);
-              }}
-              onKeyDown={handleSearchKeyDown}
-              placeholder="Найти в диалоге"
-              aria-label="Найти сообщение в диалоге"
-              maxLength={CHAT_SEARCH_MAX_CHARS}
-              autoComplete="off"
-            />
-            <span className="chat-v2-search__count" aria-live="polite">
-              {normalizedSearchQuery
-                ? (searchMatches.length ? `${Math.min(searchIndex + 1, searchMatches.length)} / ${searchMatches.length}` : '0 / 0')
-                : '—'}
-            </span>
-          </div>
-          <div className="chat-v2-search__actions">
-            <button type="button" disabled={!searchMatches.length} onClick={() => moveSearch(-1)} aria-label="Предыдущее совпадение">↑</button>
-            <button type="button" disabled={!searchMatches.length} onClick={() => moveSearch(1)} aria-label="Следующее совпадение">↓</button>
-            <button className="chat-v2-search__done" type="button" onClick={closeSearch}>Готово</button>
-          </div>
+        <section className="chat-v3-search" role="search">
+          <SearchIcon />
+          <input ref={searchInputRef} value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value.slice(0, CHAT_SEARCH_MAX_CHARS)); setSearchIndex(0); }} onKeyDown={handleSearchKeyDown} placeholder="Найти в диалоге" maxLength={CHAT_SEARCH_MAX_CHARS} />
+          <span>{normalizedSearchQuery ? (searchMatches.length ? `${Math.min(searchIndex + 1, searchMatches.length)} / ${searchMatches.length}` : '0 / 0') : '—'}</span>
+          <button type="button" disabled={!searchMatches.length} onClick={() => moveSearch(-1)} aria-label="Предыдущее совпадение">↑</button>
+          <button type="button" disabled={!searchMatches.length} onClick={() => moveSearch(1)} aria-label="Следующее совпадение">↓</button>
+          <button type="button" onClick={closeSearch}>Готово</button>
         </section>
       ) : null}
 
-      <div ref={threadRef} className="chat-thread chat-v2-thread" role="log" aria-live="polite" aria-relevant="additions text">
-        {thread?.messages.length ? thread.messages.map((item) => {
-          const searchHit = item.id === activeSearchMessageId;
-          const registerNode = (node: HTMLElement | null) => {
-            if (node) messageNodesRef.current.set(item.id, node);
-            else messageNodesRef.current.delete(item.id);
-          };
+      <ChatMessageList
+        messages={visibleMessages}
+        activeSearchMessageId={activeSearchMessageId}
+        copyFeedback={copyFeedback}
+        copyLabel={copyLabel}
+        threadLimitReached={threadLimitReached}
+        aiConnected={aiConnected}
+        threadRef={threadRef}
+        endRef={endRef}
+        onRegisterMessageNode={(messageId, node) => {
+          if (node) messageNodesRef.current.set(messageId, node);
+          else messageNodesRef.current.delete(messageId);
+        }}
+        onCopy={(item) => { void handleCopy(item); }}
+        onEdit={startEditing}
+      />
 
-          let content: ReactNode;
-          if (item.role === 'system') {
-            content = (
-              <article key={item.id} ref={registerNode} className="message message--system preview-notice chat-v2-preview-notice">
-                <span className="preview-notice__dot" aria-hidden="true" />
-                <span>{displaySystemMessage(item.content)}</span>
-              </article>
-            );
-          } else if (item.role === 'user') {
-            content = (
-              <article key={item.id} ref={registerNode} className={searchHit ? 'message message--user chat-v2-message chat-v2-message--user message--search-hit' : 'message message--user chat-v2-message chat-v2-message--user'}>
-                <div className="message__bubble chat-v2-user-bubble"><p>{item.content}</p></div>
-                <div className="message__footer message__footer--user chat-v2-message-footer">
-                  <div className="message__actions chat-v2-message-actions">
-                    <button type="button" onClick={() => { void handleCopy(item); }} aria-label={`${copyLabel(item.id)} сообщение`} title={copyLabel(item.id)}>
-                      {copyFeedback?.id === item.id && copyFeedback.status === 'copied' ? <CheckIcon /> : <CopyIcon />}
-                      <span>{copyLabel(item.id)}</span>
-                    </button>
-                    <button type="button" onClick={() => startEditing(item)} aria-label="Изменить сообщение" title="Изменить сообщение"><EditIcon /><span>Изменить</span></button>
-                  </div>
-                </div>
-              </article>
-            );
-          } else {
-            content = (
-              <article key={item.id} ref={registerNode} className={searchHit ? 'message message--assistant chat-v2-message chat-v2-message--assistant message--search-hit' : 'message message--assistant chat-v2-message chat-v2-message--assistant'}>
-                <div className="assistant-label chat-v2-assistant-label">
-                  <BrandMark size="compact" />
-                  <span>ARVELIS AI</span>
-                  <span className="chat-v2-preview-tag">{item.mock ? 'MOCK' : 'PREVIEW'}</span>
-                </div>
-                <p>{item.content}</p>
-                {item.mock ? <span className="mock-disclaimer">Демонстрационный текст — не ответ модели.</span> : null}
-                <div className="message__footer chat-v2-message-footer">
-                  <div className="message__actions chat-v2-message-actions">
-                    <button type="button" onClick={() => { void handleCopy(item); }} aria-label={`${copyLabel(item.id)} сообщение ARVELIS AI`} title={copyLabel(item.id)}>
-                      {copyFeedback?.id === item.id && copyFeedback.status === 'copied' ? <CheckIcon /> : <CopyIcon />}
-                      <span>{copyLabel(item.id)}</span>
-                    </button>
-                  </div>
-                </div>
-              </article>
-            );
-          }
+      <div className="chat-v3-composer-wrap">
+        {!isAtEnd && visibleMessages.length ? <button className="chat-v3-jump" type="button" onClick={() => scrollToLatest('smooth')}><ChevronDownIcon /><span>К последнему</span></button> : null}
 
-          return content;
-        }) : (
-          <section className="chat-empty chat-v2-empty">
-            <BrandMark size="compact" />
-            <h2>{threadLimitReached ? 'Освободите место для нового диалога' : 'Чем помочь?'}</h2>
-            <p>{threadLimitReached
-              ? 'Локальный preview достиг лимита диалогов. Удалите ненужный диалог в истории и вернитесь сюда.'
-              : 'Опишите задачу своими словами или начните с одной из заготовок.'}</p>
-            {!threadLimitReached ? (
-              <div className="chat-quick-starts chat-v2-quick-starts" aria-label="Быстрые заготовки">
-                {QUICK_STARTS.map((item) => (
-                  <button key={item.label} type="button" onClick={() => focusComposerWith(item.prompt)}>{item.label}</button>
-                ))}
-              </div>
-            ) : null}
-            <span className="chat-v2-empty__note">Сообщения сохраняются локально · AI пока не подключён</span>
-          </section>
-        )}
-        <div ref={endRef} className="chat-thread__end" aria-hidden="true" />
+        <ChatComposer
+          message={message}
+          pendingAttachments={pendingAttachments}
+          attachmentError={attachmentError}
+          attachmentBusy={attachmentBusy}
+          draftSaveFailed={draftSaveFailed}
+          sendLimitReached={sendLimitReached}
+          aiConnected={aiConnected}
+          modelLabel={modelLabel}
+          selectedModelProviderLabel={selectedModel?.providerLabel}
+          voiceRecording={voiceRecorder.recording}
+          voiceElapsedMs={voiceRecorder.elapsedMs}
+          voiceError={voiceRecorder.error}
+          canSubmit={canSubmit}
+          textareaRef={textareaRef}
+          fileInputRef={fileInputRef}
+          onMessageChange={updateComposerMessage}
+          onMessageKeyDown={handleKeyDown}
+          onMessageBlur={flushDraft}
+          onFileInput={handleFileInput}
+          onRemoveAttachment={(attachment) => { void removePendingAttachment(attachment); }}
+          onStartVoice={() => { setAttachmentError(null); void voiceRecorder.start(); }}
+          onCancelVoice={voiceRecorder.cancel}
+          onStopVoice={voiceRecorder.stop}
+          onOpenModel={() => setModelOpen(true)}
+          onSubmit={submit}
+        />
       </div>
 
-      <div className="chat-composer-wrap chat-v2-composer-wrap">
-        {!isAtEnd && thread?.messages.length ? (
-          <button className="chat-jump-latest chat-v2-jump-latest" type="button" onClick={() => scrollToLatest('smooth')} aria-label="Перейти к последнему сообщению" title="К последнему сообщению">
-            <ChevronDownIcon /><span>К последнему</span>
-          </button>
-        ) : null}
+      <span className="chat-a11y-status" aria-live="polite">{copyFeedback ? (copyFeedback.status === 'copied' ? 'Сообщение скопировано' : 'Не удалось скопировать сообщение') : ''}</span>
 
-        {messageLimitReached && thread ? (
-          <div className="chat-limit-notice chat-v2-limit-notice" role="status">
-            <strong>Локальный лимит сообщений достигнут.</strong>
-            <button type="button" onClick={handleNewChat} disabled={threadLimitReached}>Новый диалог</button>
-          </div>
-        ) : null}
-
-        <div className="chat-composer chat-v2-composer">
-          <textarea
-            ref={textareaRef}
-            value={message}
-            onChange={(event) => updateComposerMessage(event.target.value)}
-            onKeyDown={handleKeyDown}
-            onBlur={flushDraft}
-            placeholder={sendLimitReached ? 'Отправка недоступна' : 'Сообщение'}
-            aria-label="Сообщение"
-            rows={1}
-            maxLength={CHAT_MESSAGE_MAX_CHARS}
-            disabled={sendLimitReached}
-          />
-          <button className="send-button chat-v2-send-button" type="button" disabled={!message.trim() || sendLimitReached} onClick={submit} aria-label="Отправить сообщение"><SendIcon /></button>
-        </div>
-
-        <div className="chat-v2-composer-meta">
-          {draftSaveFailed
-            ? <span className="chat-draft-warning" role="status">Черновик не удалось сохранить.</span>
-            : <span className="chat-v2-composer-hint">Enter — отправить · Shift+Enter — новая строка</span>}
-          {message.length >= CHAT_COMPOSER_COUNTER_THRESHOLD
-            ? <span className="chat-char-count chat-v2-char-count">{message.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')}</span>
-            : null}
-        </div>
-      </div>
-
-      <span className="chat-a11y-status" aria-live="polite">
-        {copyFeedback ? (copyFeedback.status === 'copied' ? 'Сообщение скопировано' : 'Не удалось скопировать сообщение') : ''}
-      </span>
+      {modelOpen ? (
+        <ChatSheet onClose={() => setModelOpen(false)} ariaLabel="Выбор модели" className="chat-v3-model-sheet">
+          <span className="chat-v2-sheet__handle" aria-hidden="true" />
+          <div className="chat-v3-sheet-heading"><strong>Модель</strong><span>Показываем только реально подключённые AI-модели.</span></div>
+          {CONNECTED_CHAT_MODELS.length ? <div className="chat-v3-model-list">{CONNECTED_CHAT_MODELS.map((model) => <button key={model.id} type="button" className={selectedModelId === model.id ? 'is-selected' : ''} onClick={() => { setSelectedModelId(model.id); setModelOpen(false); }}><div><strong>{model.label}</strong><span>{model.providerLabel}</span></div>{selectedModelId === model.id ? <CheckIcon /> : null}</button>)}</div> : <div className="chat-v3-model-empty"><ModelIcon /><strong>AI-модели ещё не подключены</strong><p>Selector готов технически, но ARVELIS не показывает выдуманные модели. Список появится после подключения реального provider gateway.</p></div>}
+          <button className="chat-v2-sheet__close" type="button" onClick={() => setModelOpen(false)}>Закрыть</button>
+        </ChatSheet>
+      ) : null}
 
       {menuOpen && thread ? (
         <ChatSheet onClose={() => setMenuOpen(false)} ariaLabel="Действия с диалогом" className="chat-v2-sheet--actions">
           <span className="chat-v2-sheet__handle" aria-hidden="true" />
-          <div className="chat-v2-sheet__heading">
-            <strong>Диалог</strong>
-            <span>{thread.title}</span>
-          </div>
+          <div className="chat-v3-sheet-heading"><strong>Диалог</strong><span>{thread.title}</span></div>
           <div className="chat-v2-action-list">
-            <button data-chat-sheet-autofocus type="button" onClick={handleNewChat} disabled={threadLimitReached}>
-              <PlusIcon /><span><strong>Новый диалог</strong><small>{threadLimitReached ? 'Локальный лимит диалогов достигнут' : 'Начать чистый разговор'}</small></span>
-            </button>
-            <button type="button" onClick={startRenaming}><EditIcon /><span><strong>Переименовать</strong><small>Изменить название текущего диалога</small></span></button>
-            <button className="chat-v2-action-list__danger" type="button" onClick={openDelete}><TrashIcon /><span><strong>Удалить</strong><small>Удалить диалог и его локальный черновик</small></span></button>
+            <button data-chat-sheet-autofocus type="button" onClick={handleNewChat} disabled={threadLimitReached}><PlusIcon /><span><strong>Новый диалог</strong><small>Начать чистый разговор</small></span></button>
+            <button type="button" onClick={startRenaming}><EditIcon /><span><strong>Переименовать</strong><small>Изменить название</small></span></button>
+            <button className="chat-v2-action-list__danger" type="button" onClick={() => { setMenuOpen(false); setDeleteOpen(true); }}><TrashIcon /><span><strong>Удалить</strong><small>Удалить диалог и его вложения</small></span></button>
           </div>
           <button className="chat-v2-sheet__close" type="button" onClick={() => setMenuOpen(false)}>Закрыть</button>
         </ChatSheet>
@@ -617,60 +584,30 @@ export function ChatScreen({
       {renaming && thread ? (
         <ChatSheet onClose={() => setRenaming(false)} ariaLabelledBy="chat-rename-title" className="chat-v2-form-sheet">
           <span className="chat-v2-sheet__handle" aria-hidden="true" />
-          <div className="chat-v2-sheet__heading">
-            <strong id="chat-rename-title">Переименовать диалог</strong>
-            <span>Название помогает быстрее находить разговор в истории.</span>
-          </div>
+          <div className="chat-v3-sheet-heading"><strong id="chat-rename-title">Переименовать диалог</strong><span>Название используется в Главной и Истории.</span></div>
           <label htmlFor="chat-title-input">Название</label>
-          <input
-            data-chat-sheet-autofocus
-            data-chat-sheet-select="all"
-            id="chat-title-input"
-            value={renameValue}
-            onChange={(event) => setRenameValue(event.target.value.slice(0, CHAT_THREAD_TITLE_MAX_CHARS))}
-            onKeyDown={handleRenameKeyDown}
-            maxLength={CHAT_THREAD_TITLE_MAX_CHARS}
-            autoComplete="off"
-          />
-          <div className="chat-v2-form-sheet__actions">
-            <button type="button" onClick={() => setRenaming(false)}>Отмена</button>
-            <button className="chat-v2-primary-action" type="button" onClick={saveRename} disabled={!renameValue.trim()}>Сохранить</button>
-          </div>
+          <input data-chat-sheet-autofocus data-chat-sheet-select="all" id="chat-title-input" value={renameValue} onChange={(event) => setRenameValue(event.target.value.slice(0, CHAT_THREAD_TITLE_MAX_CHARS))} onKeyDown={handleRenameKeyDown} maxLength={CHAT_THREAD_TITLE_MAX_CHARS} autoComplete="off" />
+          <div className="chat-v2-form-sheet__actions"><button type="button" onClick={() => setRenaming(false)}>Отмена</button><button className="chat-v2-primary-action" type="button" onClick={saveRename} disabled={!renameValue.trim()}>Сохранить</button></div>
         </ChatSheet>
       ) : null}
 
       {editingMessageId && thread ? (
         <ChatSheet onClose={cancelEditing} ariaLabelledBy="chat-edit-title" className="chat-v2-form-sheet">
           <span className="chat-v2-sheet__handle" aria-hidden="true" />
-          <div className="chat-v2-sheet__heading">
-            <strong id="chat-edit-title">Изменить сообщение</strong>
-            <span>Редактируется только ваше локальное сообщение.</span>
-          </div>
-          <textarea
-            data-chat-sheet-autofocus
-            data-chat-sheet-select="end"
-            value={editingMessage}
-            onChange={(event) => setEditingMessage(event.target.value.slice(0, CHAT_MESSAGE_MAX_CHARS))}
-            onKeyDown={handleEditKeyDown}
-            maxLength={CHAT_MESSAGE_MAX_CHARS}
-            rows={5}
-            aria-label="Редактировать сообщение"
-          />
+          <div className="chat-v3-sheet-heading"><strong id="chat-edit-title">Изменить сообщение</strong><span>Вложения остаются без изменений.</span></div>
+          <textarea data-chat-sheet-autofocus data-chat-sheet-select="end" value={editingMessage} onChange={(event) => setEditingMessage(event.target.value.slice(0, CHAT_MESSAGE_MAX_CHARS))} onKeyDown={handleEditKeyDown} maxLength={CHAT_MESSAGE_MAX_CHARS} rows={5} aria-label="Редактировать сообщение" />
           <span className="chat-v2-form-sheet__counter">{editingMessage.length.toLocaleString('ru-RU')} / {CHAT_MESSAGE_MAX_CHARS.toLocaleString('ru-RU')}</span>
-          <div className="chat-v2-form-sheet__actions">
-            <button type="button" onClick={cancelEditing}>Отмена</button>
-            <button className="chat-v2-primary-action" type="button" onClick={saveEditing} disabled={!editingMessage.trim()}>Сохранить</button>
-          </div>
+          <div className="chat-v2-form-sheet__actions"><button type="button" onClick={cancelEditing}>Отмена</button><button className="chat-v2-primary-action" type="button" onClick={saveEditing} disabled={!editingMessage.trim()}>Сохранить</button></div>
         </ChatSheet>
       ) : null}
 
       <ConfirmDialog
         open={deleteOpen}
-        title="Удалить локальный диалог?"
-        description={thread ? `«${thread.title}» будет удалён из локальной истории вместе с черновиком. После подтверждения отменить действие нельзя.` : ''}
+        title="Удалить диалог?"
+        description={thread ? `«${thread.title}» и связанные с ним локальные вложения будут удалены с этого устройства. Отменить действие после подтверждения нельзя.` : ''}
         confirmLabel="Удалить"
         danger
-        onConfirm={confirmDelete}
+        onConfirm={() => { if (thread) onDeleteThread(thread.id); setDeleteOpen(false); }}
         onCancel={() => setDeleteOpen(false)}
       />
     </div>

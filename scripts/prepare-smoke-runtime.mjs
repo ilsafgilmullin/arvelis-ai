@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 const target = process.argv[2];
 const allowed = new Map([
   ['auth', 'tests/.dist-auth'],
+  ['chat', 'tests/.dist-chat'],
   ['server-auth', 'tests/.dist-server-auth'],
   ['server-db', 'tests/.dist-server-db'],
   ['server-sqlite', 'tests/.dist-server-sqlite'],

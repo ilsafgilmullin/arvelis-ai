@@ -118,12 +118,12 @@ export function ChatSheet({
     };
   }, []);
 
-  const classes = className ? `chat-v2-sheet ${className}` : 'chat-v2-sheet';
+  const classes = className ? `chat-sheet ${className}` : 'chat-sheet';
 
   return (
     <div
       ref={overlayRef}
-      className="chat-v2-overlay"
+      className="chat-overlay"
       role="presentation"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();

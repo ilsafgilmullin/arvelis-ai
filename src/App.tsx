@@ -7,6 +7,11 @@ import {
   normalizePreviewProfileName,
   validatePreviewProfileName,
 } from './auth/previewProfile';
+import {
+  conversationAttachmentIds,
+  createConversation,
+  createLocalUserMessage,
+} from './chat/domain';
 import { AppBootScreen } from './components/AppBootScreen';
 import { normalizeChatMessage, normalizeThreadTitle } from './domain/chatPolicy';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
@@ -22,12 +27,17 @@ import {
   type AppLoadProgress,
   type PreparedCoreModules,
 } from './lib/appPreload';
+import { deleteChatAttachmentBlobs } from './lib/chatAttachmentStorage';
 import {
   chatDraftKey,
   clearChatDrafts,
   removeChatDraft,
   setChatDraftAccountScope,
 } from './lib/chatDraftStorage';
+import {
+  clearPendingChatAttachments,
+  loadPendingChatAttachments,
+} from './lib/chatPendingAttachmentStorage';
 import {
   DEMO_MAX_MESSAGES_PER_THREAD,
   DEMO_MAX_THREADS,
@@ -38,7 +48,12 @@ import {
 import { AuthScreen } from './screens/AuthScreen';
 import { RealAuthScreen } from './screens/RealAuthScreen';
 import { WelcomeScreen } from './screens/WelcomeScreen';
-import type { AppScreen, DemoMessage, DemoThread, DemoWorkspaceState, EntryScreen } from './types';
+import type {
+  AppScreen,
+  ChatAttachmentMeta,
+  ChatWorkspaceState,
+  EntryScreen,
+} from './types';
 
 const HistoryScreen = lazy(() => loadHistoryModule().then((module) => ({ default: module.HistoryScreen })));
 const ProfileScreen = lazy(() => loadProfileModule().then((module) => ({ default: module.ProfileScreen })));
@@ -64,20 +79,10 @@ function waitForBootPaint(): Promise<void> {
   });
 }
 
-function titleFromPrompt(prompt: string): string {
-  const normalized = prompt.replace(/\s+/g, ' ').trim();
-  if (!normalized) return 'Новый диалог';
-  return normalized.length > 52 ? `${normalized.slice(0, 49)}…` : normalized;
-}
-
-function createUserMessage(content: string): DemoMessage {
-  return { id: makeId('msg'), role: 'user', content, createdAt: Date.now() };
-}
-
 export default function App() {
   const [entry, setEntry] = useState<EntryScreen>('splash');
   const [screen, setScreen] = useState<AppScreen>('workspace');
-  const [workspace, setWorkspace] = useState<DemoWorkspaceState | null>(null);
+  const [workspace, setWorkspace] = useState<ChatWorkspaceState | null>(null);
   const [core, setCore] = useState<PreparedCoreModules | null>(null);
   const [persistenceAvailable, setPersistenceAvailable] = useState(true);
   const [loadProgress, setLoadProgress] = useState<AppLoadProgress>(INITIAL_LOAD_PROGRESS);
@@ -221,18 +226,22 @@ export default function App() {
     setScreen('chat');
   };
 
-  const createThreadFromPrompt = (prompt: string) => {
-    const normalizedPrompt = normalizeChatMessage(prompt);
-    if (!normalizedPrompt || threadLimitReached) return;
+  const createThreadFromMessage = (content: string, attachments: ChatAttachmentMeta[] = []) => {
+    const normalizedContent = normalizeChatMessage(content);
+    if ((!normalizedContent && !attachments.length) || threadLimitReached) return;
 
     const timestamp = Date.now();
-    const thread: DemoThread = {
-      id: makeId('thread'),
-      title: titleFromPrompt(normalizedPrompt),
+    const message = createLocalUserMessage({
+      id: makeId('msg'),
+      content: normalizedContent,
+      attachments,
       createdAt: timestamp,
-      updatedAt: timestamp,
-      messages: [createUserMessage(normalizedPrompt)],
-    };
+    });
+    const thread = createConversation({
+      id: makeId('thread'),
+      message,
+      createdAt: timestamp,
+    });
 
     setWorkspace((current) => {
       if (!current || current.threads.length >= DEMO_MAX_THREADS) return current;
@@ -245,19 +254,24 @@ export default function App() {
     setScreen('chat');
   };
 
-  const sendMessage = (content: string) => {
+  const sendMessage = (content: string, attachments: ChatAttachmentMeta[] = []) => {
     if (!workspace) return;
     const normalizedContent = normalizeChatMessage(content);
-    if (!normalizedContent) return;
+    if (!normalizedContent && !attachments.length) return;
 
     if (!activeThread) {
-      createThreadFromPrompt(normalizedContent);
+      createThreadFromMessage(normalizedContent, attachments);
       return;
     }
     if (activeThread.messages.length >= DEMO_MAX_MESSAGES_PER_THREAD) return;
 
-    const userMessage = createUserMessage(normalizedContent);
     const timestamp = Date.now();
+    const userMessage = createLocalUserMessage({
+      id: makeId('msg'),
+      content: normalizedContent,
+      attachments,
+      createdAt: timestamp,
+    });
 
     setWorkspace((current) => current ? {
       ...current,
@@ -310,10 +324,16 @@ export default function App() {
   };
 
   const deleteThread = (threadId: string) => {
-    removeChatDraft(chatDraftKey(threadId));
+    const thread = workspace?.threads.find((item) => item.id === threadId);
+    const draftKey = chatDraftKey(threadId);
+    const pendingAttachmentIds = loadPendingChatAttachments(draftKey).map((attachment) => attachment.id);
+    clearPendingChatAttachments(draftKey);
+    removeChatDraft(draftKey);
+    void deleteChatAttachmentBlobs([...conversationAttachmentIds(thread), ...pendingAttachmentIds]);
+
     setWorkspace((current) => {
       if (!current) return current;
-      const threads = current.threads.filter((thread) => thread.id !== threadId);
+      const threads = current.threads.filter((item) => item.id !== threadId);
       return {
         ...current,
         threads,
@@ -387,6 +407,15 @@ export default function App() {
 
   const resetLocalData = () => {
     ++launchSequenceRef.current;
+
+    const draftKeys = [
+      chatDraftKey(null),
+      ...(workspace?.threads.map((thread) => chatDraftKey(thread.id)) ?? []),
+    ];
+    const pendingAttachmentIds = draftKeys.flatMap((key) => loadPendingChatAttachments(key).map((attachment) => attachment.id));
+    draftKeys.forEach((key) => clearPendingChatAttachments(key));
+    const messageAttachmentIds = workspace?.threads.flatMap((thread) => conversationAttachmentIds(thread)) ?? [];
+    void deleteChatAttachmentBlobs([...messageAttachmentIds, ...pendingAttachmentIds]);
     clearChatDrafts();
 
     if (REAL_AUTH_ENABLED && realSession) {

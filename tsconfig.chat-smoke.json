@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "outDir": "tests/.dist-chat",
+    "rootDir": "."
+  },
+  "include": [
+    "src/types.ts",
+    "src/chat/domain.ts",
+    "src/chat/attachmentPolicy.ts",
+    "src/lib/chatPendingAttachmentStorage.ts",
+    "tests/chat-domain-smoke.ts",
+    "tests/chat-attachments-smoke.ts"
+  ]
+}

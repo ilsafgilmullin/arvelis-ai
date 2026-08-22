@@ -6,7 +6,7 @@ import {
   conversationMessageCountLabel,
   conversationRelativeTime,
 } from '../domain/chatPresentation';
-import type { DemoThread } from '../types';
+import type { Conversation } from '../types';
 
 function greetingFor(profileName: string): string {
   const hour = new Date().getHours();
@@ -26,7 +26,7 @@ export function WorkspaceScreen({
   onOpenHistory,
 }: {
   profileName: string;
-  threads: DemoThread[];
+  threads: Conversation[];
   threadLimitReached: boolean;
   onNewChat: () => void;
   onOpenThread: (threadId: string) => void;

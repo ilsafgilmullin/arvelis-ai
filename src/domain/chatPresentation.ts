@@ -1,4 +1,5 @@
-import type { DemoThread } from '../types';
+import { messageAttachments, messageText } from '../chat/domain';
+import type { Conversation } from '../types';
 
 export function conversationRelativeTime(timestamp: number, now = Date.now()): string {
   const delta = Math.max(0, now - timestamp);
@@ -14,8 +15,8 @@ export function conversationRelativeTime(timestamp: number, now = Date.now()): s
   return `${days} дн назад`;
 }
 
-export function conversationMessageCount(thread: DemoThread): number {
-  return thread.messages.reduce((count, message) => count + (message.role === 'system' ? 0 : 1), 0);
+export function conversationMessageCount(conversation: Conversation): number {
+  return conversation.messages.reduce((count, message) => count + (message.role === 'system' ? 0 : 1), 0);
 }
 
 export function conversationMessageCountLabel(count: number): string {
@@ -28,19 +29,35 @@ export function conversationMessageCountLabel(count: number): string {
   return `${count} сообщений`;
 }
 
-export function conversationPreview(thread: DemoThread, maxLength = 92): string {
-  for (let index = thread.messages.length - 1; index >= 0; index -= 1) {
-    const message = thread.messages[index];
+function attachmentPreview(conversation: Conversation): string | null {
+  for (let index = conversation.messages.length - 1; index >= 0; index -= 1) {
+    const message = conversation.messages[index];
     if (!message || message.role === 'system') continue;
 
-    const normalized = message.content.replace(/\s+/g, ' ').trim();
-    if (!normalized) continue;
+    const attachments = messageAttachments(message);
+    const first = attachments[0];
+    if (!first) continue;
 
-    const labeled = message.mock ? `MOCK · ${normalized}` : normalized;
-    if (labeled.length <= maxLength) return labeled;
-
-    return `${labeled.slice(0, Math.max(1, maxLength - 1))}…`;
+    if (first.kind === 'audio') return 'Голосовое сообщение';
+    if (first.kind === 'image') return attachments.length > 1 ? `Фото · ${attachments.length}` : 'Фото';
+    if (first.kind === 'video') return attachments.length > 1 ? `Видео · ${attachments.length}` : 'Видео';
+    return first.name || 'Файл';
   }
 
-  return 'Диалог без содержимого';
+  return null;
+}
+
+export function conversationPreview(conversation: Conversation, maxLength = 92): string {
+  for (let index = conversation.messages.length - 1; index >= 0; index -= 1) {
+    const message = conversation.messages[index];
+    if (!message || message.role === 'system') continue;
+
+    const normalized = messageText(message).replace(/\s+/g, ' ').trim();
+    if (!normalized) continue;
+
+    if (normalized.length <= maxLength) return normalized;
+    return `${normalized.slice(0, Math.max(1, maxLength - 1))}…`;
+  }
+
+  return attachmentPreview(conversation) ?? 'Пустой диалог';
 }
