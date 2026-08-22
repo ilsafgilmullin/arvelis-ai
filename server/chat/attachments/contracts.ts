@@ -45,7 +45,11 @@ export type ChatStorageGcRecord = {
 
 export interface ChatUploadStore {
   reserve(input: ReserveChatUploadInput): Promise<ReserveChatUploadResult>;
-  markReady(accountId: string, uploadId: string, sha256: string, readyAt: number): Promise<ChatUploadRecord | null>;
+  markReady(
+    accountId: string,
+    uploadId: string,
+    completion: { sha256: string; mimeType: string; readyAt: number },
+  ): Promise<ChatUploadRecord | null>;
   abortAndQueue(accountId: string, uploadId: string, reason: ChatStorageGcReason, now: number): Promise<boolean>;
   expireAndQueue(now: number, limit: number): Promise<number>;
 }
