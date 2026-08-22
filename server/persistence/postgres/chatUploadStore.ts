@@ -176,16 +176,15 @@ export class PostgresChatUploadStore implements ChatUploadStore, ChatStorageGcSt
   async markReady(
     accountId: string,
     uploadId: string,
-    sha256: string,
-    readyAt: number,
+    completion: { sha256: string; mimeType: string; readyAt: number },
   ): Promise<ChatUploadRecord | null> {
     const result = await this.pool.query<UploadRow>(`
       UPDATE chat_uploads
-      SET sha256 = $3, state = 'ready'
-      WHERE id = $1 AND account_id = $2 AND state = 'receiving' AND expires_at > $4
+      SET sha256 = $3, mime_type = $4, state = 'ready'
+      WHERE id = $1 AND account_id = $2 AND state = 'receiving' AND expires_at > $5
       RETURNING id, account_id, kind, name, mime_type, size_bytes, duration_ms,
                 storage_key, sha256, state, created_at, expires_at
-    `, [uploadId, accountId, sha256, readyAt]);
+    `, [uploadId, accountId, completion.sha256, completion.mimeType, completion.readyAt]);
     const row = result.rows[0];
     return row ? uploadFromRow(row) : null;
   }
