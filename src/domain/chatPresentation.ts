@@ -1,4 +1,4 @@
-import type { DemoThread } from '../types';
+import type { ChatAttachmentKind, DemoThread } from '../types';
 
 export function conversationRelativeTime(timestamp: number, now = Date.now()): string {
   const delta = Math.max(0, now - timestamp);
@@ -28,19 +28,29 @@ export function conversationMessageCountLabel(count: number): string {
   return `${count} сообщений`;
 }
 
+function attachmentPreview(kind: ChatAttachmentKind, count: number, name: string): string {
+  const suffix = count > 1 ? ` · ещё ${count - 1}` : '';
+  if (kind === 'audio') return `Голосовое сообщение${suffix}`;
+  if (kind === 'image') return `Фото${suffix}`;
+  if (kind === 'video') return `Видео${suffix}`;
+  return `${name || 'Файл'}${suffix}`;
+}
+
 export function conversationPreview(thread: DemoThread, maxLength = 92): string {
   for (let index = thread.messages.length - 1; index >= 0; index -= 1) {
     const message = thread.messages[index];
-    if (!message || message.role === 'system') continue;
+    if (!message || message.role === 'system' || message.mock) continue;
 
     const normalized = message.content.replace(/\s+/g, ' ').trim();
-    if (!normalized) continue;
+    if (normalized) {
+      if (normalized.length <= maxLength) return normalized;
+      return `${normalized.slice(0, Math.max(1, maxLength - 1))}…`;
+    }
 
-    const labeled = message.mock ? `MOCK · ${normalized}` : normalized;
-    if (labeled.length <= maxLength) return labeled;
-
-    return `${labeled.slice(0, Math.max(1, maxLength - 1))}…`;
+    const attachments = message.attachments ?? [];
+    const first = attachments[0];
+    if (first) return attachmentPreview(first.kind, attachments.length, first.name);
   }
 
-  return 'Диалог без содержимого';
+  return 'Пустой диалог';
 }
