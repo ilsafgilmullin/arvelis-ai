@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"],
+    "outDir": "tests/.dist-server-sqlite",
+    "rootDir": "."
+  },
+  "include": [
+    "server/auth/account/contracts.ts",
+    "server/auth/account/displayName.ts",
+    "server/auth/application/contracts.ts",
+    "server/auth/application/service.ts",
+    "server/auth/emailOtp/contracts.ts",
+    "server/auth/emailOtp/emailAddress.ts",
+    "server/auth/emailOtp/policy.ts",
+    "server/auth/emailOtp/service.ts",
+    "server/auth/emailOtp/webCryptoSecurity.ts",
+    "server/auth/session/contracts.ts",
+    "server/auth/session/policy.ts",
+    "server/auth/session/service.ts",
+    "server/auth/session/webCryptoSecurity.ts",
+    "server/persistence/sqlite/database.ts",
+    "server/persistence/sqlite/authStores.ts",
+    "tests/sqlite-auth-persistence-smoke.ts",
+    "tests/sqlite-auth-flow-smoke.ts"
+  ]
+}

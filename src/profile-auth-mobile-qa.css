@@ -1,0 +1,70 @@
+/* ARVELIS AI — closed-test profile mobile QA.
+   Fixes action-row compression and reserves space for the fixed bottom navigation. */
+
+@media (max-width: 780px) {
+  .profile-v2 {
+    padding-bottom: calc(156px + env(safe-area-inset-bottom));
+  }
+
+  .profile-v2__actions {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .profile-v2__action {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    min-height: 88px;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 18px 2px;
+  }
+
+  .profile-v2__action > svg,
+  .profile-v2__action > .icon {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    margin-top: 1px;
+  }
+
+  .profile-v2__action > div {
+    display: block;
+    flex: 1 1 auto;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .profile-v2__action > div > strong {
+    display: block;
+    width: auto;
+    max-width: none;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: normal;
+  }
+
+  .profile-v2__action > div > span {
+    display: block;
+    width: auto;
+    max-width: 42rem;
+    margin-top: 6px;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+  }
+
+  .profile-v2__action > span {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .profile-v2__action {
+    gap: 12px;
+    padding-block: 17px;
+  }
+}

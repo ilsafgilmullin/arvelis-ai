@@ -45,7 +45,10 @@ function withTimeout<T>(promise: Promise<T>, taskName: string): Promise<T> {
   });
 }
 
-export async function prepareApp(onProgress: (progress: AppLoadProgress) => void): Promise<PreparedApp> {
+export async function prepareApp(
+  onProgress: (progress: AppLoadProgress) => void,
+  options?: { accountScopeId?: string; profileName?: string },
+): Promise<PreparedApp> {
   const completedTasks = new Set<AppLoadTaskId>();
 
   const complete = (taskId: AppLoadTaskId, label: string) => {
@@ -76,7 +79,7 @@ export async function prepareApp(onProgress: (progress: AppLoadProgress) => void
   });
 
   const storageTask = Promise.resolve().then(() => {
-    const workspace = loadDemoWorkspace();
+    const workspace = loadDemoWorkspace(options?.accountScopeId, options?.profileName);
     const persistenceAvailable = canUseDemoStorage();
     complete('storage', 'Локальные данные готовы');
     return { workspace, persistenceAvailable };

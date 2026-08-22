@@ -66,6 +66,8 @@ export type AuthFailureCode =
   | 'invalid_challenge'
   | 'challenge_expired'
   | 'rate_limited'
+  | 'account_exists'
+  | 'account_not_found'
   | 'account_locked'
   | 'network_error'
   | 'service_unavailable'
@@ -92,6 +94,7 @@ export type AuthStartRequest = {
 export type AuthCompleteRequest = {
   challengeId: string;
   response: string;
+  displayName?: string;
 };
 
 export type AuthStartResult =

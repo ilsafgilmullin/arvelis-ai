@@ -2,16 +2,35 @@ import { CHAT_DRAFT_MAX_ENTRIES, CHAT_MESSAGE_MAX_CHARS } from '../domain/chatPo
 
 const DRAFT_STORAGE_KEY = 'arvelis.preview.chatDrafts.v1';
 const MAX_THREAD_ID_LENGTH = 128;
-const MAX_DRAFT_KEY_LENGTH = 'thread:'.length + MAX_THREAD_ID_LENGTH;
+const ACCOUNT_SCOPE_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+const PREVIEW_DRAFT_PREFIX = 'thread:';
+const ACCOUNT_DRAFT_PREFIX = 'account:';
 const MAX_DRAFT_STORE_CHARS = 1_000_000;
 
 type DraftStore = Record<string, string>;
 
+let activeAccountScopeId: string | undefined;
+
+function isValidThreadPart(value: string): boolean {
+  if (value === 'new') return true;
+  return value.length > 0 && value.length <= MAX_THREAD_ID_LENGTH && value.trim() === value;
+}
+
+function accountDraftPrefix(accountScopeId: string): string | null {
+  return ACCOUNT_SCOPE_PATTERN.test(accountScopeId) ? `${ACCOUNT_DRAFT_PREFIX}${accountScopeId}:thread:` : null;
+}
+
 function isValidDraftKey(key: string): boolean {
-  if (key === 'thread:new') return true;
-  if (!key.startsWith('thread:') || key.length > MAX_DRAFT_KEY_LENGTH) return false;
-  const threadId = key.slice('thread:'.length);
-  return threadId.length > 0 && threadId.length <= MAX_THREAD_ID_LENGTH && threadId.trim() === threadId;
+  if (key.startsWith(PREVIEW_DRAFT_PREFIX)) {
+    return isValidThreadPart(key.slice(PREVIEW_DRAFT_PREFIX.length));
+  }
+
+  if (!key.startsWith(ACCOUNT_DRAFT_PREFIX)) return false;
+  const threadMarker = key.indexOf(':thread:', ACCOUNT_DRAFT_PREFIX.length);
+  if (threadMarker < 0) return false;
+  const accountScopeId = key.slice(ACCOUNT_DRAFT_PREFIX.length, threadMarker);
+  const threadPart = key.slice(threadMarker + ':thread:'.length);
+  return ACCOUNT_SCOPE_PATTERN.test(accountScopeId) && isValidThreadPart(threadPart);
 }
 
 function readDraftStore(): DraftStore {
@@ -61,8 +80,18 @@ function writeDraftStore(store: DraftStore): boolean {
   }
 }
 
-export function chatDraftKey(threadId: string | null): string {
-  return threadId ? `thread:${threadId}` : 'thread:new';
+export function setChatDraftAccountScope(accountScopeId?: string): boolean {
+  if (accountScopeId !== undefined && !ACCOUNT_SCOPE_PATTERN.test(accountScopeId)) return false;
+  activeAccountScopeId = accountScopeId;
+  return true;
+}
+
+export function chatDraftKey(threadId: string | null, accountScopeId = activeAccountScopeId): string {
+  const threadPart = threadId ?? 'new';
+  if (!isValidThreadPart(threadPart)) return '';
+  if (accountScopeId === undefined) return `${PREVIEW_DRAFT_PREFIX}${threadPart}`;
+  const prefix = accountDraftPrefix(accountScopeId);
+  return prefix ? `${prefix}${threadPart}` : '';
 }
 
 export function loadChatDraft(key: string): string {
@@ -102,12 +131,22 @@ export function removeChatDraft(key: string): boolean {
   return writeDraftStore(store);
 }
 
-export function clearChatDrafts(): boolean {
+export function clearChatDrafts(accountScopeId = activeAccountScopeId): boolean {
   if (typeof window === 'undefined') return false;
 
   try {
-    window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-    return true;
+    const store = readDraftStore();
+    const prefix = accountScopeId === undefined ? PREVIEW_DRAFT_PREFIX : accountDraftPrefix(accountScopeId);
+    if (prefix === null) return false;
+
+    let changed = false;
+    for (const key of Object.keys(store)) {
+      if (key.startsWith(prefix)) {
+        delete store[key];
+        changed = true;
+      }
+    }
+    return changed ? writeDraftStore(store) : true;
   } catch {
     return false;
   }

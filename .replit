@@ -1,4 +1,4 @@
-run = "npm install --include=dev --no-package-lock --no-audit --no-fund && npm run dev"
+run = "npm ci --include=dev --no-audit --no-fund && npm run dev"
 entrypoint = "index.html"
 modules = ["nodejs-22"]
 

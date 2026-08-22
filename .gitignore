@@ -5,9 +5,18 @@ node_modules/
 .next/
 dist/
 build/
+server-dist/
 coverage/
 tests/.dist-auth/
 tests/.dist-server-auth/
+tests/.dist-server-db/
+tests/.dist-server-sqlite/
+
+# Local runtime data
+.data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 
 # Secrets
 .env

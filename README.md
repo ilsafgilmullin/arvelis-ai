@@ -1,24 +1,38 @@
 # ARVELIS AI
 
-**ARVELIS AI** — профессиональный универсальный ИИ-ассистент для работы, учёбы и решения сложных повседневных задач.
+Профессиональный универсальный ИИ-ассистент для работы, учёбы и решения сложных повседневных задач.
 
-> INTELLIGENCE. PRECISION. RESULTS.
+Текущий репозиторий содержит product/frontend foundation и изолированные auth foundations. Реальный AI пока не подключён; demo/mock элементы должны оставаться явно маркированными.
 
-## Статус
+## Development
 
-Проект создан с нуля. Текущий этап: продуктовая фиксация, чистые бренд-ассеты и первый рабочий интерфейс. Реальный AI, авторизация, база данных, биллинг и production-инфраструктура пока не подключены.
+Текущий стабильный frontend-preview:
 
-## Утверждено
+```bash
+npm run dev
+```
 
-- бренд `ARVELIS AI`;
-- слоган `INTELLIGENCE. PRECISION. RESULTS.`;
-- строгий графитово-золотой стиль;
-- геометрическая золотая буква `A` внутри круговой орбиты;
-- правая часть орбиты переходит в точечную дугу;
-- mobile-first интерфейс;
-- публичное позиционирование продукта;
-- внешние интеграции не входят в текущий этап.
+Real Email OTP auth candidate находится за rollout flag и не должен включаться без test secrets/checks.
 
-## Правило разработки
+Закрытый бесплатный auth-test path:
 
-GitHub-репозиторий и активная ветка являются источником истины. Изменения разрабатываются в отдельных ветках. Merge в `main`, force push, удаление веток, production deploy и другие необратимые действия выполняются только после отдельного подтверждения.
+- SQLite (`AUTH_DB_PROVIDER=sqlite`, `.data/arvelis-auth.sqlite`);
+- generic SMTP через отдельный test mailbox;
+- same-origin Auth API;
+- HttpOnly server session;
+- `VITE_REAL_AUTH_ENABLED=false` до фактического E2E smoke.
+
+После настройки protected environment auth runtime запускается командой:
+
+```bash
+npm run dev:auth
+```
+
+## Safety
+
+- Не помещать `.env`, SQLite data, SMTP password, OTP/session peppers, API keys или другие secrets в GitHub.
+- Не использовать локальный SQLite-файл как production database.
+- Не выдавать local/demo chat state за реальный AI/backend.
+- Merge в `main` и production publish выполняются только после отдельного подтверждения.
+
+См. `docs/07_DECISIONS.md`, `docs/36_AUTH_PERSISTENCE_V1.md`, `docs/37_FREE_YANDEX_MAIL_AUTH_SETUP.md`, `docs/38_FREE_SQLITE_AUTH_DB.md`.

@@ -3,8 +3,16 @@ import type { SessionSecurityPort } from './contracts';
 const encoder = new TextEncoder();
 const MIN_PEPPER_BYTES = 32;
 
-function randomBytes(length: number): Uint8Array {
-  const bytes = new Uint8Array(length);
+type CryptoBytes = Uint8Array<ArrayBuffer>;
+
+function copyToCryptoBytes(source: Uint8Array): CryptoBytes {
+  const copy = new Uint8Array(new ArrayBuffer(source.byteLength));
+  copy.set(source);
+  return copy;
+}
+
+function randomBytes(length: number): CryptoBytes {
+  const bytes = new Uint8Array(new ArrayBuffer(length));
   globalThis.crypto.getRandomValues(bytes);
   return bytes;
 }
@@ -15,9 +23,9 @@ function toHex(bytes: Uint8Array): string {
   return output;
 }
 
-function fromHex(value: string): Uint8Array | null {
+function fromHex(value: string): CryptoBytes | null {
   if (!value || value.length % 2 !== 0 || !/^[a-f0-9]+$/i.test(value)) return null;
-  const bytes = new Uint8Array(value.length / 2);
+  const bytes = new Uint8Array(new ArrayBuffer(value.length / 2));
   for (let index = 0; index < bytes.length; index += 1) {
     const pair = value.slice(index * 2, index * 2 + 2);
     const parsed = Number.parseInt(pair, 16);
@@ -27,8 +35,8 @@ function fromHex(value: string): Uint8Array | null {
   return bytes;
 }
 
-function sessionPayload(sessionId: string, secret: string): Uint8Array {
-  return encoder.encode(`session:v1\0${sessionId}\0${secret}`);
+function sessionPayload(sessionId: string, secret: string): CryptoBytes {
+  return copyToCryptoBytes(encoder.encode(`session:v1\0${sessionId}\0${secret}`));
 }
 
 /**
@@ -43,10 +51,10 @@ export class WebCryptoSessionSecurity implements SessionSecurityPort {
     if (!globalThis.crypto?.subtle || pepper.byteLength < MIN_PEPPER_BYTES) {
       throw new Error('Session security requires Web Crypto and a >=32 byte pepper');
     }
-    this.keyPromise = this.importPepper(new Uint8Array(pepper));
+    this.keyPromise = this.importPepper(copyToCryptoBytes(pepper));
   }
 
-  private async importPepper(keyMaterial: Uint8Array): Promise<CryptoKey> {
+  private async importPepper(keyMaterial: CryptoBytes): Promise<CryptoKey> {
     try {
       return await globalThis.crypto.subtle.importKey(
         'raw',

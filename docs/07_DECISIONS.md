@@ -131,7 +131,38 @@
 - ARVELIS CONTROL не использует пользовательский email OTP realm как достаточную owner/admin authorization boundary.
 - Server foundation зафиксирован в `docs/34_EMAIL_OTP_AUTH_CORE.md`.
 
-Остаются `OPEN`: конкретный email delivery provider, production DB, challenge/rate-limit persistence, backend framework/topology, account duplicate/linking semantics, session backend/cookie topology, роли и уровни доступа.
+Остаются `OPEN`: production DB provider/region, окончательная backend topology, account linking/recovery, роли и уровни доступа, production session/cookie policy.
+
+## 2026-08-21 — Бесплатная отправка email OTP для test/auth
+
+Предыдущее решение использовать **Yandex Cloud Postbox отменено пользователем до активации инфраструктуры**.
+
+- Postbox resource, billing account, sender/domain и API credentials не создавались.
+- Для закрытого тестирования утверждён бесплатный path: обычный бесплатный ящик **Яндекс Почты** через generic SMTP adapter.
+- Отдельный Yandex Cloud billing account, платный email-сервис и собственный домен для test/auth не требуются.
+- Основной SMTP test endpoint: `smtp.yandex.ru`, port `465`, SSL/SMTPS.
+- Для ARVELIS используется отдельный тестовый mailbox и отдельный пароль приложения типа «Почта»; обычный пароль Яндекс ID не хранится в ARVELIS.
+- SMTP credentials хранятся только в protected environment/secrets.
+- SMTP-транспорт ARVELIS требует TLS `1.2+`.
+- Account, Session и frontend по-прежнему не зависят от Яндекса: email delivery остаётся за `EmailOtpDeliveryPort` / generic SMTP adapter.
+- Обычная Яндекс Почта утверждена только для development/closed testing. Production transactional-email provider остаётся `OPEN`.
+
+## 2026-08-21 — Бесплатная БД для закрытого auth-теста
+
+Для текущего development/closed-test этапа выбран **SQLite через встроенный `node:sqlite`**.
+
+- Базовый test runtime: `AUTH_DB_PROVIDER=sqlite`.
+- Файл по умолчанию: `.data/arvelis-auth.sqlite`.
+- Внешний DB account, отдельный cloud database и платный DB-сервис для закрытого теста не требуются.
+- SQLite adapter реализует те же Account / Email Identity / OTP Challenge / Rate Limit / Session contracts, что и PostgreSQL adapter.
+- PostgreSQL adapter не удаляется и остаётся заменяемым вариантом для будущего production persistence.
+- SQLite-файл и WAL/SHM исключены из Git и не должны попадать в GitHub, чат или публичные артефакты.
+- Это решение относится только к development/closed testing. Локальный filesystem опубликованного Replit deployment не считается production-persistent storage.
+- Production DB provider/region, backups, retention, migration path и требования по персональным данным остаются `OPEN`.
+
+Основание: пользователь потребовал убрать обязательные платные сервисы на текущем тестовом этапе; SQLite позволяет проверить реальную регистрацию и server session без внешней БД, сохраняя provider-independent persistence boundary.
+
+Следствие: до production ARVELIS обязан перейти на отдельно утверждённое persistent storage решение; текущий SQLite-файл нельзя выдавать за production DB.
 
 ## 2026-08-21 — ARVELIS CONTROL
 
@@ -153,7 +184,7 @@
 - production database/data model;
 - роли и уровни доступа;
 - конкретный auth provider / identity core;
-- email delivery provider;
+- production transactional-email provider;
 - production session backend/cookie topology;
 - финальные требования по персональным данным;
 - биллинг и тарифы;

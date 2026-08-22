@@ -92,20 +92,28 @@ function assertStartRequest(request: AuthStartRequest): AuthStartRequest {
 function assertCompleteRequest(request: AuthCompleteRequest): AuthCompleteRequest {
   if (containsUnsafeProtocolCharacters(request.challengeId)
     || request.challengeId.trim() !== request.challengeId
-    || containsUnsafeProtocolCharacters(request.response)) {
+    || containsUnsafeProtocolCharacters(request.response)
+    || (request.displayName !== undefined && containsUnsafeProtocolCharacters(request.displayName))) {
     throw new AuthProtocolError('complete-request');
   }
 
   const response = request.response.trim();
+  const displayName = request.displayName?.replace(/\s+/g, ' ').trim();
 
   if (!request.challengeId
     || request.challengeId.length > AUTH_PROTOCOL_LIMITS.idLength
     || !response
-    || response.length > AUTH_PROTOCOL_LIMITS.challengeResponseLength) {
+    || response.length > AUTH_PROTOCOL_LIMITS.challengeResponseLength
+    || (request.displayName !== undefined && (
+      !displayName
+      || displayName.length > AUTH_PROTOCOL_LIMITS.displayNameLength
+    ))) {
     throw new AuthProtocolError('complete-request');
   }
 
-  return { challengeId: request.challengeId, response };
+  return displayName === undefined
+    ? { challengeId: request.challengeId, response }
+    : { challengeId: request.challengeId, response, displayName };
 }
 
 function parseStartResult(value: unknown): AuthStartResult {

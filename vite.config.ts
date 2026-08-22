@@ -2,6 +2,18 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const replitHosts = ['.replit.dev', '.repl.co', '.replit.app'];
+const sensitiveDevFiles = [
+  '.env',
+  '.env.*',
+  '*.{crt,pem,key,p12,pfx,cer,der}',
+  '.npmrc',
+  '.yarnrc.yml',
+  '**/.git/**',
+  '.data/**',
+  '**/*.sqlite',
+  '**/*.sqlite-shm',
+  '**/*.sqlite-wal',
+];
 
 export default defineConfig({
   plugins: [react()],
@@ -18,6 +30,17 @@ export default defineConfig({
     port: 3000,
     strictPort: true,
     allowedHosts: replitHosts,
+    fs: {
+      // Keep Vite's sensitive-file defaults and additionally prevent the
+      // closed-test auth database from ever being served from project root.
+      deny: sensitiveDevFiles,
+    },
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: false,
+      },
+    },
   },
   preview: {
     host: '0.0.0.0',

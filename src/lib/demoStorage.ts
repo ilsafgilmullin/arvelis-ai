@@ -6,12 +6,14 @@ import {
 import { DEMO_MOCK_RESPONSE, initialDemoThreads } from '../data/demo';
 import type { DemoMessage, DemoThread, DemoWorkspaceState } from '../types';
 
-const STORAGE_KEY = 'arvelis.demo.workspace.v1';
+const PREVIEW_STORAGE_KEY = 'arvelis.demo.workspace.v1';
+const ACCOUNT_STORAGE_PREFIX = 'arvelis.demo.workspace.v1.account.';
 const STORAGE_PROBE_KEY = 'arvelis.demo.storage.probe';
 const VALID_ROLES = new Set<DemoMessage['role']>(['user', 'assistant', 'system']);
 const WORKSPACE_KEYS = new Set(['threads', 'activeThreadId', 'profileName']);
 const THREAD_KEYS = new Set(['id', 'title', 'createdAt', 'updatedAt', 'messages']);
 const MESSAGE_KEYS = new Set(['id', 'role', 'content', 'createdAt', 'editedAt', 'mock']);
+const ACCOUNT_SCOPE_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 export const DEMO_PREVIEW_NOTICE = 'Сообщение сохранено на этом устройстве. AI-ответы в этой версии пока недоступны.';
 
 const LEGACY_SYSTEM_PREVIEW_COPY = new Set<string>([
@@ -37,13 +39,18 @@ const DEMO_MAX_STORED_MESSAGE_CHARS = 12_000;
 
 type UnknownRecord = Record<string, unknown>;
 
-const defaultState = (): DemoWorkspaceState => ({
+function workspaceStorageKey(accountScopeId?: string): string | null {
+  if (accountScopeId === undefined) return PREVIEW_STORAGE_KEY;
+  return ACCOUNT_SCOPE_PATTERN.test(accountScopeId) ? `${ACCOUNT_STORAGE_PREFIX}${accountScopeId}` : null;
+}
+
+const defaultState = (profileName = DEFAULT_PREVIEW_PROFILE_NAME): DemoWorkspaceState => ({
   threads: initialDemoThreads.map((thread) => ({
     ...thread,
     messages: thread.messages.map((message) => ({ ...message })),
   })),
   activeThreadId: initialDemoThreads[0]?.id ?? null,
-  profileName: DEFAULT_PREVIEW_PROFILE_NAME,
+  profileName,
 });
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -205,15 +212,16 @@ export function canUseDemoStorage(): boolean {
   }
 }
 
-export function loadDemoWorkspace(): DemoWorkspaceState {
-  if (typeof window === 'undefined') return defaultState();
+export function loadDemoWorkspace(accountScopeId?: string, fallbackProfileName = DEFAULT_PREVIEW_PROFILE_NAME): DemoWorkspaceState {
+  const storageKey = workspaceStorageKey(accountScopeId);
+  if (typeof window === 'undefined' || storageKey === null) return defaultState(fallbackProfileName);
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw || raw.length > DEMO_MAX_SERIALIZED_CHARS) return defaultState();
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw || raw.length > DEMO_MAX_SERIALIZED_CHARS) return defaultState(fallbackProfileName);
 
     const parsed = JSON.parse(raw) as unknown;
-    if (!isRecord(parsed) || !hasOnlyKeys(parsed, WORKSPACE_KEYS)) return defaultState();
+    if (!isRecord(parsed) || !hasOnlyKeys(parsed, WORKSPACE_KEYS)) return defaultState(fallbackProfileName);
 
     const storedThreads = parsed.threads;
     if (
@@ -223,43 +231,46 @@ export function loadDemoWorkspace(): DemoWorkspaceState {
       !hasUniqueWorkspaceIds(storedThreads) ||
       !isWithinContentBudget(storedThreads)
     ) {
-      return defaultState();
+      return defaultState(fallbackProfileName);
     }
 
     const threads = storedThreads.map(normalizeKnownLegacyCopy);
     const activeThreadId = typeof parsed.activeThreadId === 'string' && threads.some((thread) => thread.id === parsed.activeThreadId)
       ? parsed.activeThreadId
       : threads[0]?.id ?? null;
+    const storedProfileName = resolveStoredPreviewProfileName(parsed.profileName);
 
     return {
       threads,
       activeThreadId,
-      profileName: resolveStoredPreviewProfileName(parsed.profileName),
+      profileName: storedProfileName === DEFAULT_PREVIEW_PROFILE_NAME ? fallbackProfileName : storedProfileName,
     };
   } catch {
-    return defaultState();
+    return defaultState(fallbackProfileName);
   }
 }
 
-export function saveDemoWorkspace(state: DemoWorkspaceState): boolean {
-  if (typeof window === 'undefined' || !isWorkspacePersistable(state)) return false;
+export function saveDemoWorkspace(state: DemoWorkspaceState, accountScopeId?: string): boolean {
+  const storageKey = workspaceStorageKey(accountScopeId);
+  if (typeof window === 'undefined' || storageKey === null || !isWorkspacePersistable(state)) return false;
 
   try {
     const serialized = JSON.stringify(state);
     if (serialized.length > DEMO_MAX_SERIALIZED_CHARS) return false;
-    window.localStorage.setItem(STORAGE_KEY, serialized);
+    window.localStorage.setItem(storageKey, serialized);
     return true;
   } catch {
     return false;
   }
 }
 
-export function resetDemoWorkspace(): DemoWorkspaceState {
-  const state = defaultState();
+export function resetDemoWorkspace(accountScopeId?: string, fallbackProfileName = DEFAULT_PREVIEW_PROFILE_NAME): DemoWorkspaceState {
+  const storageKey = workspaceStorageKey(accountScopeId);
+  const state = defaultState(fallbackProfileName);
 
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && storageKey !== null) {
     try {
-      window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(storageKey);
     } catch {
       // The caller will attempt to persist the clean state and surface the result.
     }
