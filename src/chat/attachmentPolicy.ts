@@ -1,14 +1,11 @@
+import {
+  CHAT_ATTACHMENT_KIND_MAX_BYTES,
+  CHAT_ATTACHMENT_MAX_COUNT,
+  CHAT_ATTACHMENT_MAX_TOTAL_BYTES,
+} from '../../shared/chatAttachmentLimits';
 import type { ChatAttachmentKind, ChatAttachmentMeta } from '../types';
 
-export const CHAT_ATTACHMENT_MAX_COUNT = 8;
-export const CHAT_ATTACHMENT_MAX_TOTAL_BYTES = 120 * 1024 * 1024;
-
-const KIND_LIMITS: Record<ChatAttachmentKind, number> = {
-  image: 20 * 1024 * 1024,
-  video: 80 * 1024 * 1024,
-  audio: 30 * 1024 * 1024,
-  file: 30 * 1024 * 1024,
-};
+export { CHAT_ATTACHMENT_MAX_COUNT, CHAT_ATTACHMENT_MAX_TOTAL_BYTES };
 
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/g;
 
@@ -48,7 +45,7 @@ export function validateAttachmentCandidate(
   candidate: Pick<ChatAttachmentMeta, 'kind' | 'size'>,
 ): string | null {
   if (!Number.isFinite(candidate.size) || candidate.size <= 0) return 'Пустой файл добавить нельзя.';
-  const max = KIND_LIMITS[candidate.kind];
+  const max = CHAT_ATTACHMENT_KIND_MAX_BYTES[candidate.kind];
   if (candidate.size > max) {
     return `${candidate.kind === 'video' ? 'Видео' : candidate.kind === 'image' ? 'Изображение' : candidate.kind === 'audio' ? 'Аудио' : 'Файл'} слишком большое. Максимум ${formatAttachmentSize(max)}.`;
   }
