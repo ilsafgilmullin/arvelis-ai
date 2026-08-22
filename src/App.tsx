@@ -31,7 +31,6 @@ import {
 import {
   DEMO_MAX_MESSAGES_PER_THREAD,
   DEMO_MAX_THREADS,
-  DEMO_PREVIEW_NOTICE,
   loadDemoWorkspace,
   resetDemoWorkspace,
   saveDemoWorkspace,
@@ -75,18 +74,9 @@ function createUserMessage(content: string): DemoMessage {
   return { id: makeId('msg'), role: 'user', content, createdAt: Date.now() };
 }
 
-function createSystemMessage(): DemoMessage {
-  return {
-    id: makeId('sys'),
-    role: 'system',
-    createdAt: Date.now() + 1,
-    content: DEMO_PREVIEW_NOTICE,
-  };
-}
-
 export default function App() {
   const [entry, setEntry] = useState<EntryScreen>('splash');
-  const [screen, setScreen] = useState<AppScreen>('chat');
+  const [screen, setScreen] = useState<AppScreen>('workspace');
   const [workspace, setWorkspace] = useState<DemoWorkspaceState | null>(null);
   const [core, setCore] = useState<PreparedCoreModules | null>(null);
   const [persistenceAvailable, setPersistenceAvailable] = useState(true);
@@ -191,7 +181,7 @@ export default function App() {
       setCore(prepared.core);
       setWorkspace(nextWorkspace);
       setPersistenceAvailable(prepared.persistenceAvailable);
-      setScreen('chat');
+      setScreen('workspace');
       setEntry('app');
       preloadSecondaryAppModules();
     } catch {
@@ -241,7 +231,7 @@ export default function App() {
       title: titleFromPrompt(normalizedPrompt),
       createdAt: timestamp,
       updatedAt: timestamp,
-      messages: [createUserMessage(normalizedPrompt), createSystemMessage()],
+      messages: [createUserMessage(normalizedPrompt)],
     };
 
     setWorkspace((current) => {
@@ -343,7 +333,7 @@ export default function App() {
     const profileName = workspace?.profileName;
     setPendingProfileName(profileName && !isDefaultPreviewProfileName(profileName) ? profileName : undefined);
     setLoadError(false);
-    setScreen('chat');
+    setScreen('workspace');
     setEntry('auth');
   };
 
@@ -363,7 +353,7 @@ export default function App() {
       setChatDraftAccountScope(undefined);
       setPendingProfileName(undefined);
       setLoadError(false);
-      setScreen('chat');
+      setScreen('workspace');
       setEntry('auth');
     } catch {
       setSignOutError(true);
@@ -404,7 +394,7 @@ export default function App() {
       setWorkspace(next);
       setPersistenceAvailable(saveDemoWorkspace(next, realSession.account.id));
       setLoadError(false);
-      setScreen('chat');
+      setScreen('workspace');
       return;
     }
 
@@ -413,7 +403,7 @@ export default function App() {
     setPersistenceAvailable(saveDemoWorkspace(next));
     setPendingProfileName(undefined);
     setLoadError(false);
-    setScreen('chat');
+    setScreen('workspace');
     setEntry('auth');
   };
 
@@ -475,6 +465,7 @@ export default function App() {
           threadLimitReached={threadLimitReached}
           onNewChat={newChat}
           onOpenThread={openThread}
+          onOpenHistory={() => setScreen('history')}
         />
       ) : null}
       {screen === 'chat' ? (
