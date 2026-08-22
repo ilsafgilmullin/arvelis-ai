@@ -9,6 +9,7 @@ const migrations = [
   { id: '001_auth_foundation', path: resolve('server/db/migrations/001_auth_foundation.sql') },
   { id: '002_chat_foundation', path: resolve('server/db/migrations/002_chat_foundation.sql') },
   { id: '003_chat_rate_limits', path: resolve('server/db/migrations/003_chat_rate_limits.sql') },
+  { id: '004_chat_file_pipeline', path: resolve('server/db/migrations/004_chat_file_pipeline.sql') },
 ];
 
 if (!connectionString) {
