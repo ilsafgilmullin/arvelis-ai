@@ -3,6 +3,7 @@ import {
   isPersistablePreviewProfileName,
   resolveStoredPreviewProfileName,
 } from '../auth/previewProfile';
+import { CHAT_ATTACHMENT_MAX_COUNT, isValidStoredAttachmentMeta } from '../chat/attachmentPolicy';
 import type { DemoMessage, DemoThread, DemoWorkspaceState } from '../types';
 
 const PREVIEW_STORAGE_KEY = 'arvelis.demo.workspace.v1';
@@ -11,7 +12,7 @@ const STORAGE_PROBE_KEY = 'arvelis.demo.storage.probe';
 const VALID_ROLES = new Set<DemoMessage['role']>(['user', 'assistant', 'system']);
 const WORKSPACE_KEYS = new Set(['threads', 'activeThreadId', 'profileName']);
 const THREAD_KEYS = new Set(['id', 'title', 'createdAt', 'updatedAt', 'messages']);
-const MESSAGE_KEYS = new Set(['id', 'role', 'content', 'createdAt', 'editedAt', 'mock']);
+const MESSAGE_KEYS = new Set(['id', 'role', 'content', 'createdAt', 'editedAt', 'attachments', 'mock']);
 const ACCOUNT_SCOPE_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 
 /** Legacy preview copy is recognized only so old browser data can be cleaned safely. */
@@ -75,11 +76,13 @@ function isValidIdentifier(value: unknown): value is string {
 }
 
 function hasAllowedPreviewRoleSemantics(message: Partial<DemoMessage>): boolean {
-  if (message.role === 'user') return message.mock === undefined;
+  const attachments = message.attachments ?? [];
+  if (message.role === 'user') return message.mock === undefined && attachments.length <= CHAT_ATTACHMENT_MAX_COUNT;
 
   // System/assistant preview messages are accepted only as legacy input so
   // loadDemoWorkspace can remove them. New workspace writes no longer create
   // either kind of message.
+  if (attachments.length) return false;
   if (message.role === 'system') {
     return message.mock === undefined
       && typeof message.content === 'string'
@@ -100,13 +103,17 @@ function hasAllowedPreviewRoleSemantics(message: Partial<DemoMessage>): boolean 
 function isMessage(value: unknown): value is DemoMessage {
   if (!isRecord(value) || !hasOnlyKeys(value, MESSAGE_KEYS)) return false;
   const message = value as Partial<DemoMessage>;
+  const attachments = message.attachments ?? [];
   return (
     isValidIdentifier(message.id) &&
     typeof message.role === 'string' &&
     VALID_ROLES.has(message.role as DemoMessage['role']) &&
     typeof message.content === 'string' &&
-    message.content.length > 0 &&
     message.content.length <= DEMO_MAX_STORED_MESSAGE_CHARS &&
+    Array.isArray(attachments) &&
+    attachments.length <= CHAT_ATTACHMENT_MAX_COUNT &&
+    attachments.every(isValidStoredAttachmentMeta) &&
+    (message.content.trim().length > 0 || attachments.length > 0) &&
     isValidTimestamp(message.createdAt) &&
     (message.editedAt === undefined || (isValidTimestamp(message.editedAt) && message.editedAt >= message.createdAt)) &&
     (message.mock === undefined || typeof message.mock === 'boolean') &&
@@ -134,6 +141,7 @@ function isThread(value: unknown): value is DemoThread {
 
 function hasUniqueWorkspaceIds(threads: DemoThread[]): boolean {
   const threadIds = new Set<string>();
+  const attachmentIds = new Set<string>();
 
   for (const thread of threads) {
     if (threadIds.has(thread.id)) return false;
@@ -143,6 +151,10 @@ function hasUniqueWorkspaceIds(threads: DemoThread[]): boolean {
     for (const message of thread.messages) {
       if (messageIds.has(message.id)) return false;
       messageIds.add(message.id);
+      for (const attachment of message.attachments ?? []) {
+        if (attachmentIds.has(attachment.id)) return false;
+        attachmentIds.add(attachment.id);
+      }
     }
   }
 
@@ -168,6 +180,7 @@ function isWithinContentBudget(threads: DemoThread[]): boolean {
     total += thread.title.length;
     for (const message of thread.messages) {
       total += message.content.length;
+      for (const attachment of message.attachments ?? []) total += attachment.name.length + attachment.mimeType.length;
       if (total > DEMO_MAX_TOTAL_CONTENT_CHARS) return false;
     }
   }
