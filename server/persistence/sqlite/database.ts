@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { ensureSqliteChatFileSchema } from './chatFileSchema';
 import { ensureSqliteChatRateLimitSchema } from './chatRateLimitSchema';
 import { ensureSqliteChatSchema } from './chatSchema';
 
@@ -172,5 +173,6 @@ export function openSqliteAuthDatabase(location: string): DatabaseSync {
   ensureSqliteAuthSchema(database);
   ensureSqliteChatSchema(database);
   ensureSqliteChatRateLimitSchema(database);
+  ensureSqliteChatFileSchema(database);
   return database;
 }
