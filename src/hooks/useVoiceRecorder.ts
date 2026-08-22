@@ -119,6 +119,8 @@ export function useVoiceRecorder(onComplete: (result: VoiceRecordingResult) => v
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
       clearTimer();
+      // Navigating away/unmounting is cancellation, not an implicit send-ready recording.
+      chunksRef.current = [];
       if (recorderRef.current?.state !== 'inactive') recorderRef.current?.stop();
       stopTracks();
     };
