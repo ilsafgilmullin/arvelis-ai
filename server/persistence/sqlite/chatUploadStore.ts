@@ -152,14 +152,13 @@ export class SqliteChatUploadStore implements ChatUploadStore, ChatStorageGcStor
   async markReady(
     accountId: string,
     uploadId: string,
-    sha256: string,
-    readyAt: number,
+    completion: { sha256: string; mimeType: string; readyAt: number },
   ): Promise<ChatUploadRecord | null> {
     const result = this.database.prepare(`
       UPDATE chat_uploads
-      SET sha256 = ?, state = 'ready'
+      SET sha256 = ?, mime_type = ?, state = 'ready'
       WHERE id = ? AND account_id = ? AND state = 'receiving' AND expires_at > ?
-    `).run(sha256, uploadId, accountId, readyAt);
+    `).run(completion.sha256, completion.mimeType, uploadId, accountId, completion.readyAt);
     if (result.changes !== 1) return null;
     const row = this.database.prepare(`
       SELECT id, account_id, kind, name, mime_type, size_bytes, duration_ms,
