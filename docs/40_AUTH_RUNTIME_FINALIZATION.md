@@ -37,6 +37,22 @@ Vite получает только scoped `VITE_REAL_AUTH_ENABLED=true` для �
 5. При регистрации OTP отправляется на email, введённый пользователем.
 6. После подтверждения создаются Account + server Session; closed-test persistence — SQLite.
 
+## Safari / переключение в Почту во время OTP
+
+На iPhone Safari может выгрузить вкладку из памяти, пока пользователь открывает приложение Почты, а при возврате восстановить страницу через reload. До исправления активный Email OTP challenge хранился только в React state, поэтому после такого reload интерфейс забывал уже отправленный код и предлагал запросить новый.
+
+Исправление:
+
+- после успешного `/api/auth/start` сохраняется короткоживущий pending handoff;
+- сохраняются только `challengeId`, intent, email, display name для sign-up, masked destination и server expiry;
+- сам 6-значный OTP не сохраняется;
+- session secret не сохраняется и по-прежнему существует только в HttpOnly cookie;
+- после reload сначала проверяется полноценная server Session, а если её ещё нет — восстанавливается действующий pending OTP challenge;
+- после успешной авторизации, явной смены email/режима, terminal challenge error или истечения challenge pending handoff удаляется;
+- просроченный или повреждённый browser state не используется.
+
+Pending OTP handoff хранится локально только для восстановления незавершённого входа и ограничен серверным `expiresAt`. Это не заменяет server session и не используется как credential после завершения OTP.
+
 ## Что не меняется
 
 - AI по-прежнему не подключён.
@@ -53,8 +69,9 @@ Vite получает только scoped `VITE_REAL_AUTH_ENABLED=true` для �
 - `npm audit --audit-level=high`;
 - `npm run check`;
 - closed-test auth dev environment smoke;
+- pending Email OTP handoff smoke;
 - SQLite auth persistence/flow smoke;
 - PostgreSQL compatibility job;
-- Replit iPhone E2E: session restore → sign out → sign in/sign up → OTP → refresh.
+- Replit iPhone E2E: request OTP → открыть Почту → вернуться в Safari → ввести уже полученный код → session restore → refresh.
 
 Merge в `main` выполняется только после отдельного подтверждения пользователя.
