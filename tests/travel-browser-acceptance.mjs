@@ -288,6 +288,7 @@ try {
   await setViewport(client, { name: '390x844', width: 390, height: 844, mobile: true });
   await client.send('Page.navigate', { url: APP_URL });
   await waitFor(client, "document.readyState === 'complete'", 'document ready');
+  await waitFor(client, "Boolean(document.querySelector('#preview-profile-name')) || Boolean(document.querySelector('.travel-app'))", 'registration or Travel app');
   const needsPreviewProfile = await client.evaluate("Boolean(document.querySelector('#preview-profile-name'))");
   if (needsPreviewProfile) {
     await setControlValue(client, '#preview-profile-name', 'Acceptance QA');
