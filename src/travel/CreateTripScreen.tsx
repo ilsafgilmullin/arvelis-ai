@@ -1,6 +1,43 @@
-import type { FormEvent } from 'react';
-import type { CreateTripInput, TripValidationError } from './domain';
-import { INTERESTS, TRANSPORT, ToggleGroup, VACATION_TYPES } from './ui';
+import { type FormEvent, useState } from 'react';
+import { getExactTripDuration, validateCreateTripInput, type CreateTripInput, type TripValidationError } from './domain';
+import {
+  INTERESTS,
+  TRANSPORT,
+  ToggleGroup,
+  VACATION_TYPES,
+  formatDateRange,
+  formatDays,
+  formatMoney,
+  formatNights,
+  formatTravelers,
+} from './ui';
+
+type Step = 1 | 2 | 3;
+
+const STEP_FIELDS: Record<Step, Array<TripValidationError['field']>> = {
+  1: ['origin', 'destination', 'dates', 'durationDays'],
+  2: ['travelerCount', 'budgetLimitRub'],
+  3: [],
+};
+
+function Stepper({ value, min, max, label, display, onChange }: {
+  value: number;
+  min: number;
+  max: number;
+  label: string;
+  display: string;
+  onChange: (value: number) => void;
+}) {
+  return <div className="travel-stepper" role="group" aria-label={label}>
+    <button type="button" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} aria-label={`Уменьшить: ${label}`}>−</button>
+    <output aria-live="polite">{display}</output>
+    <button type="button" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} aria-label={`Увеличить: ${label}`}>+</button>
+  </div>;
+}
+
+function CalendarIcon() {
+  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 3.5v3M14.5 3.5v3M4 7.5h12M4.5 5.5h11v11h-11z" /></svg>;
+}
 
 export function CreateTripScreen({ form, setForm, errors, storageAvailable, onSubmit, onCancel }: {
   form: CreateTripInput;
@@ -10,47 +47,152 @@ export function CreateTripScreen({ form, setForm, errors, storageAvailable, onSu
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
 }) {
-  const fieldError = (field: TripValidationError['field']) => errors.find((error) => error.field === field)?.message;
+  const [step, setStep] = useState<Step>(1);
+  const [stepErrors, setStepErrors] = useState<TripValidationError[]>([]);
+  const activeErrors = [...errors, ...stepErrors];
+  const fieldError = (field: TripValidationError['field']) => activeErrors.find((error) => error.field === field)?.message;
+  const exactDuration = !form.flexibleDates ? getExactTripDuration(form.startDate, form.endDate) : null;
+  const budgetText = form.budgetLimitRub > 0 ? formatMoney(form.budgetLimitRub) : '';
+
+  const patch = (next: Partial<CreateTripInput>) => {
+    setStepErrors([]);
+    setForm({ ...form, ...next });
+  };
+
+  const goNext = () => {
+    const validation = validateCreateTripInput(form).filter((error) => STEP_FIELDS[step].includes(error.field));
+    setStepErrors(validation);
+    if (validation.length > 0 || step === 3) return;
+    setStep((step + 1) as Step);
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }));
+  };
+
+  const goBack = () => {
+    setStepErrors([]);
+    if (step === 1) {
+      onCancel();
+      return;
+    }
+    setStep((step - 1) as Step);
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }));
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (step !== 3) {
+      event.preventDefault();
+      goNext();
+      return;
+    }
+    onSubmit(event);
+  };
 
   return <main className="travel-page travel-create">
-    <div className="travel-title-row"><div><p className="travel-kicker">НОВАЯ ПОЕЗДКА</p><h1>Создать поездку</h1><p>Сохраните основные параметры. Поиск вариантов и AI-планирование пока не запускаются.</p></div></div>
-    {!storageAvailable ? <div className="travel-alert" role="alert">Локальное хранилище недоступно. Поездку нельзя надёжно сохранить на этом устройстве.</div> : null}
-    <form className="travel-form" onSubmit={onSubmit} noValidate>
-      <section className="travel-form-section">
-        <div className="travel-form-section__heading"><span>01</span><div><h2>Основное</h2><p>Откуда начинается поездка и куда вы хотите отправиться.</p></div></div>
+    <header className="travel-create__header">
+      <div>
+        <p className="travel-kicker">ШАГ {step} ИЗ 3</p>
+        <h1>Создать поездку</h1>
+        <p>{step === 1 ? 'Куда и когда' : step === 2 ? 'Кто едет и какой бюджет' : 'Что важно в путешествии'}</p>
+      </div>
+      <div className="travel-create__progress" aria-label={`Шаг ${step} из 3`}>
+        {[1, 2, 3].map((value) => <span key={value} className={value <= step ? 'is-active' : ''} />)}
+      </div>
+    </header>
+
+    {!storageAvailable ? <div className="travel-alert" role="alert">Не удаётся сохранить поездку на этом устройстве.</div> : null}
+
+    <form className="travel-form travel-form--wizard" onSubmit={handleSubmit} noValidate>
+      {step === 1 ? <section className="travel-form-section travel-form-section--step">
         <div className="travel-form-grid">
-          <label><span>Откуда</span><input value={form.origin} onChange={(event) => setForm({ ...form, origin: event.target.value })} placeholder="Например, Казань" autoComplete="address-level2" aria-invalid={Boolean(fieldError('origin'))} />{fieldError('origin') ? <small className="travel-field-error">{fieldError('origin')}</small> : null}</label>
-          <label><span>Куда</span><input value={form.destination} onChange={(event) => setForm({ ...form, destination: event.target.value })} disabled={form.destinationUnknown} placeholder="Страна или город" aria-invalid={Boolean(fieldError('destination'))} />{fieldError('destination') ? <small className="travel-field-error">{fieldError('destination')}</small> : null}</label>
+          <label>
+            <span>Откуда</span>
+            <input value={form.origin} onChange={(event) => patch({ origin: event.target.value })} placeholder="Например, Казань" autoComplete="address-level2" aria-invalid={Boolean(fieldError('origin'))} />
+            {fieldError('origin') ? <small className="travel-field-error">{fieldError('origin')}</small> : null}
+          </label>
+          <label>
+            <span>Куда</span>
+            <input value={form.destination} onChange={(event) => patch({ destination: event.target.value })} disabled={form.destinationUnknown} placeholder="Страна или город" aria-invalid={Boolean(fieldError('destination'))} />
+            {fieldError('destination') ? <small className="travel-field-error">{fieldError('destination')}</small> : null}
+          </label>
         </div>
-        <label className="travel-check"><input type="checkbox" checked={form.destinationUnknown} onChange={(event) => setForm({ ...form, destinationUnknown: event.target.checked, destination: event.target.checked ? '' : form.destination })} /><span><strong>Не знаю куда</strong><small>Направление можно будет подобрать после подключения ARVELIS AI.</small></span></label>
-      </section>
 
-      <section className="travel-form-section">
-        <div className="travel-form-section__heading"><span>02</span><div><h2>Даты и путешественники</h2><p>Точные даты или гибкая длительность.</p></div></div>
-        <label className="travel-check"><input type="checkbox" checked={form.flexibleDates} onChange={(event) => setForm({ ...form, flexibleDates: event.target.checked })} /><span><strong>Гибкие даты</strong><small>Можно сохранить поездку без точного календарного диапазона.</small></span></label>
-        <div className="travel-form-grid travel-form-grid--three">
-          <label><span>Начало</span><input type="date" value={form.startDate} disabled={form.flexibleDates} onChange={(event) => setForm({ ...form, startDate: event.target.value })} /></label>
-          <label><span>Окончание</span><input type="date" value={form.endDate} disabled={form.flexibleDates} onChange={(event) => setForm({ ...form, endDate: event.target.value })} /></label>
-          <label><span>Количество дней</span><input type="number" min="1" max="90" inputMode="numeric" value={form.durationDays} onChange={(event) => setForm({ ...form, durationDays: Number(event.target.value) })} aria-invalid={Boolean(fieldError('durationDays'))} /></label>
-          <label><span>Путешественников</span><input type="number" min="1" max="20" inputMode="numeric" value={form.travelerCount} onChange={(event) => setForm({ ...form, travelerCount: Number(event.target.value) })} aria-invalid={Boolean(fieldError('travelerCount'))} /></label>
+        <label className="travel-check">
+          <input type="checkbox" checked={form.destinationUnknown} onChange={(event) => patch({ destinationUnknown: event.target.checked, destination: event.target.checked ? '' : form.destination })} />
+          <span><strong>Не знаю куда</strong><small>Направление можно выбрать позже.</small></span>
+        </label>
+
+        <div className="travel-date-mode" role="group" aria-label="Режим дат">
+          <button type="button" className={!form.flexibleDates ? 'is-active' : ''} aria-pressed={!form.flexibleDates} onClick={() => patch({ flexibleDates: false })}>Точные даты</button>
+          <button type="button" className={form.flexibleDates ? 'is-active' : ''} aria-pressed={form.flexibleDates} onClick={() => patch({ flexibleDates: true })}>Гибкие даты</button>
         </div>
-        {fieldError('dates') ? <p className="travel-field-error">{fieldError('dates')}</p> : null}
-      </section>
 
-      <section className="travel-form-section">
-        <div className="travel-form-section__heading"><span>03</span><div><h2>Бюджет</h2><p>Только ваш лимит — автоматические цены сейчас не рассчитываются.</p></div></div>
-        <div className="travel-form-grid travel-form-grid--budget"><label><span>Общий бюджет, ₽</span><input type="number" min="1" step="1000" inputMode="numeric" value={form.budgetLimitRub} onChange={(event) => setForm({ ...form, budgetLimitRub: Number(event.target.value) })} aria-invalid={Boolean(fieldError('budgetLimitRub'))} />{fieldError('budgetLimitRub') ? <small className="travel-field-error">{fieldError('budgetLimitRub')}</small> : null}</label></div>
-      </section>
+        {!form.flexibleDates ? <>
+          <div className="travel-form-grid travel-date-grid">
+            <label>
+              <span>Начало</span>
+              <div className="travel-date-input"><CalendarIcon /><input type="date" value={form.startDate} max={form.endDate || undefined} onChange={(event) => patch({ startDate: event.target.value })} /></div>
+            </label>
+            <label>
+              <span>Окончание</span>
+              <div className="travel-date-input"><CalendarIcon /><input type="date" value={form.endDate} min={form.startDate || undefined} onChange={(event) => patch({ endDate: event.target.value })} /></div>
+            </label>
+          </div>
+          {fieldError('dates') ? <p className="travel-field-error">{fieldError('dates')}</p> : null}
+          {exactDuration ? <div className="travel-date-summary" role="status">
+            <strong>{formatDateRange(form.startDate, form.endDate)}</strong>
+            <span>{formatNights(exactDuration.nights)} · {formatDays(exactDuration.days)}</span>
+          </div> : null}
+        </> : <div className="travel-flex-duration">
+          <span>Длительность</span>
+          <Stepper value={form.durationDays} min={1} max={90} label="Длительность поездки" display={formatNights(form.durationDays)} onChange={(durationDays) => patch({ durationDays })} />
+          {fieldError('durationDays') ? <small className="travel-field-error">{fieldError('durationDays')}</small> : null}
+        </div>}
+      </section> : null}
 
-      <section className="travel-form-section">
-        <div className="travel-form-section__heading"><span>04</span><div><h2>Предпочтения</h2><p>Помогут будущему ассистенту учитывать ваш стиль путешествия.</p></div></div>
-        <div className="travel-field-block"><span>Тип отдыха</span><ToggleGroup values={VACATION_TYPES} selected={form.vacationTypes} onChange={(vacationTypes) => setForm({ ...form, vacationTypes })} /></div>
-        <div className="travel-field-block"><span>Интересы</span><ToggleGroup values={INTERESTS} selected={form.interests} onChange={(interests) => setForm({ ...form, interests })} /></div>
-        <div className="travel-field-block"><span>Транспорт</span><ToggleGroup values={TRANSPORT} selected={form.transportPreferences} onChange={(transportPreferences) => setForm({ ...form, transportPreferences })} /></div>
-        <label><span>Дополнительные пожелания</span><textarea rows={4} value={form.additionalNotes} onChange={(event) => setForm({ ...form, additionalNotes: event.target.value })} placeholder="Например: не хотим сложных пересадок" /></label>
-      </section>
+      {step === 2 ? <section className="travel-form-section travel-form-section--step">
+        <div className="travel-step-field">
+          <span>Путешественники</span>
+          <Stepper value={form.travelerCount} min={1} max={20} label="Количество путешественников" display={formatTravelers(form.travelerCount)} onChange={(travelerCount) => patch({ travelerCount })} />
+          {fieldError('travelerCount') ? <small className="travel-field-error">{fieldError('travelerCount')}</small> : null}
+        </div>
 
-      <div className="travel-form-actions"><button className="travel-secondary" type="button" onClick={onCancel}>Отмена</button><button className="travel-primary" type="submit" disabled={!storageAvailable}>Сохранить поездку</button></div>
+        <label className="travel-budget-field">
+          <span>Общий бюджет</span>
+          <div className="travel-money-input">
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={budgetText}
+              onChange={(event) => {
+                const digits = event.target.value.replace(/\D/g, '');
+                patch({ budgetLimitRub: digits ? Number(digits) : 0 });
+              }}
+              placeholder="120 000"
+              aria-invalid={Boolean(fieldError('budgetLimitRub'))}
+            />
+            <span aria-hidden="true">₽</span>
+          </div>
+          <small>Общий лимит на поездку.</small>
+          {fieldError('budgetLimitRub') ? <small className="travel-field-error">{fieldError('budgetLimitRub')}</small> : null}
+        </label>
+      </section> : null}
+
+      {step === 3 ? <section className="travel-form-section travel-form-section--step">
+        <div className="travel-field-block"><span>Тип отдыха</span><ToggleGroup values={VACATION_TYPES} selected={form.vacationTypes} onChange={(vacationTypes) => patch({ vacationTypes })} /></div>
+        <div className="travel-field-block"><span>Интересы</span><ToggleGroup values={INTERESTS} selected={form.interests} onChange={(interests) => patch({ interests })} /></div>
+        <div className="travel-field-block"><span>Транспорт</span><ToggleGroup values={TRANSPORT} selected={form.transportPreferences} onChange={(transportPreferences) => patch({ transportPreferences })} /></div>
+        <label>
+          <span>Дополнительные пожелания</span>
+          <textarea rows={3} value={form.additionalNotes} onChange={(event) => patch({ additionalNotes: event.target.value })} placeholder="Например: без сложных пересадок" />
+        </label>
+      </section> : null}
+
+      <div className="travel-form-actions travel-form-actions--wizard">
+        <button className="travel-secondary" type="button" onClick={goBack}>Назад</button>
+        {step < 3
+          ? <button className="travel-primary" type="submit" disabled={!storageAvailable}>Продолжить</button>
+          : <button className="travel-primary" type="submit" disabled={!storageAvailable}>Создать поездку</button>}
+      </div>
     </form>
   </main>;
 }

@@ -141,7 +141,7 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
         ) : null}
 
         <div className="auth-heading auth-heading--v2">
-          <p className="section-kicker">ARVELIS AI · TRAVEL ASSISTANT</p>
+          <p className="section-kicker">ARVELIS AI · АССИСТЕНТ ПУТЕШЕСТВИЙ</p>
           <h1>{isSignUp ? 'Создать аккаунт' : 'Войти в ARVELIS AI'}</h1>
           <p>
             {isSignUp

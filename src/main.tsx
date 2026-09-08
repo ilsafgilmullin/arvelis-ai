@@ -29,6 +29,7 @@ import './travel/travel-v2-home.css';
 import './travel/travel-v2-workspace.css';
 import './travel/travel-v2-responsive.css';
 import './travel/travel-v2-auth.css';
+import './travel/travel-v2-polish.css';
 
 const root = document.getElementById('root');
 

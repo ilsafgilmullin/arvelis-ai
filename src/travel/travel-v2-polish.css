@@ -1,0 +1,686 @@
+/* ARVELIS AI — Travel UI Redesign V2 physical iPhone polish pass.
+   Loaded after the V2 foundation layers. This file only refines the active light Travel presentation. */
+
+.travel-shell {
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+}
+
+.travel-create {
+  width: min(760px, 100%);
+}
+
+.travel-create__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.travel-create__header h1 {
+  margin: 0;
+  color: var(--travel-text-primary);
+  font-size: clamp(30px, 5vw, 46px);
+  line-height: 1.04;
+  letter-spacing: -.04em;
+}
+
+.travel-create__header > div > p:last-child {
+  margin: 8px 0 0;
+  color: var(--travel-text-secondary);
+}
+
+.travel-create__progress {
+  width: min(210px, 34vw);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  padding-bottom: 6px;
+}
+
+.travel-create__progress span {
+  height: 5px;
+  border-radius: 999px;
+  background: #dbecee;
+}
+
+.travel-create__progress span.is-active {
+  background: var(--travel-gradient-primary);
+}
+
+.travel-form--wizard {
+  gap: 12px;
+}
+
+.travel-form-section--step {
+  min-height: 340px;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.travel-date-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--travel-border);
+  border-radius: 14px;
+  background: #f1f7f8;
+}
+
+.travel-date-mode button {
+  min-height: 46px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--travel-text-secondary);
+  background: transparent;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.travel-date-mode button.is-active {
+  color: #075f66;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(22, 76, 87, .09), inset 0 0 0 1px #c6e1e2;
+}
+
+.travel-date-input {
+  min-height: 50px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--travel-border-strong);
+  border-radius: 12px;
+  background: #fbfefe;
+  color-scheme: light;
+}
+
+.travel-date-input:focus-within {
+  border-color: #6eb6bb;
+  box-shadow: 0 0 0 var(--travel-focus-width) rgba(0, 106, 118, .12);
+}
+
+.travel-date-input svg {
+  width: 20px;
+  height: 20px;
+  color: #4c747b;
+}
+
+.travel-date-input svg path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.travel-form .travel-date-input input {
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color-scheme: light;
+}
+
+.travel-form .travel-date-input input:focus {
+  border: 0;
+  box-shadow: none;
+}
+
+.travel-date-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 15px;
+  border: 1px solid #c8e4e4;
+  border-radius: 13px;
+  color: #17464d;
+  background: #eef9f8;
+}
+
+.travel-date-summary strong {
+  font-size: 14px;
+}
+
+.travel-date-summary span {
+  color: #4b7077;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.travel-step-field,
+.travel-flex-duration,
+.travel-budget-field {
+  display: grid;
+  gap: 10px;
+  color: #35565d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.travel-stepper {
+  width: min(360px, 100%);
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 8px;
+}
+
+.travel-stepper button {
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--travel-border-strong);
+  border-radius: 13px;
+  color: #075f66;
+  background: #fff;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.travel-stepper button:disabled {
+  opacity: .38;
+  cursor: not-allowed;
+}
+
+.travel-stepper output {
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  padding: 0 14px;
+  border: 1px solid var(--travel-border);
+  border-radius: 13px;
+  color: var(--travel-text-primary);
+  background: #f8fcfc;
+  font-size: 15px;
+  font-weight: 760;
+  text-align: center;
+}
+
+.travel-money-input {
+  width: min(420px, 100%);
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding-right: 14px;
+  border: 1px solid var(--travel-border-strong);
+  border-radius: 12px;
+  background: #fbfefe;
+}
+
+.travel-money-input:focus-within {
+  border-color: #6eb6bb;
+  box-shadow: 0 0 0 var(--travel-focus-width) rgba(0, 106, 118, .12);
+}
+
+.travel-form .travel-money-input input {
+  min-height: 50px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.travel-form .travel-money-input input:focus {
+  border: 0;
+  box-shadow: none;
+}
+
+.travel-money-input > span {
+  color: #315f66;
+  font-size: 16px;
+}
+
+.travel-budget-field > small:not(.travel-field-error) {
+  color: var(--travel-text-tertiary);
+  font-weight: 500;
+}
+
+.travel-form-actions--wizard {
+  padding-top: 6px;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+}
+
+.travel-chat-workspace {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  min-height: min(620px, calc(100dvh - 210px));
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+}
+
+.travel-chat-workspace .travel-chat {
+  min-height: 360px;
+  align-content: start;
+}
+
+.travel-chat__welcome {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 24px 10px;
+  text-align: center;
+}
+
+.travel-chat__welcome-icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
+  border-radius: 15px;
+  color: #fff;
+  background: var(--travel-gradient-primary);
+  font-weight: 850;
+  box-shadow: 0 10px 24px rgba(17, 119, 168, .18);
+}
+
+.travel-chat__welcome h2 {
+  margin: 0;
+  color: var(--travel-text-primary);
+  font-size: 24px;
+  letter-spacing: -.03em;
+}
+
+.travel-chat__welcome > p {
+  max-width: 520px;
+  margin: 0;
+  color: var(--travel-text-secondary);
+  line-height: 1.55;
+}
+
+.travel-starter-prompts--chat {
+  margin-top: 6px;
+}
+
+.travel-chat__quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.travel-ai-notice {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #c8e3e4;
+  border-radius: 999px;
+  color: #365e65;
+  background: #f1f9f9;
+  font-size: 12px;
+}
+
+.travel-ai-notice p {
+  margin: 0;
+}
+
+.travel-ai-notice.is-warning {
+  border-color: #ead7aa;
+  background: #fffaf0;
+}
+
+.travel-ai-notice.is-error {
+  border-color: #efc2bd;
+  color: #8f251c;
+  background: #fff7f6;
+}
+
+.travel-ai-composer--chat {
+  margin-top: 0;
+  scroll-margin-block: 80px calc(34vh + env(safe-area-inset-bottom));
+}
+
+.travel-ai-composer--chat textarea {
+  min-height: 70px;
+  max-height: 180px;
+}
+
+.travel-service-foundation {
+  max-width: 680px;
+  margin-top: 24px;
+}
+
+.travel-service-foundation__icon {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 20px;
+  border: 1px solid var(--travel-border);
+  border-radius: 22px;
+  background: var(--travel-gradient-soft);
+  box-shadow: var(--travel-shadow-sm);
+}
+
+.travel-service-foundation__icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+.travel-service-foundation__icon svg path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.travel-service-foundation__icon.is-route { color: #08777d; background: #e9f8f7; }
+.travel-service-foundation__icon.is-document { color: #245f9f; background: #edf5fb; }
+.travel-service-foundation__icon.is-shield { color: #147a55; background: #edf8f2; }
+.travel-service-foundation__icon.is-map { color: #3768a5; background: #eef4fb; }
+.travel-service-foundation__icon.is-budget { color: #096d6f; background: #eef9f7; }
+
+.travel-service-foundation > p:not(.travel-kicker) {
+  margin-bottom: 22px;
+}
+
+.travel-profile {
+  width: min(720px, 100%);
+  margin: 0 auto;
+}
+
+.travel-profile__hero {
+  grid-template-columns: 68px minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 18px 0 22px;
+  border-bottom: 0;
+}
+
+.travel-profile__avatar {
+  width: 64px;
+  height: 64px;
+}
+
+.travel-profile__identity h1 {
+  font-size: clamp(28px, 6vw, 38px);
+}
+
+.travel-profile__identity > p:last-child {
+  margin-top: 5px;
+  color: var(--travel-text-secondary);
+  font-size: 13px;
+}
+
+.travel-profile__menu {
+  overflow: hidden;
+  border: 1px solid var(--travel-border);
+  border-radius: var(--travel-radius-md);
+  background: #fff;
+  box-shadow: var(--travel-shadow-sm);
+}
+
+.travel-profile__menu-row {
+  width: 100%;
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 15px;
+  border: 0;
+  border-bottom: 1px solid var(--travel-border);
+  color: var(--travel-text-primary);
+  background: #fff;
+  text-align: left;
+}
+
+.travel-profile__menu-row:last-child {
+  border-bottom: 0;
+}
+
+button.travel-profile__menu-row {
+  cursor: pointer;
+}
+
+button.travel-profile__menu-row:hover {
+  background: #f7fbfc;
+}
+
+.travel-profile__menu-row strong {
+  font-size: 14px;
+  font-weight: 680;
+}
+
+.travel-profile__menu-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #08777d;
+  background: #eef8f8;
+}
+
+.travel-profile__menu-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.travel-profile__menu-icon svg path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.travel-profile__chevron {
+  color: #83989d;
+  font-size: 24px;
+  font-weight: 300;
+  text-align: right;
+}
+
+.travel-profile__security {
+  margin-top: 14px;
+  padding: 0;
+  border: 0;
+}
+
+.travel-profile__logout {
+  margin-top: 18px;
+  padding-bottom: calc(22px + env(safe-area-inset-bottom));
+}
+
+.travel-profile__logout .travel-danger {
+  width: 100%;
+}
+
+.travel-settings__advanced {
+  border-style: dashed;
+}
+
+.travel-workspace__hero .travel-kicker {
+  letter-spacing: .1em;
+}
+
+@media (max-width: 700px) {
+  .travel-shell {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  .travel-page {
+    padding-top: 16px;
+  }
+
+  .travel-ai-hero {
+    padding: 18px 0 16px;
+  }
+
+  .travel-ai-hero .travel-kicker {
+    margin-bottom: 7px;
+  }
+
+  .travel-ai-hero h1 {
+    font-size: clamp(32px, 9.8vw, 40px);
+  }
+
+  .travel-ai-hero__lead {
+    margin-top: 7px;
+    line-height: 1.42;
+  }
+
+  .travel-ai-composer--hero {
+    margin-top: 12px;
+    padding: 10px;
+  }
+
+  .travel-ai-composer--hero textarea {
+    min-height: 68px;
+    max-height: 150px;
+  }
+
+  .travel-starter-prompts {
+    margin-top: 9px;
+  }
+
+  .travel-capability-note {
+    margin-top: 8px;
+  }
+
+  .travel-home-trips {
+    padding-top: 14px;
+  }
+
+  .travel-create__header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .travel-create__progress {
+    width: 100%;
+    padding: 0;
+  }
+
+  .travel-form-section--step {
+    min-height: 0;
+    padding: 16px;
+  }
+
+  .travel-date-summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .travel-date-summary span {
+    white-space: normal;
+  }
+
+  .travel-form-actions--wizard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding-bottom: calc(34px + env(safe-area-inset-bottom));
+  }
+
+  .travel-chat-workspace {
+    min-height: calc(100dvh - 190px);
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .travel-chat-workspace .travel-chat {
+    min-height: 300px;
+    padding: 14px;
+  }
+
+  .travel-chat__welcome {
+    min-height: 230px;
+    padding: 18px 4px;
+  }
+
+  .travel-chat__welcome h2 {
+    font-size: 22px;
+  }
+
+  .travel-ai-composer--chat textarea {
+    min-height: 62px;
+  }
+
+  .travel-profile__hero {
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 13px;
+    padding-top: 8px;
+  }
+
+  .travel-profile__avatar {
+    width: 56px;
+    height: 56px;
+  }
+
+  .travel-profile__hero > .travel-secondary {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+
+  .travel-service-foundation {
+    margin-top: 12px;
+  }
+
+  .travel-service-foundation__icon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 16px;
+    border-radius: 19px;
+  }
+}
+
+@media (max-width: 390px) {
+  .travel-form-actions--wizard {
+    grid-template-columns: 1fr;
+  }
+
+  .travel-stepper {
+    width: 100%;
+  }
+
+  .travel-chat__quick-actions {
+    width: 100%;
+  }
+
+  .travel-chat__quick-actions .travel-secondary,
+  .travel-chat__quick-actions .travel-link {
+    flex: 1 1 auto;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .travel-ai-hero {
+    padding: 8px 0 10px;
+  }
+
+  .travel-ai-composer--hero textarea {
+    min-height: 56px;
+  }
+
+  .travel-chat-workspace {
+    min-height: 340px;
+  }
+
+  .travel-chat__welcome {
+    min-height: 190px;
+  }
+}

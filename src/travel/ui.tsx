@@ -19,7 +19,7 @@ export const LEGAL_SECTIONS = ['Въезд', 'Транзит', 'Паспорт',
 
 export const TRIP_BOOK_LABELS: Record<string, string> = {
   cover: 'Обложка', overview: 'Обзор', documents: 'Документы', transport: 'Транспорт', stay: 'Жильё', itinerary: 'Маршрут',
-  map: 'Карта', budget: 'Бюджет', legal: 'Legal', usefulInfo: 'Useful info', emergencyContacts: 'Экстренные контакты',
+  map: 'Карта', budget: 'Бюджет', legal: 'Юридическая проверка', usefulInfo: 'Полезная информация', emergencyContacts: 'Экстренные контакты',
 };
 
 export const EMPTY_FORM: CreateTripInput = {
@@ -27,9 +27,46 @@ export const EMPTY_FORM: CreateTripInput = {
   durationDays: 7, travelerCount: 2, budgetLimitRub: 120000, vacationTypes: [], interests: [], transportPreferences: [], additionalNotes: '',
 };
 
+function pluralRu(value: number, one: string, few: string, many: string): string {
+  const absolute = Math.abs(Math.trunc(value));
+  const mod100 = absolute % 100;
+  const mod10 = absolute % 10;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+
+export function formatNights(value: number): string {
+  return `${value} ${pluralRu(value, 'ночь', 'ночи', 'ночей')}`;
+}
+
+export function formatDays(value: number): string {
+  return `${value} ${pluralRu(value, 'день', 'дня', 'дней')}`;
+}
+
+export function formatTravelers(value: number): string {
+  return `${value} ${pluralRu(value, 'путешественник', 'путешественника', 'путешественников')}`;
+}
+
 export function formatDate(value?: string): string {
   if (!value) return 'Гибкие даты';
   return new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`));
+}
+
+export function formatDateRange(startDate?: string, endDate?: string): string {
+  if (!startDate || !endDate) return 'Гибкие даты';
+  const start = new Date(`${startDate}T12:00:00`);
+  const end = new Date(`${endDate}T12:00:00`);
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const sameMonth = sameYear && start.getMonth() === end.getMonth();
+  if (sameMonth) {
+    const monthYear = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' }).format(end);
+    return `${start.getDate()}–${end.getDate()} ${monthYear}`;
+  }
+  const startText = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' as const }) }).format(start);
+  const endText = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }).format(end);
+  return `${startText} — ${endText}`;
 }
 
 export function formatUpdated(value: string): string {
@@ -48,6 +85,15 @@ export function ToggleGroup({ values, selected, onChange }: { values: string[]; 
   })}</div>;
 }
 
-export function EmptyState({ title, text, action, variant = 'default' }: { title: string; text: string; action?: ReactNode; variant?: 'default' | 'compact' }) {
-  return <section className={`travel-empty travel-empty--${variant}`} role="status"><div className="travel-empty__mark" aria-hidden="true">A</div><h2>{title}</h2><p>{text}</p>{action}</section>;
+export function EmptyState({ title, text, action, variant = 'default', icon }: {
+  title: string;
+  text: string;
+  action?: ReactNode;
+  variant?: 'default' | 'compact';
+  icon?: ReactNode;
+}) {
+  return <section className={`travel-empty travel-empty--${variant}`} role="status">
+    {icon ?? <div className="travel-empty__mark" aria-hidden="true">A</div>}
+    <h2>{title}</h2><p>{text}</p>{action}
+  </section>;
 }

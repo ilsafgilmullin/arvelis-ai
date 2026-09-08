@@ -181,6 +181,11 @@ export type TripValidationError = {
   message: string;
 };
 
+export type ExactTripDuration = {
+  nights: number;
+  days: number;
+};
+
 export const TRAVEL_CAPABILITY_STATE = {
   aiProvider: 'not_connected',
   transportProviders: 'not_connected',
@@ -199,6 +204,30 @@ const makeId = (prefix: string): string => {
   return `${prefix}-${random}`;
 };
 
+function parseDateOnlyUtc(value: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const timestamp = Date.UTC(year, month - 1, day);
+  const date = new Date(timestamp);
+  if (
+    date.getUTCFullYear() !== year
+    || date.getUTCMonth() !== month - 1
+    || date.getUTCDate() !== day
+  ) return null;
+  return timestamp;
+}
+
+export function getExactTripDuration(startDate: string, endDate: string): ExactTripDuration | null {
+  const start = parseDateOnlyUtc(startDate);
+  const end = parseDateOnlyUtc(endDate);
+  if (start === null || end === null || end < start) return null;
+  const nights = Math.round((end - start) / 86_400_000);
+  return { nights, days: nights + 1 };
+}
+
 export function isTripStatus(value: unknown): value is TripStatus {
   return typeof value === 'string' && (TRIP_STATUSES as readonly string[]).includes(value);
 }
@@ -209,21 +238,22 @@ export function validateCreateTripInput(input: CreateTripInput): TripValidationE
   if (!input.destinationUnknown && !input.destination.trim()) {
     errors.push({ field: 'destination', message: 'Укажите направление или выберите «Не знаю куда».' });
   }
-  if (!Number.isInteger(input.durationDays) || input.durationDays < 1 || input.durationDays > 90) {
-    errors.push({ field: 'durationDays', message: 'Количество дней должно быть от 1 до 90.' });
+
+  if (input.flexibleDates) {
+    if (!Number.isInteger(input.durationDays) || input.durationDays < 1 || input.durationDays > 90) {
+      errors.push({ field: 'durationDays', message: 'Длительность должна быть от 1 до 90 ночей.' });
+    }
+  } else if (!input.startDate || !input.endDate) {
+    errors.push({ field: 'dates', message: 'Укажите даты или включите гибкие даты.' });
+  } else if (!getExactTripDuration(input.startDate, input.endDate)) {
+    errors.push({ field: 'dates', message: 'Дата окончания не может быть раньше даты начала.' });
   }
+
   if (!Number.isInteger(input.travelerCount) || input.travelerCount < 1 || input.travelerCount > 20) {
     errors.push({ field: 'travelerCount', message: 'Количество путешественников должно быть от 1 до 20.' });
   }
   if (!Number.isFinite(input.budgetLimitRub) || input.budgetLimitRub <= 0) {
     errors.push({ field: 'budgetLimitRub', message: 'Укажите бюджет больше нуля.' });
-  }
-  if (!input.flexibleDates) {
-    if (!input.startDate || !input.endDate) {
-      errors.push({ field: 'dates', message: 'Укажите даты или включите гибкие даты.' });
-    } else if (input.endDate < input.startDate) {
-      errors.push({ field: 'dates', message: 'Дата окончания не может быть раньше даты начала.' });
-    }
   }
   return errors;
 }
@@ -254,6 +284,7 @@ export function createTripDraft(input: CreateTripInput, ownerScopeId: string, no
     id: makeId('traveler'),
     label: input.travelerCount === 1 ? 'Путешественник' : `Путешественник ${index + 1}`,
   }));
+  const exactDuration = input.flexibleDates ? null : getExactTripDuration(input.startDate, input.endDate);
 
   return {
     id: makeId('trip'),
@@ -263,7 +294,7 @@ export function createTripDraft(input: CreateTripInput, ownerScopeId: string, no
     ...(destination ? { destination } : {}),
     ...(!input.flexibleDates && input.startDate ? { startDate: input.startDate } : {}),
     ...(!input.flexibleDates && input.endDate ? { endDate: input.endDate } : {}),
-    durationDays: input.durationDays,
+    durationDays: exactDuration?.days ?? input.durationDays,
     travelers,
     status: 'draft',
     preferences: {

@@ -40,9 +40,9 @@ export function AuthScreen({
         </header>
 
         <div className="auth-heading auth-heading--v2">
-          <p className="section-kicker">ARVELIS AI · TRAVEL ASSISTANT</p>
+          <p className="section-kicker">ARVELIS AI · АССИСТЕНТ ПУТЕШЕСТВИЙ</p>
           <h1>Планируйте поездки в одном месте</h1>
-          <p>Собирайте маршрут, бюджет, документы и детали поездки в едином Travel workspace.</p>
+          <p>Собирайте маршрут, бюджет, документы и важные детали путешествия.</p>
         </div>
 
         {hasLocalProfile ? (
