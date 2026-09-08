@@ -1,103 +1,76 @@
 # ARVELIS AI — дорожная карта
 
-## Этап 1 — Product Foundation
+**Актуальность:** 2026-09-08.
 
-- [x] Название и слоган.
-- [x] Позиционирование.
-- [x] Широкая целевая аудитория.
-- [x] Визуальное направление.
-- [x] Логотип-концепция.
-- [x] Репозиторий и Git workflow.
-- [x] Отдельный документ AI MVP readiness gates.
-- [ ] Одна главная проблема первого AI MVP.
-- [ ] Формальное утверждение основного AI-сценария.
-- [ ] Финальные границы AI MVP.
-- [ ] Production-модель данных.
-- [ ] Уровни доступа.
-- [ ] Финальные требования безопасности/персональных данных.
-- [ ] Финальное утверждение ключевых экранов.
-- [ ] Критерии готовности первого AI-релиза.
+Предыдущая universal/chat-first roadmap superseded решением `Travel Product Pivot`. Исторические этапы и PR не удаляются.
 
-## Этап 2 — Brand Assets
+## Foundation, уже сохранённый из предыдущих этапов
 
-- [ ] финальный `logo-full.svg`;
-- [ ] финальный `logo-full-tagline.svg`;
-- [x] чистый `logo-mark.svg` для preview;
-- [x] `logo-mark-small.svg` с неизменённой геометрией знака;
-- [ ] `logo-full-light.svg`;
-- [ ] `app-icon-512.png`;
-- [x] отдельный `favicon.svg` на базе утверждённого знака;
-- [ ] `favicon-32.png`;
-- [ ] `social-preview-1200x630.png`;
-- [ ] `brand-preview.png`;
-- [x] базовые UI design tokens в CSS;
-- [ ] финальная vector typography/outline для full lockup;
-- [ ] отдельный бренд-гайд и master-assets.
+- [x] ARVELIS AI name/tagline/graphite-gold brand.
+- [x] Clean brand mark assets used by UI.
+- [x] React + TypeScript + Vite frontend foundation.
+- [x] Mobile-first/safe-area/reduced-motion UI hardening.
+- [x] Passwordless Email OTP domain/server foundation.
+- [x] Account/Session foundation.
+- [x] SQLite closed-test auth persistence.
+- [x] PostgreSQL-compatible auth persistence.
+- [x] Replit runtime configuration.
+- [x] CI/npm lockfile/build/test foundation.
 
-## Этап 3 — Runnable UX/UI Preview
+## Travel Pivot Foundation V1 — CURRENT SLICE
 
-- [x] mobile-first layout;
-- [x] desktop layout;
-- [x] welcome screen;
-- [x] preview-access screen без реальной авторизации;
-- [x] workspace;
-- [x] интерактивный локальный chat flow;
-- [x] поиск/удаление локальной истории;
-- [x] profile/settings;
-- [x] loading/empty/error/offline/limit states;
-- [x] browser online/offline detection;
-- [x] safe-area support;
-- [x] reduced-motion support;
-- [x] keyboard-aware mobile chat layout;
-- [x] Replit Run configuration;
-- [x] первичный фактический запуск и smoke-test текущего `main` на iPhone через Replit Preview;
-- [x] первичный визуальный QA по реальным iPhone-скриншотам;
-- [x] отдельный QA-hardening/product-polish candidate в `fix/qa-hardening-v1`;
-- [ ] контрольный iPhone smoke-test QA candidate после разрешённого merge;
-- [ ] фактический smoke-test на Android;
-- [ ] фактический desktop browser smoke-test.
+- [x] Travel vertical / target user / main problem / main flow fixed.
+- [x] `Trip` becomes primary domain object.
+- [x] Travel-first Home.
+- [x] `Мои поездки`.
+- [x] mobile-first `Создать поездку` flow.
+- [x] local user-created Trip draft persistence.
+- [x] reopen saved Trip.
+- [x] Trip Workspace.
+- [x] Overview foundation.
+- [x] Itinerary foundation with truthful empty state.
+- [x] Map provider-neutral foundation with truthful empty state.
+- [x] Budget domain/calculation foundation.
+- [x] Legal source/domain foundation.
+- [x] Trip Book frontend representation.
+- [x] provider-neutral interfaces for AI/Transport/Map/Legal/Weather/Stay/Currency.
+- [x] Travel domain/storage/truthfulness/ownership smoke tests.
+- [x] Existing auth/server foundations preserved.
+- [x] universal/chat-first positioning marked superseded in current docs.
+- [ ] physical iPhone portrait/landscape smoke of this exact Travel PR by the user.
+- [ ] physical Android narrow viewport smoke.
+- [ ] desktop browser visual smoke.
 
-Все preview/mock-данные явно маркируются. Никакой mock не выдаётся за AI/backend.
+The unchecked device checks are acceptance QA, not permission to add more product scope inside this slice.
 
-## Этап 4 — Technical Foundation
+## Next logical slice — NOT STARTED
 
-- [x] технический стек **preview** зафиксирован;
-- [x] frontend разбит на components/screens/data/lib/hooks/types;
-- [x] локальное preview-хранилище отделено от UI;
-- [x] Error Boundary и explicit storage/offline states добавлены в QA candidate;
-- [ ] подтверждённый CI build — GitHub hosted runner сейчас завершается до выполнения полезных шагов;
-- [ ] сгенерировать и закоммитить проверенный `package-lock.json`;
-- [ ] утвердить **production** technical stack;
-- [ ] утвердить production auth;
-- [ ] утвердить production data model;
-- [ ] серверный API/gateway;
-- [ ] логирование и обработка серверных ошибок;
-- [ ] preview deployment policy.
+Server-side Trip persistence/API with server-authoritative account ownership, replacing local-only Travel persistence behind a repository boundary.
 
-## Этап 5 — AI MVP
+Do not start it automatically after this PR.
 
-Не начинать до закрытия обязательных gate из `docs/06_MVP_GATES.md`.
+## Later Travel sequence — product direction, not current work
 
-- [ ] провайдер-независимый AI gateway;
-- [ ] один основной AI-сценарий;
-- [ ] таймауты, отмена, retry;
-- [ ] rate/cost limits;
-- [ ] серверная история;
-- [ ] защита системных инструкций и данных.
+1. destination/Plan real-data contract and AI orchestration policy;
+2. Transport providers and normalized route comparison;
+3. Budget provider inputs and currency handling;
+4. Legal source ingestion/verification;
+5. Map provider implementation;
+6. Stay/Weather integrations where justified;
+7. Trip Book export/generation;
+8. Live Companion;
+9. Safe/emergency capabilities.
 
-## Этап 6 — Closed Beta
+Each external provider is a separate engineering/security/legal decision. No paid integration is implied by this roadmap.
 
-- [ ] ограниченная группа пользователей;
-- [ ] аналитика сценариев;
-- [ ] нагрузочные и мобильные проверки;
-- [ ] security review;
-- [ ] исправления по фактическим данным.
+## Explicitly not in current slice
 
-## Этап 7 — Production
-
-- [ ] биллинг;
-- [ ] поддержка;
-- [ ] мониторинг;
-- [ ] backup/recovery;
-- [ ] юридические документы;
-- [ ] публичное развёртывание.
+- real AI provider;
+- booking/ticket purchase;
+- production transport/stay/map/legal/weather APIs;
+- payments/billing/subscriptions;
+- production deployment/public registration rollout;
+- AR/offline maps;
+- Live/Safe automation;
+- camera/realtime voice;
+- Travel Memory/full Group Travel.

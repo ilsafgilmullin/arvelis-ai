@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "outDir": "tests/.dist-travel",
+    "rootDir": "."
+  },
+  "include": [
+    "src/travel/domain.ts",
+    "src/travel/storage.ts",
+    "src/travel/providers.ts",
+    "tests/travel-foundation-smoke.ts"
+  ]
+}

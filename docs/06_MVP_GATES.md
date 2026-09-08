@@ -1,124 +1,74 @@
-# ARVELIS AI — AI MVP readiness gates
+# ARVELIS AI — Travel MVP readiness gates
 
-Этот документ отделяет уже подтверждённые решения от рабочих гипотез. Реальный AI/backend не подключается, пока обязательные gates не закрыты отдельно.
+**Актуальность:** 2026-09-08 Travel Product Pivot.
 
-## Статусы
+Этот документ отделяет утверждённый Travel product contract от ещё не выбранных provider/production решений. Реальный AI и real-data integrations не подключаются автоматически после закрытия Foundation V1.
 
-- `APPROVED` — решение явно зафиксировано и может использоваться как источник истины.
-- `CANDIDATE` — рабочая гипотеза/реализация для проверки, но не финальное продуктовое решение.
-- `OPEN` — решение ещё не принято.
+Статусы: `APPROVED`, `FOUNDATION`, `OPEN`.
 
 ## 1. Целевой пользователь — APPROVED
 
-ARVELIS AI создаётся как публичный продукт для **широкой аудитории**.
+Русскоязычный самостоятельный путешественник: solo, пары, семьи, небольшие группы; Россия + international; iPhone/Android/desktop; бюджетные ограничения — важный сценарий.
 
-Основные области применения текущего позиционирования:
+## 2. Главная проблема — APPROVED
 
-- работа;
-- учёба;
-- сложные повседневные задачи.
+Объединить разрозненные решения по бюджету, транспорту, времени, комфорту, legal, карте и программе в один проверяемый Trip plan, не маскируя предположения под факты.
 
-Это не означает, что первый AI MVP обязан одновременно глубоко закрывать все три области.
+## 3. Основной сценарий — APPROVED
 
-## 2. Главная проблема первого AI-релиза — OPEN
+Пользователь задаёт origin/destination или просит подобрать направление, даты/гибкость, duration, travelers, budget и preferences → ARVELIS в будущем оркестрирует Plan/Transport/Budget/Legal/Map/Itinerary → формирует Trip Book.
 
-Зафиксировано только общее направление: не делать очередной универсальный чат без отличий.
+## 4. Границы MVP — APPROVED / staged
 
-До подключения модели необходимо выбрать **одну главную проблему**, которую первый AI-релиз решает лучше и понятнее обычного чата.
+Approved product boundaries:
 
-## 3. Основной сценарий — CANDIDATE
+- Plan/Discover;
+- Transport;
+- Budget;
+- Legal;
+- Map;
+- Itinerary;
+- Trip Book.
 
-Текущий рабочий сценарий:
+Future, not base MVP Foundation: Live Companion, Safe, AR/offline maps, camera/realtime voice, Travel Memory, full Group Travel.
 
-1. пользователь формулирует задачу;
-2. при необходимости передаёт исходный текст/файл;
-3. получает структурированный профессиональный результат;
-4. уточняет или корректирует результат;
-5. сохраняет диалог/задачу в истории.
+## 5. Модель данных — FOUNDATION
 
-Этот сценарий используется как основа UX-preview, но требует отдельного продуктового утверждения перед AI-интеграцией.
+Foundation domain types существуют для Trip/Traveler/Preferences/Destination/Transport/Itinerary/Budget/Legal/Map/TripBook.
 
-## 4. Границы MVP — OPEN
+`localStorage` — только current Travel Foundation persistence. Production Trip schema/server repository — `OPEN`.
 
-Не утверждены:
+## 6. Уровни доступа — FOUNDATION / OPEN
 
-- точный набор AI-возможностей первого релиза;
-- поддерживаемые типы файлов;
-- web-search / tools / integrations;
-- память между диалогами;
-- совместная работа;
-- голос/изображения;
-- биллинг и квоты.
+Existing Email OTP Account/Session foundation server-authoritative. Current Travel data is scoped locally.
 
-Любая из этих функций считается **вне текущего scope**, пока не утверждена отдельно.
+Production Travel authorization, sharing/group roles и admin permissions — `OPEN`.
 
-## 5. Модель данных — OPEN
+## 7. Security/privacy — FOUNDATION / OPEN
 
-Текущий `localStorage` — только инфраструктура frontend-preview и **не является production data model**.
+Approved invariants находятся в `docs/05_SECURITY.md`. До real providers остаются open: exact data categories, document policy, retention, provider transfer rules, production region, consent/legal package.
 
-До backend необходимо определить минимум:
+## 8. Key screens — FOUNDATION
 
-- user/account;
-- workspace/session;
-- thread/conversation;
-- message;
-- attachment;
-- provider/model execution metadata;
-- consent/privacy metadata;
-- audit/security events;
-- retention/deletion status.
+Travel Foundation includes Home, My Trips, Create Trip, Trip Workspace, Profile and truthful provider-empty states.
 
-Конкретные поля и связи пока не утверждены.
+Physical acceptance on iPhone/Android/desktop remains QA work; Foundation UI is not declared final production design.
 
-## 6. Уровни доступа — OPEN
+## 9. Release criteria — OPEN
 
-Реальные роли и разрешения не утверждены.
+Before any real AI/data MVP release separately approve:
 
-Preview не содержит настоящей авторизации и не должен использоваться как модель production access control.
-
-## 7. Безопасность и персональные данные — CANDIDATE
-
-Базовые принципы уже зафиксированы в `docs/05_SECURITY.md`, но до backend нужны отдельные решения по:
-
-- категориям принимаемых пользовательских данных;
-- срокам хранения;
-- удалению/экспорту;
-- журналированию;
-- регионам хранения и инфраструктуре;
-- обработке файлов;
-- prompt injection / tool permissions;
-- возрастным и юридическим ограничениям, если они потребуются;
-- требованиям законодательства для выбранной production-архитектуры.
-
-## 8. Макеты ключевых экранов — CANDIDATE
-
-Собран runnable frontend-preview:
-
-- Welcome;
-- Preview Access;
-- Workspace;
-- Chat;
-- History;
-- Profile/Settings;
-- internal System States.
-
-Текущая ветка `fix/qa-hardening-v1` — QA/product-polish candidate. Она не считается финально утверждённым UI до реального smoke-test после merge-кандидата.
-
-## 9. Критерии готовности первого AI-релиза — OPEN
-
-Перед AI MVP необходимо отдельно утвердить критерии, минимум:
-
-- функциональная готовность;
-- качество/точность ответов для выбранного сценария;
+- selected providers and fallback policy;
+- quality/accuracy metrics;
+- source verification policy;
 - latency/error budgets;
-- безопасность;
-- privacy/data handling;
-- mobile/desktop UX;
-- observability;
-- cost/rate controls;
-- отказоустойчивость AI-провайдера;
-- критерии closed beta и rollback.
+- privacy/security review;
+- rate/cost controls;
+- observability/audit;
+- server Trip persistence/backup/recovery;
+- mobile/desktop acceptance;
+- closed-beta rollback criteria.
 
-## Gate на подключение реального AI
+## Gate for real AI/providers
 
-Подключение реального AI разрешается только после отдельного подтверждения минимум пунктов 2–9 и выбора серверной архитектуры. До этого UI может использовать только явно маркированные `PREVIEW/MOCK` сценарии.
+Travel Pivot Foundation V1 does **not** grant permission to connect OpenAI/Gemini/Claude, transport/booking, paid map, production legal/weather/stay/currency APIs or paid infrastructure. Every provider integration remains a separate reviewed slice.

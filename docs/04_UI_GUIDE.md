@@ -1,148 +1,160 @@
 # ARVELIS AI — UI Guide
 
-## Визуальное направление
+## Visual direction — unchanged brand
 
-- глубокий чёрный или графитовый фон;
-- золото только как акцент и сигнал состояния;
-- чистая геометрия;
-- профессиональная премиальность без показной роскоши;
-- минимум декоративного шума;
-- сдержанные тени и анимации;
-- высокая читаемость и контраст;
-- интерфейс должен ощущаться как живой профессиональный помощник, а не холодная корпоративная панель и не тематический «AI-аттракцион».
+- deep black/graphite background;
+- gold is an accent/status signal, not a full-surface fill;
+- strict clean geometry;
+- professional premium feel without theatrical luxury;
+- restrained shadows/glow/motion;
+- strong readability and contrast;
+- approved ARVELIS A/orbit/dotted-arc geometry is not redesigned.
 
-## Характер продукта
+Travel pivot must not turn ARVELIS into a generic blue tourism site.
 
-ARVELIS AI должен быть:
+## Travel visual language
 
-- дружелюбным и спокойным;
-- персональным там, где это уместно;
-- профессиональным и точным;
-- визуально премиальным, но не «строгим ради строгости»;
-- понятным без технического жаргона в основных пользовательских сценариях.
+Travel context is expressed through useful product information:
 
-Основной тон интерфейса: `живой + дружелюбный + профессиональный`.
+- destinations;
+- future verified place photography;
+- transport indicators;
+- budget structure;
+- itinerary/timeline;
+- real map provider data;
+- Trip Book structure.
 
-Примеры:
+Forbidden travel clichés:
 
-- `Открыть ARVELIS AI` вместо `Открыть рабочее пространство`;
-- `С чего начнём?` вместо приказного `Сформулируйте задачу`;
-- при доступном имени — короткое приветствие по имени;
-- технические ограничения preview объясняются спокойно и честно, но не доминируют над основной задачей пользователя.
+- decorative palm trees/airplanes as brand replacement;
+- bright blue gradients;
+- fake maps/routes;
+- postcard-style visual noise;
+- invented booking cards/prices.
 
-## Запрещено
+Existing generic forbidden patterns remain: acid neon, overloaded space backgrounds, futuristic HUD, excessive glow, cheap 3D robots, random gold frames and chatbot cloning.
 
-- кислотные градиенты;
-- перегруженный космический фон;
-- футуристический HUD;
-- чрезмерное свечение;
-- дешёвые 3D-роботы;
-- детские карточки и иллюстрации;
-- визуальный клон обычного чат-бота;
-- случайные золотые рамки вокруг каждого блока;
-- декоративные элементы без функциональной роли;
-- холодный канцелярский тон во всех пользовательских текстах;
-- скрывать preview/mock за видом реально работающего AI.
+## Information architecture
 
-## Smart Entry / Loading
+Primary V1 contour:
 
-Загрузка ARVELIS AI не используется как декоративная задержка.
+`Главная · Поездки · Создать · Профиль`
 
-Правила:
+Trip Workspace contains:
 
-- никаких искусственных таймеров ради показа заставки;
-- прогресс в процентах отображается только если он связан с реально завершёнными задачами подготовки;
-- критические модули интерфейса загружаются перед входом в приложение;
-- второстепенные разделы прогреваются после первого render в idle/background режиме;
-- если конкретный lazy-модуль реально ещё не готов, используется indeterminate loading без выдуманного процента;
-- фирменный loading-screen использует утверждённый логотип и спокойную анимацию;
-- при ошибке загрузки пользователь получает понятный retry-state;
-- `prefers-reduced-motion` отключает необязательные анимации.
+- Обзор;
+- Маршрут;
+- Карта;
+- Бюджет;
+- Документы;
+- Legal;
+- Trip Book.
 
-Цель Smart Entry — одновременно улучшить восприятие входа и снизить конкуренцию за ресурсы телефона в момент первого render.
+Chat is not a primary navigation item in Travel Foundation V1. A future chat/assistant surface may exist only as a trip-scoped interaction layer after a separate product decision.
 
-## Терминология preview
+## Home
 
-Пользовательский интерфейс текущего этапа использует:
+Home must prioritize:
 
-- `PRODUCT PREVIEW` на входном экране;
-- `PREVIEW` как компактный статус экрана;
-- `LOCAL PREVIEW` для локального chat/state;
-- `MOCK` только для предзаписанного демонстрационного ответа.
+1. ARVELIS brand;
+2. concise AI Travel Assistant positioning;
+3. primary CTA `Создать поездку`;
+4. recent user-created trips if present;
+5. honest empty state if not;
+6. clear entry to `Мои поездки`.
 
-Слово `DEMO` не должно превращаться в главный визуальный мотив продукта и создавать ощущение учебного прототипа.
+No fake statistics, fake AI results, seeded conversations or invented prices.
 
-## Информационная иерархия
+## Create Trip
 
-- один главный заголовок на экран;
-- короткий контекст/статус под ним;
-- золото не используется для всего текста подряд;
-- ключевое действие визуально сильнее вторичных действий;
-- служебные пояснения не конкурируют с основной задачей пользователя;
-- internal/QA элементы не находятся в основной навигации продукта;
-- nested QA-экран сохраняет активный родительский раздел `Профиль`.
+The form is mobile-first and grouped into understandable blocks instead of one dense questionnaire.
 
-## Навигация
+Required foundation inputs:
 
-Desktop:
+- origin;
+- destination or `Не знаю куда`;
+- dates or flexible dates;
+- duration;
+- traveler count;
+- budget;
+- vacation type;
+- interests;
+- transport preferences;
+- additional wishes.
 
-- постоянная левая навигация;
-- основные разделы: Workspace, Chat, History, Profile;
-- active item имеет визуальный акцент и `aria-current`;
-- внутренние QA-разделы открываются из Profile, а не занимают основной sidebar.
+Rules:
 
-Mobile:
+- fields have visible labels;
+- numeric/date inputs use suitable mobile input types;
+- disabled state is explicit for flexible/unknown choices;
+- errors appear next to the relevant field/group;
+- draft-save is a real local operation, not an AI action;
+- no fake progress like «ищем лучшие билеты» while no provider exists.
 
-- нижняя навигация;
-- safe-area обязательно учитывается;
-- при открытой клавиатуре навигация не должна занимать рабочую высоту composer;
-- новый экран открывается с начала страницы, кроме намеренной прокрутки внутри chat flow.
+## Trip cards
 
-## Формы и действия
+Cards show only persisted Trip data:
 
-- input/textarea на iPhone не должны вызывать нежелательный Safari zoom;
-- пустой submit блокируется;
-- действие, которое уже не имеет смысла в текущем состоянии, disabled;
-- разрушительные действия требуют подтверждения;
-- confirm-dialog поддерживает Escape, focus trap и возврат фокуса;
-- интерфейс не просит реальные секреты в preview без настоящей авторизации.
+- title/direction;
+- dates/flex dates;
+- status;
+- traveler count/duration;
+- user budget limit;
+- updated time.
 
-## Состояния
+## Empty/provider states
 
-Обязательны:
+If a provider does not exist, the UI says so directly.
 
-- loading;
-- empty;
-- error;
-- offline;
-- limit;
-- storage unavailable;
-- runtime fallback вместо белого экрана.
+Examples:
 
-Пустая коллекция и пустой результат поиска — разные UX-состояния и не должны использовать один и тот же текст.
+- itinerary: plan not generated;
+- map: provider not connected;
+- Legal: check not run, use official sources;
+- Budget: automatic prices absent;
+- Documents: upload/processing not included.
+
+A placeholder must never visually impersonate a completed provider result.
 
 ## Mobile-first
 
-- учитывать top/bottom/left/right safe areas iPhone;
-- touch-target не менее удобного мобильного размера;
-- отсутствие horizontal overflow;
-- длинные URL/слова должны безопасно переноситься;
-- корректная работа с экранной клавиатурой;
-- быстрый первый render;
-- landscape phone не должен случайно превращаться в desktop-sidebar из-за CSS-ширины;
-- отдельно проверять 320–360 px;
-- desktop проектируется отдельно, а не просто растягивается из mobile.
+- iPhone top/bottom/left/right safe areas;
+- minimum practical touch target ≈44px;
+- no horizontal page overflow;
+- horizontal tab scroller only where intentional;
+- fixed bottom navigation leaves content padding below it;
+- sticky form actions must not collide with bottom nav;
+- phone landscape stays a phone layout;
+- explicitly harden 320–360px widths;
+- narrow Android viewport follows the same touch/overflow contract;
+- desktop is a separate layout adaptation, not a stretched mobile screen.
 
-## Motion
+## Keyboard/forms
 
-- анимация короткая и функциональная;
-- motion может добавлять ощущение жизни, но не должен задерживать пользователя;
-- никакой анимации ради «вау-эффекта»;
-- `prefers-reduced-motion` учитывается;
-- прокрутка к последнему сообщению не должна мешать пользователю с reduced motion.
+- inputs remain readable on iPhone without accidental zoom;
+- page/form scroll must allow the focused field to remain reachable;
+- no fixed-element collision with software keyboard;
+- submit validation is deterministic and does not silently discard data.
 
-## Design tokens и brand assets
+## Accessibility
 
-Текущий preview использует зафиксированные базовые CSS tokens. Финальные master-цвета, размеры логотипа для всех носителей и экспортные ассеты фиксируются после завершения чистого набора brand assets.
+- semantic `button`, `nav`, `main`, `form`, `label` elements;
+- `aria-pressed` for toggle chips;
+- `aria-selected` for workspace tabs;
+- `aria-live`/role states where status feedback matters;
+- visible keyboard focus;
+- color is not the only status cue;
+- desktop keyboard navigation works without pointer;
+- `prefers-reduced-motion` disables nonessential motion.
 
-Утверждённая геометрия логотипа, композиция, название и слоган не изменяются в UI-polish без отдельного подтверждения.
+## Smart Entry / performance
+
+- no artificial loading timers;
+- Home/Create must not preload a heavy map SDK;
+- Profile/System States may remain lazy;
+- real providers will be loaded on demand;
+- first Travel render shows user-owned data without waiting for external APIs.
+
+## Legacy UI
+
+Old Chat/Home/History CSS/components remain in repository for history and potential future reuse, but they are no longer the product source of truth. Do not polish or extend them inside Travel Pivot Foundation V1.

@@ -1,195 +1,179 @@
 # ARVELIS AI — архитектура
 
+**Актуальность:** Travel Pivot Foundation V1, 2026-09-08.
+
 ## Принципы
 
 - mobile-first frontend;
-- UI, доменная логика, данные и AI-интеграции разделяются;
-- AI-слой в будущем должен быть провайдер-независимым;
-- серверная авторизация и контроль доступа появятся только после отдельного security/design review;
-- preview/mock отделяются от production;
-- секреты хранятся только в защищённом окружении;
-- GitHub `main` является источником истины после утверждённого merge;
-- текущий preview не используется как оправдание преждевременной фиксации production backend/data model.
+- `Trip` — основной продуктовый агрегат;
+- UI, domain, persistence, provider adapters, auth, audit и analytics разделяются;
+- внешние AI/travel providers заменяемы;
+- server-authoritative auth сохраняется отдельным контуром;
+- account-scoped data access — обязательное требование для будущей server persistence;
+- demo/mock и real provider data имеют явную границу;
+- секреты только в protected environment;
+- legacy Chat не определяет Travel domain.
 
-## Runnable Preview
+## Фактический stack после pre-change audit
 
-Текущий тестовый frontend использует:
+- React `19.2.8`;
+- React DOM `19.2.8`;
+- TypeScript `6.0.3`;
+- Vite `8.2.1`;
+- `@vitejs/plugin-react 6.0.5`;
+- Node requirement `>=22.12.0 <27`; CI runtime Node `24.19.0`;
+- npm lockfile существует и используется CI через `npm ci`;
+- Vite dev/preview: `0.0.0.0:3000`;
+- `/api` same-origin proxy → auth server `127.0.0.1:3001`;
+- frontend router dependency отсутствует: текущий shell использует explicit application state navigation;
+- server runtime уже содержит auth/db/persistence/runtime boundaries;
+- development/closed-test auth persistence: SQLite;
+- PostgreSQL-compatible auth persistence проверяется отдельным CI job.
 
-- React 19.2.8;
-- React DOM 19.2.8;
-- TypeScript 6.0.3;
-- Vite 8.2.1;
-- Node.js 22.12+; целевая LTS-линия runtime — Node 24;
-- без router-зависимости;
-- без UI framework;
-- без backend;
-- без реального AI;
-- без реальной авторизации;
-- без серверной базы данных;
-- локальное preview-хранилище через `localStorage` браузера.
+Это фактический foundation stack. Выбор production Travel infrastructure/providers остаётся отдельным решением.
 
-Это зафиксированный **preview stack**, а не финальное решение для production.
+## Travel frontend boundary
 
-## Структура frontend
+Новый модуль `src/travel/` содержит:
 
-- `src/components/` — переиспользуемые элементы интерфейса, навигация и бренд-компоненты;
-- `src/screens/` — основные экраны preview;
-- `src/domain/` — frontend-domain policy, не зависящая от конкретного UI-компонента;
-- `src/data/` — только явно обозначенные preview/mock-данные;
-- `src/lib/` — локальная инфраструктура preview, валидация browser storage и Smart Entry preload orchestration;
-- `src/hooks/` — изолированные browser/UI hooks, включая общий lifecycle локальных Chat drafts;
-- `src/types.ts` — типы frontend-домена.
+- `domain.ts` — типы, Trip validation, statuses, Budget calculation, truth capability state;
+- `storage.ts` — local account-scope repository boundary;
+- `providers.ts` — provider-neutral interfaces;
+- `TravelApp.tsx` — Travel composition/navigation layer;
+- `travel-foundation-v1.css` — mobile-first Travel UI layer.
 
-`App.tsx` выполняет роль composition/root state и не содержит разметку всех экранов.
+Travel domain не импортирует React-компоненты.
 
-## Smart Entry / preload model
+## Trip domain
 
-Smart Entry не является декоративной задержкой. На входе параллельно выполняются реальные критические задачи:
+Foundation предусматривает:
 
-1. загрузка App Layout + стартового ARVELIS AI экрана;
-2. загрузка Chat module;
-3. чтение/валидация локального preview-state.
+- `Trip`;
+- `Traveler`;
+- `TripPreferences`;
+- `DestinationOption`;
+- `TransportRoute` / `TransportSegment`;
+- `ItineraryDay` / `ItineraryItem`;
+- `Budget` / `BudgetItem`;
+- `LegalCheck` / `LegalRequirement` / `LegalSource`;
+- `MapPoint`;
+- `TripBook`.
 
-Progress формируется только из завершённых задач. После готовности core-компоненты используются напрямую, чтобы не запускать второй full-screen `Suspense` loader.
+Типы достаточно отделены от UI, чтобы заменить local persistence на server repository без изменения пользовательской информационной архитектуры.
 
-History, Profile и System States остаются secondary chunks и прогреваются после первого экрана последовательно в idle/fallback режиме. Это снижает одновременную нагрузку на слабый телефон и не блокирует вход.
+## Provider-neutral interfaces
 
-Критические dynamic imports имеют защитный timeout. Зависшая загрузка должна перейти в retry-state, а не оставаться бесконечной. Повторный/retry запуск защищён sequence token: устаревшая async-подготовка не должна перезаписывать более новый state/progress.
+Будущие integrations подключаются через contracts:
 
-Никакая из этих оптимизаций не считается production caching/offline architecture. Service Worker/CDN/cache policy требуют отдельного решения перед релизом.
+- `AIProvider`;
+- `TransportProvider`;
+- `MapProvider`;
+- `LegalSourceProvider`;
+- `WeatherProvider`;
+- `StayProvider`;
+- `CurrencyProvider`.
 
-## Chat interaction model
+Foundation не содержит vendor implementation и API keys.
 
-Chat разделён по ответственности:
+## Persistence V1
 
-1. `ChatScreen` — conversation UI, keyboard/scroll/search UX и пользовательские действия;
-2. `WorkspaceScreen` — старт нового диалога и продолжение общего new-chat draft;
-3. `App.tsx` — текущая preview domain-модель thread/message mutations;
-4. `src/domain/chatPolicy.ts` — единые пользовательские ограничения/нормализация Chat;
-5. `useChatDraft` — общий lifecycle черновика для Home и Chat;
-6. `demoStorage.ts` / `chatDraftStorage.ts` — изолированная browser persistence.
+В текущем slice Trip drafts хранятся в browser `localStorage` через `TripRepository`.
 
-Основной workspace state содержит threads, messages, активный thread и display name. Черновики намеренно хранятся **отдельным compact localStorage store**, чтобы набор каждого символа не заставлял сериализовать всю историю диалогов.
+Правила:
 
-Черновик нового диалога использует один ключ и на Home, и на пустом Chat. Поэтому пользователь может начать формулировку на главной, перейти в Chat и продолжить без потери текста. Существующие threads имеют независимые draft keys.
+- real-auth scope использует server Account ID как ownership namespace;
+- preview использует отдельный стабильный local preview scope;
+- repository отклоняет запись Trip с чужим `ownerScopeId`;
+- при чтении foreign-owned/invalid payload отбрасывается;
+- user-created data не смешивается с sample content;
+- этот storage **не является production Trip database** и не синхронизируется между устройствами.
 
-Текущий local Chat поддерживает:
+Следующий server persistence slice должен реализовать тот же ownership contract server-side, а не доверять client-supplied account identity.
 
-- создание нового thread;
-- отправку пользовательского сообщения в local preview;
-- переименование и удаление текущего thread с подтверждением;
-- редактирование только пользовательского сообщения с `editedAt`;
-- копирование текста через Clipboard API + DOM fallback;
-- отдельный draft для каждого thread и общий draft ещё не созданного диалога;
-- smart scroll через `IntersectionObserver` и `visualViewport` hardening;
-- кнопку перехода к последнему сообщению при чтении старой части истории;
-- локальный поиск по текущему диалогу с переходом между совпадениями;
-- визуальные разделители сообщений по датам;
-- quick-start/scenario prompts, которые только заполняют composer и не отправляют текст автоматически;
-- единое ограничение 6000 символов через domain policy;
-- явные preview-лимиты количества threads/messages вместо скрытого отказа persistence.
+## Auth — сохранённая архитектура
 
-Эти операции не являются AI-операциями. Они должны оставаться пригодными после подключения provider-agnostic AI gateway.
+Travel pivot не переписывает существующую Email OTP foundation.
 
-Будущий AI integration layer должен добавлять streaming/pending/error/cancel semantics через отдельный domain/provider слой. `Regenerate`, `Stop generation`, attachments, voice, web-search, citations и model selector не должны встраиваться в `ChatScreen` как локальные фальшивые действия.
+Сохраняются:
 
-## Chat data integrity
+- passwordless Email OTP;
+- trusted server verification;
+- raw OTP не хранится/не логируется;
+- independent OTP/session peppers;
+- HttpOnly session cookie;
+- same-origin API;
+- server-authoritative Account/Session;
+- SQLite test adapter;
+- PostgreSQL-compatible adapter;
+- environment-only SMTP/secret configuration.
 
-Локальная preview-миграция имеет отдельные правила целостности:
+PR #22 содержит отдельную ещё не слитую auth-runtime finalization работу и не использовался как base Travel V1.
 
-- пользовательский `user` content является данными пользователя и не переписывается по совпадению текста с legacy/system copy;
-- автоматическая legacy-нормализация разрешена только для известных `system`/`assistant` preview-фраз;
-- мигрируемый предзаписанный assistant-текст обязан сохранять `mock: true`, чтобы после обновления он не мог визуально выглядеть как реальный ответ AI;
-- повторные известные system preview-notices могут безопасно схлопываться до одного, поскольку это инфраструктурная preview-метка, а не пользовательский контент;
-- неизвестный текст не исправляется и не «улучшается» автоматически.
+## Legacy Chat
 
-Тот же принцип должен использоваться для будущих server/database migrations: данные пользователя не меняются эвристической copy-нормализацией.
+Исторический Chat frontend/domain/storage остаётся в repository, потому что:
 
-## CSS layers
+1. его удаление не требуется для Travel Foundation;
+2. связанные PR #23–#25 остаются открытыми stacked branches;
+3. отдельные interaction/persistence patterns могут пригодиться позже для trip-scoped assistant layer.
 
-Чтобы не переписывать работающую дизайн-систему целиком, стили разделены по ответственности:
+Однако `App.tsx` больше не загружает Chat как центральный core module, а старые Chat/Home/History решения считаются product-superseded.
 
-1. `styles.css` — базовая дизайн-система и компоненты;
-2. `mobile-polish.css` — mobile-specific исправления;
-3. `qa-hardening.css` — destructive actions/QA элементы;
-4. `runtime-polish.css` — runtime fallback и keyboard-aware поведение;
-5. `layout-hardening.css` — narrow/tablet/landscape safe layout;
-6. `product-polish.css` — последний визуальный слой продуктовой иерархии;
-7. `post-merge-mobile-qa.css` — подтверждённые iPhone/WebView corrections;
-8. `smart-entry.css` — Smart Entry, task/progress UI и lightweight screen transitions;
-9. `smart-entry-responsive.css` — short-screen/landscape hardening загрузочного экрана;
-10. `chat-experience.css` — основная conversational visual system;
-11. `chat-features.css` — функциональные Chat overrides: search/date/limit/draft/accessibility states.
+Chat не должен получать новые функции в Travel Foundation V1.
 
-Последующие слои не должны самовольно менять утверждённую геометрию бренда.
+## Map / Legal truth boundary
 
-## Replit runtime
+Map UI может отображать только реальные points/provider results или честный empty state. Фиктивная карта запрещена.
 
-Preview запускается на `0.0.0.0:3000`.
+Legal data должна быть отдельным domain boundary и в будущем содержать минимум:
 
-`.replit` связывает локальный порт 3000 с внешним портом 80 и выполняет установку зависимостей перед `npm run dev`, поэтому пользователь может тестировать проект кнопкой Run без Shell и без Replit Agent.
+- country;
+- requirement type;
+- summary;
+- source name/url;
+- verifiedAt;
+- effectiveFrom/effectiveUntil;
+- confidence/status.
 
-`package-lock.json` пока намеренно не зафиксирован: среда, в которой готовился preview, не имела рабочего доступа к npm registry. Перед production/closed beta lock-файл должен быть сгенерирован реальной установкой npm-зависимостей, проверен и закоммичен.
+Юридические правила не хардкодятся в AI prompt как источник истины.
 
-## Локальная preview-модель
+## Performance model
 
-Текущий preview умеет:
+- Home/Create не зависят от heavy map SDK;
+- real map/provider modules должны подключаться lazy/on-demand;
+- Travel Foundation не добавляет новые runtime dependencies;
+- Profile/System States остаются lazy modules;
+- first render не ждёт real provider calls.
 
-- создавать локальные диалоги;
-- добавлять сообщения;
-- переименовывать и удалять диалоги;
-- редактировать пользовательские сообщения локально;
-- сохранять отдельные chat drafts;
-- продолжать new-chat draft между Home и Chat;
-- искать сообщения внутри текущего диалога;
-- искать и удалять историю;
-- сохранять отображаемое имя;
-- восстанавливать стартовые preview-данные;
-- отслеживать online/offline состояние браузера;
-- определять недоступность localStorage;
-- валидировать сохранённую структуру до загрузки;
-- нормализовать только известные legacy preview-copy без изменения пользовательского текста;
-- схлопывать повторные известные preview-status до одного уведомления на диалог;
-- не перезаписывать последнюю корректную локальную версию заведомо слишком большим/некорректным состоянием.
+## Replit
 
-Draft store ограничен по количеству записей и длине. Удаление thread очищает его draft, а полный preview reset очищает весь draft store.
+`.replit` использует Node 22 module, выполняет `npm ci --include=dev --no-audit --no-fund && npm run dev` и публикует local port `3000` на external `80`.
 
-Preview thread/message limits обрабатываются до мутации состояния и сопровождаются явным UX-состоянием. Они являются ограничениями тестовой локальной модели, а не будущими тарифными/production лимитами.
+Vite запрещает serving `.env`, `.data`, sqlite/WAL/SHM, private keys и `.git` из project root.
 
-Эти функции не являются backend-функциями. Если localStorage недоступен, интерфейс продолжает работать в текущей сессии и явно предупреждает, что изменения могут исчезнуть после перезагрузки.
+Replit Agent для обычной разработки не нужен; source of truth остаётся GitHub.
 
-## Runtime safety preview
+## CI
 
-QA candidate включает:
+PR в `main` запускает:
 
-- React Error Boundary вместо белого экрана;
-- explicit offline/storage banners;
-- confirm-dialog для разрушительных локальных действий;
-- focus trap и возврат фокуса;
-- safe-area/keyboard hardening;
-- защиту от horizontal overflow длинных данных;
-- short-screen/landscape hardening Smart Entry;
-- smart Chat auto-scroll без принудительного ухода вниз во время чтения старых сообщений;
-- безопасный local search без `innerHTML`/HTML injection;
-- mobile Search/Rename/Edit modes без конкуренции основного composer/mobile navigation с клавиатурой;
-- Clipboard failure feedback + `aria-live` feedback;
-- draft persistence failure feedback;
-- отказ от постоянного filled `transform` после screen entrance animation, чтобы не создавать лишний containing block для fixed/mobile UI.
+- `npm ci`;
+- `npm audit --audit-level=high`;
+- TypeScript typecheck;
+- auth core smoke;
+- server Email OTP smoke;
+- SQLite auth persistence smoke;
+- Travel foundation smoke;
+- auth server build;
+- frontend build;
+- отдельный PostgreSQL migration/persistence job на PostgreSQL 18.4.
 
-Это UX/runtime hardening, а не production security audit.
+## Production boundaries still open
 
-## Будущий AI gateway
-
-Серверный слой должен:
-
-- выбирать провайдера и модель;
-- валидировать вход;
-- применять системные политики;
-- ограничивать стоимость и частоту;
-- минимизировать чувствительные данные;
-- журналировать только необходимые технические метаданные;
-- поддерживать таймаут, отмену и повтор;
-- не раскрывать API-ключи клиенту;
-- позволять заменять AI-провайдера без переписывания UI/domain слоя.
-
-Реализация gateway не начинается до закрытия обязательных gate из `docs/06_MVP_GATES.md`.
+- server Trip repository/API;
+- selected provider implementations and routing/fallback policy;
+- observability/audit for provider calls;
+- document storage/retention;
+- production region/hosting;
+- legal/privacy package;
+- billing and quotas.

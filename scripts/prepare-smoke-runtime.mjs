@@ -7,6 +7,7 @@ const allowed = new Map([
   ['server-auth', 'tests/.dist-server-auth'],
   ['server-db', 'tests/.dist-server-db'],
   ['server-sqlite', 'tests/.dist-server-sqlite'],
+  ['travel', 'tests/.dist-travel'],
 ]);
 
 const relative = allowed.get(target);

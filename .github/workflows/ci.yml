@@ -49,6 +49,9 @@ jobs:
       - name: SQLite auth persistence smoke
         run: npm run test:server-sqlite
 
+      - name: Travel foundation smoke
+        run: npm run test:travel
+
       - name: Auth server runtime build
         run: npm run build:auth-server
 

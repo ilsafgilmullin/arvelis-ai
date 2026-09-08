@@ -175,19 +175,77 @@
 - Реальные owner/admin роли, способ входа, support provider, billing/admin actions, production infrastructure controls и exact domain остаются `OPEN`.
 - Frontend foundation развивается отдельно в `feat/arvelis-control-v1` / Draft PR №12 и не должен смешиваться с пользовательским App bundle.
 
-## Не утверждено для production
+## 2026-09-08 — Travel Product Pivot
 
-- одна главная проблема первого AI MVP;
-- финальные границы AI MVP;
-- AI-провайдер и модель;
-- production technical stack;
-- production database/data model;
-- роли и уровни доступа;
-- конкретный auth provider / identity core;
-- production transactional-email provider;
-- production session backend/cookie topology;
-- финальные требования по персональным данным;
-- биллинг и тарифы;
-- production-хостинг;
-- критерии готовности AI-релиза;
+Это решение **supersedes** продуктовые части решений `2026-08-20 — Product` и `2026-08-21 — App entry / authorization UX`, где ARVELIS позиционировался как универсальный assistant и Chat был центральным стартовым контуром. Исторический текст выше сохраняется намеренно. Brand, Email OTP, Account/Session, security и Git workflow этим pivot не отменяются.
+
+### Vertical
+
+- `ARVELIS AI — AI Travel Assistant` полного цикла.
+- Название, слоган, знак, graphite/gold brand direction остаются без изменений.
+
+### Target user
+
+- русскоязычный самостоятельный путешественник;
+- solo, пары, семьи, небольшие группы;
+- Россия + международные поездки;
+- бюджетные ограничения считаются основным входным параметром;
+- приоритет iPhone, Android, desktop;
+- проектировать для работы в России без VPN там, где это технически и юридически возможно.
+
+### Main problem
+
+Пользователь вынужден отдельно решать направление, транспорт, время, бюджет, комфорт, legal requirements, карту и itinerary. ARVELIS должен собирать эти ограничения в один проверяемый `Trip`, отделяя real provider/source data от предположений.
+
+### Main flow
+
+`Главная → Создать поездку / Мои поездки → Trip Workspace → Plan/Transport/Budget/Legal/Map/Itinerary → Trip Book`.
+
+Основной объект продукта — `Trip`. Chat может появиться позже внутри конкретного Trip как interaction layer, но не является корнем архитектуры.
+
+### MVP product boundaries
+
+- **Plan** — параметры, направление/Discover и планирование;
+- **Transport** — normalized routes/segments;
+- **Budget** — лимит, расходы, резерв, остаток;
+- **Legal** — requirements только с source/date/status boundary;
+- **Map** — provider-neutral map layer;
+- **Itinerary** — программа по дням;
+- **Trip Book** — единый пакет поездки.
+
+`Live Companion` и `Safe` фиксируются как future направления и не входят в текущий Foundation V1.
+
+### Travel Pivot Foundation V1
+
+- real AI provider не подключается;
+- real flight/rail/bus/stay booking APIs не подключаются;
+- paid map API не подключается;
+- production Legal/Weather API не подключаются;
+- payment/billing/subscriptions/production deploy не выполняются;
+- user-created Trip drafts допускается хранить локально как account/local-preview scoped foundation data;
+- sample/mock content отделяется от user-created data;
+- фальшивые рейсы, цены, гостиницы, legal conclusions, карты и AI recommendations запрещены;
+- provider contracts закладываются для `AIProvider`, `TransportProvider`, `MapProvider`, `LegalSourceProvider`, `WeatherProvider`, `StayProvider`, `CurrencyProvider`;
+- existing Email OTP/Auth foundation сохраняется без ослабления.
+
+### Consequences
+
+- Home больше не строится вокруг универсального Chat.
+- Primary navigation: `Главная · Поездки · Создать · Профиль`.
+- Старые Chat components/domain/CSS не удаляются этим slice; они считаются legacy и не получают новых Travel Foundation функций.
+- Следующий server/data slice требует отдельного подтверждения и не начинается автоматически.
+
+## Открыто после Travel Product Pivot
+
+- real AI provider/model/routing/fallback policy;
+- production Trip persistence/data schema/API;
+- production transport/stay/map/legal/weather/currency providers;
+- production database/provider region, backup/retention strategy;
+- account linking/recovery и расширенные роли/permissions;
+- production transactional-email provider/session topology;
+- обработка и хранение travel-документов;
+- финальные требования по персональным данным/consent/transborder transfer;
+- billing/tariffs;
+- production hosting;
+- критерии real-data/AI closed beta и public release;
 - дата публичного запуска.
