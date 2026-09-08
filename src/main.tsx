@@ -26,6 +26,10 @@ import './profile-auth-mobile-qa.css';
 import './history-foundation-v1.css';
 import './travel/travel-foundation-v1.css';
 import './travel/travel-acceptance-v1.css';
+import './travel/travel-v2-shell.css';
+import './travel/travel-v2-home.css';
+import './travel/travel-v2-workspace.css';
+import './travel/travel-v2-responsive.css';
 
 const root = document.getElementById('root');
 
