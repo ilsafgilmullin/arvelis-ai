@@ -1,0 +1,39 @@
+/* Travel Pivot Foundation V1 — acceptance-only mobile/accessibility hardening.
+   Loaded after travel-foundation-v1.css so these narrow corrections do not redesign the flow. */
+
+/* Interactive preference chips must meet the ~44px mobile touch-target floor. */
+.travel-toggle {
+  min-height: 44px;
+}
+
+/* Checkbox rows are clickable through their labels; make the complete label target large enough. */
+.travel-check {
+  min-height: 44px;
+  align-items: center;
+}
+
+.travel-check input {
+  margin-top: 0;
+}
+
+/* Keep keyboard focus unambiguous without changing the resting visual hierarchy. */
+.travel-app button:focus-visible,
+.travel-app input:focus-visible,
+.travel-app textarea:focus-visible {
+  outline: 2px solid rgba(213, 168, 66, 0.78);
+  outline-offset: 2px;
+}
+
+/* Keep sticky Create Trip actions clear of the fixed bottom navigation + iPhone safe area. */
+@media (max-width: 640px) {
+  .travel-form-actions {
+    bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Low-height phone landscape needs clearance without consuming unnecessary vertical space. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .travel-form-actions {
+    bottom: 76px;
+  }
+}
