@@ -1,0 +1,360 @@
+/* ARVELIS AI — Travel UI Redesign V2 auth presentation.
+   Loaded after legacy auth styles so the active Travel flow is consistently light. */
+
+.arvelis-travel-runtime .travel-auth {
+  --auth-bg: #f7fbfc;
+  --auth-surface: #ffffff;
+  --auth-surface-soft: #eef8f8;
+  --auth-text: #102a30;
+  --auth-muted: #5d7379;
+  --auth-muted-2: #73888d;
+  --auth-border: #d5e7e9;
+  --auth-border-strong: #aed3d6;
+  --auth-teal: #087f83;
+  --auth-blue: #245fa9;
+  --auth-focus: #006a76;
+  --auth-danger: #b42318;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: max(24px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  color: var(--auth-text);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(25, 164, 158, .11), transparent 28rem),
+    radial-gradient(circle at 92% 12%, rgba(57, 118, 193, .09), transparent 30rem),
+    var(--auth-bg);
+  color-scheme: light;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-panel--v2 {
+  width: min(520px, 100%);
+  padding: clamp(26px, 5vw, 42px);
+  border: 1px solid var(--auth-border);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 24px 64px rgba(22, 76, 87, .12);
+}
+
+.arvelis-travel-runtime .travel-auth .auth-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.arvelis-travel-runtime .travel-auth .brand-lockup--travel .brand-lockup__compact-word {
+  color: #17353b;
+  letter-spacing: .13em;
+}
+
+.arvelis-travel-runtime .travel-auth .brand-lockup--travel .brand-lockup__compact-word em {
+  color: var(--auth-teal);
+}
+
+.arvelis-travel-runtime .travel-auth .auth-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid #bfdee0;
+  border-radius: 999px;
+  color: #0b6870;
+  background: #eff9f8;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .02em;
+  text-transform: none;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-preview-badge--secure {
+  border-color: #bfd8e8;
+  color: #215b89;
+  background: #f0f6fb;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-heading--v2 {
+  margin: clamp(36px, 7vh, 58px) 0 22px;
+}
+
+.arvelis-travel-runtime .travel-auth .section-kicker {
+  color: var(--auth-teal);
+  font-size: 10px;
+  letter-spacing: .13em;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-heading--v2 h1 {
+  max-width: 450px;
+  margin: 10px 0 12px;
+  color: var(--auth-text);
+  font-size: clamp(32px, 7vw, 44px);
+  line-height: 1.03;
+  letter-spacing: -.045em;
+  font-weight: 650;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-heading--v2 > p:not(.section-kicker) {
+  max-width: 450px;
+  margin: 0;
+  color: var(--auth-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--auth-border);
+  border-radius: 13px;
+  background: #f3f8f9;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-mode-switch__item {
+  min-height: 46px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--auth-muted);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-mode-switch__item--active {
+  color: #075f66;
+  background: #ffffff;
+  box-shadow: 0 2px 10px rgba(22, 76, 87, .08), inset 0 0 0 1px #c7e1e3;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-form--v2 {
+  display: grid;
+  gap: 13px;
+  margin-top: 18px;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-form--v2 label {
+  display: grid;
+  gap: 8px;
+  color: #35565d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-form--v2 input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--auth-border-strong);
+  border-radius: 12px;
+  outline: none;
+  color: var(--auth-text);
+  background: #fbfefe;
+  font-size: 16px;
+  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-form--v2 input:focus {
+  border-color: #6eb6bb;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(0, 106, 118, .14);
+}
+
+.arvelis-travel-runtime .travel-auth .auth-form--v2 input[aria-invalid='true'] {
+  border-color: #df9a92;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-field-error {
+  margin: -2px 1px 0;
+  color: var(--auth-danger);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.arvelis-travel-runtime .travel-auth .button {
+  min-height: 48px;
+  border-radius: 12px;
+  font-weight: 750;
+}
+
+.arvelis-travel-runtime .travel-auth .button--primary {
+  border: 0;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--auth-teal), #1177a8 54%, var(--auth-blue));
+  box-shadow: 0 8px 22px rgba(17, 119, 168, .16);
+}
+
+.arvelis-travel-runtime .travel-auth .button--primary:hover {
+  background: linear-gradient(135deg, #08757a, #106f9e 54%, #22589d);
+}
+
+.arvelis-travel-runtime .travel-auth .button--secondary {
+  border: 1px solid var(--auth-border-strong);
+  color: #244c54;
+  background: #ffffff;
+}
+
+.arvelis-travel-runtime .travel-auth .button--secondary:hover {
+  border-color: #91c3c7;
+  color: #075f66;
+  background: #f9fdfd;
+}
+
+.arvelis-travel-runtime .travel-auth button:focus-visible,
+.arvelis-travel-runtime .travel-auth input:focus-visible {
+  outline: 2px solid var(--auth-focus);
+  outline-offset: 3px;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-submit {
+  min-height: 52px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-local-profile {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 17px;
+  border: 1px solid var(--auth-border);
+  border-radius: 16px;
+  background: #f7fbfc;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-local-profile__avatar {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #bee0e0;
+  border-radius: 50%;
+  color: #087077;
+  background: #eaf8f7;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-local-profile__copy > span {
+  display: block;
+  color: var(--auth-muted-2);
+  font-size: 11px;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-local-profile__copy > strong {
+  display: block;
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--auth-text);
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-local-profile > .auth-submit {
+  grid-column: 1 / -1;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-network-note,
+.arvelis-travel-runtime .travel-auth .auth-status-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  margin-top: 16px;
+  padding: 12px 13px;
+  border: 1px solid var(--auth-border);
+  border-radius: 12px;
+  color: var(--auth-muted);
+  background: #f7fbfc;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-network-note > span,
+.arvelis-travel-runtime .travel-auth .auth-status-panel__signal {
+  width: 8px;
+  height: 8px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--auth-blue);
+  box-shadow: none;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-network-note > span,
+.arvelis-travel-runtime .travel-auth .auth-status-panel--error .auth-status-panel__signal {
+  background: #c6655d;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-network-note p,
+.arvelis-travel-runtime .travel-auth .auth-status-panel p {
+  margin: 0;
+  color: var(--auth-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-status-panel p { margin-top: 4px; }
+.arvelis-travel-runtime .travel-auth .auth-network-note strong,
+.arvelis-travel-runtime .travel-auth .auth-status-panel strong { color: var(--auth-text); font-size: 12px; }
+.arvelis-travel-runtime .travel-auth .auth-status-panel--warning { border-color: #ead7aa; background: #fffaf0; }
+.arvelis-travel-runtime .travel-auth .auth-status-panel--error { border-color: #efc2bd; background: #fff7f6; }
+
+.arvelis-travel-runtime .travel-auth .auth-secondary-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-link-button {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 10px;
+  color: #086f76;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.arvelis-travel-runtime .travel-auth .auth-link-button:hover { color: #075f66; background: #eef8f8; }
+.arvelis-travel-runtime .travel-auth .auth-conflict-action { width: 100%; margin-top: 12px; }
+
+.arvelis-travel-runtime .travel-auth .auth-legal-note {
+  margin: 16px 0 0;
+  color: var(--auth-muted-2);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .arvelis-travel-runtime .travel-auth {
+    display: block;
+    padding: max(18px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+  .arvelis-travel-runtime .travel-auth .auth-panel--v2 {
+    width: 100%;
+    min-height: calc(100dvh - max(36px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 20px 2px 12px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .arvelis-travel-runtime .travel-auth .auth-heading--v2 { margin-top: clamp(34px, 7vh, 52px); }
+  .arvelis-travel-runtime .travel-auth .auth-heading--v2 h1 { font-size: clamp(32px, 9.5vw, 42px); }
+}
+
+@media (max-width: 430px) {
+  .arvelis-travel-runtime .travel-auth .auth-brand { align-items: flex-start; }
+  .arvelis-travel-runtime .travel-auth .auth-preview-badge { max-width: 148px; justify-content: center; text-align: center; line-height: 1.15; }
+  .arvelis-travel-runtime .travel-auth .auth-secondary-actions { grid-template-columns: 1fr; }
+  .arvelis-travel-runtime .travel-auth .auth-link-button { width: 100%; }
+}

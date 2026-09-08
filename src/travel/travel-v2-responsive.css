@@ -28,15 +28,36 @@
     padding-left: max(14px, env(safe-area-inset-left));
   }
   .travel-header {
-    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-columns: 44px minmax(0, 1fr);
+    min-height: calc(60px + env(safe-area-inset-top));
     padding-right: max(14px, env(safe-area-inset-right));
     padding-left: max(14px, env(safe-area-inset-left));
   }
-  .travel-header__status span:last-child { display: none; }
-  .travel-page { padding-top: 24px; }
-  .travel-ai-hero { padding-top: 42px; }
-  .travel-ai-hero__lead { font-size: 15px; }
-  .travel-ai-composer--hero { margin-top: 24px; }
+  .travel-page { padding-top: 20px; }
+  .travel-ai-hero { padding: 26px 0 22px; }
+  .travel-ai-hero h1 { font-size: clamp(34px, 10.5vw, 44px); line-height: 1; }
+  .travel-ai-hero__lead { margin-top: 10px; font-size: 14px; line-height: 1.5; }
+  .travel-ai-composer--hero { margin-top: 16px; padding: 12px; }
+  .travel-ai-composer textarea { min-height: 92px; resize: vertical; }
+  .travel-starter-prompts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    margin-top: 11px;
+  }
+  .travel-starter-prompts button {
+    width: 100%;
+    min-width: 0;
+    min-height: var(--travel-touch);
+    padding: 7px 10px;
+    border-radius: 14px;
+    line-height: 1.25;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .travel-capability-note { margin-top: 10px; font-size: 11px; line-height: 1.4; }
+  .travel-section { padding-top: 18px; }
   .travel-title-row,
   .travel-section__heading,
   .travel-workspace__hero,
@@ -82,6 +103,7 @@
   .travel-profile__hero > .travel-secondary,
   .travel-profile__account-state { grid-column: 1 / -1; justify-self: stretch; }
   .travel-profile__editor > div { align-items: stretch; flex-direction: column; }
+  .travel-drawer { width: min(86vw, 340px); min-width: 0; }
 }
 
 @media (max-width: 390px) {
@@ -89,13 +111,12 @@
   .travel-brand-button { margin-left: 4px; padding-inline: 4px; }
   .brand-lockup--travel .brand-lockup__compact-word { font-size: 11px; }
   .travel-shell { padding-right: max(12px, env(safe-area-inset-right)); padding-left: max(12px, env(safe-area-inset-left)); }
-  .travel-ai-hero h1 { font-size: clamp(38px, 13vw, 52px); }
-  .travel-ai-composer--hero { padding: 11px; }
+  .travel-ai-hero { padding-top: 22px; }
+  .travel-ai-hero h1 { font-size: clamp(33px, 10.5vw, 41px); }
+  .travel-ai-composer--hero { padding: 10px; }
   .travel-ai-composer__footer { align-items: flex-end; }
-  .travel-ai-composer__footer > span { max-width: 220px; }
-  .travel-starter-prompts { justify-content: flex-start; overflow-x: auto; flex-wrap: nowrap; margin-inline: -12px; padding-inline: 12px; scrollbar-width: none; }
-  .travel-starter-prompts::-webkit-scrollbar { display: none; }
-  .travel-starter-prompts button { flex: 0 0 auto; }
+  .travel-ai-composer__footer > span { max-width: 200px; }
+  .travel-starter-prompts { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-inline: 0; padding-inline: 0; overflow: visible; }
   .travel-form-section__heading { gap: 10px; }
   .travel-form-section__heading > span { width: 30px; min-width: 30px; height: 30px; }
   .travel-form-actions { flex-direction: column-reverse; }
@@ -108,21 +129,24 @@
   .travel-tabs { margin-right: -12px; margin-left: -12px; padding-right: 12px; padding-left: 12px; }
   .travel-trip-card__top,
   .travel-trip-card__budget { align-items: flex-start; flex-direction: column; }
-  .travel-drawer { width: min(340px, calc(100vw - 14px)); min-width: 0; }
 }
 
 @media (orientation: landscape) and (max-height: 520px) {
-  .travel-header { min-height: calc(54px + env(safe-area-inset-top)); }
-  .travel-page { padding-top: 18px; }
-  .travel-ai-hero { padding-top: 24px; padding-bottom: 24px; }
-  .travel-ai-hero__lead { margin-top: 10px; }
-  .travel-ai-composer--hero { margin-top: 16px; }
-  .travel-ai-composer textarea { min-height: 78px; }
-  .travel-drawer { padding-top: calc(8px + env(safe-area-inset-top)); }
-  .travel-drawer__top { min-height: 48px; padding-bottom: 8px; }
-  .travel-drawer__nav { padding-top: 8px; }
-  .travel-drawer__section { margin-top: 6px; padding-top: 6px; }
-  .travel-drawer__account { padding-top: 8px; }
+  .travel-header { min-height: calc(52px + env(safe-area-inset-top)); }
+  .travel-page { padding-top: 12px; }
+  .travel-ai-hero { padding: 14px 0 16px; }
+  .travel-ai-hero h1 { font-size: 34px; }
+  .travel-ai-hero__lead { margin-top: 7px; }
+  .travel-ai-composer--hero { margin-top: 10px; }
+  .travel-ai-composer textarea { min-height: 70px; }
+  .travel-starter-prompts { margin-top: 8px; }
+  .travel-capability-note { margin-top: 7px; }
+  .travel-drawer { padding-top: calc(7px + env(safe-area-inset-top)); }
+  .travel-drawer__top { min-height: 46px; padding-bottom: 7px; }
+  .travel-drawer__nav { padding-top: 6px; }
+  .travel-drawer__section { margin-top: 4px; padding-top: 4px; }
+  .travel-drawer__account { padding-top: 6px; }
+  .travel-drawer__item { min-height: 48px; }
 }
 
 @media (hover: hover) and (pointer: fine) {

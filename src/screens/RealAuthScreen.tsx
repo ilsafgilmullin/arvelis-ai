@@ -126,11 +126,11 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
       : null;
 
   return (
-    <main className="auth-shell auth-shell--v2">
+    <main className="auth-shell auth-shell--v2 travel-auth" data-auth-mode="server">
       <section className="auth-panel auth-panel--v2">
         <header className="auth-brand">
-          <BrandLockup compact />
-          <span className="auth-preview-badge auth-preview-badge--secure">SECURE SIGN-IN</span>
+          <BrandLockup compact variant="travel" />
+          <span className="auth-preview-badge auth-preview-badge--secure">Вход по коду</span>
         </header>
 
         {!online ? (
@@ -141,12 +141,12 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
         ) : null}
 
         <div className="auth-heading auth-heading--v2">
-          <p className="section-kicker">ДОБРО ПОЖАЛОВАТЬ</p>
+          <p className="section-kicker">ARVELIS AI · TRAVEL ASSISTANT</p>
           <h1>{isSignUp ? 'Создать аккаунт' : 'Войти в ARVELIS AI'}</h1>
           <p>
             {isSignUp
-              ? 'Создайте аккаунт по email. Пароль не нужен — владение адресом подтверждается одноразовым кодом.'
-              : 'Введите email. Мы отправим одноразовый код для защищённого входа без постоянного пароля.'}
+              ? 'Создайте аккаунт по email. Мы отправим одноразовый код подтверждения.'
+              : 'Введите email — мы отправим одноразовый код для входа без постоянного пароля.'}
           </p>
         </div>
 
@@ -254,7 +254,7 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
         {controller.methodsStatus === 'error' ? (
           <section className="auth-status-panel auth-status-panel--error" role="alert">
             <span className="auth-status-panel__signal" aria-hidden="true" />
-            <div><strong>Способ входа временно недоступен</strong><p>Не удалось получить актуальные способы входа с сервера.</p></div>
+            <div><strong>Способ входа временно недоступен</strong><p>Не удалось получить актуальные способы входа.</p></div>
           </section>
         ) : null}
 
@@ -268,15 +268,7 @@ export function RealAuthScreen({ onAuthenticated }: { onAuthenticated: (session:
           </button>
         ) : null}
 
-        <section className="auth-security-note" aria-label="Защита входа">
-          <span className="auth-security-note__signal" aria-hidden="true" />
-          <div>
-            <strong>Одноразовый код · серверная сессия</strong>
-            <p>Код действует ограниченное время и используется один раз. Секрет сессии хранится в защищённой HttpOnly cookie и недоступен обычному JavaScript.</p>
-          </div>
-        </section>
-
-        <p className="auth-legal-note">Не сообщайте код из письма другим людям. ARVELIS AI не запрашивает постоянный пароль для этого способа входа.</p>
+        <p className="auth-legal-note">Одноразовый код действует ограниченное время. Не сообщайте его другим людям.</p>
       </section>
     </main>
   );

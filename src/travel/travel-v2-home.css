@@ -34,8 +34,13 @@
   border-radius: var(--travel-radius-lg);
   background: var(--travel-surface-elevated);
   box-shadow: var(--travel-shadow-md);
+  transition: border-color .16s ease, box-shadow .16s ease;
 }
-.travel-ai-composer--hero { max-width: 780px; margin: 30px auto 0; padding: 14px; text-align: left; }
+.travel-ai-composer:focus-within {
+  border-color: #7fbfc3;
+  box-shadow: 0 0 0 var(--travel-focus-width) rgba(0, 106, 118, .15), var(--travel-shadow-md);
+}
+.travel-ai-composer--hero { max-width: 780px; margin: 30px auto 0; padding: 14px; text-align: left; scroll-margin-block: 92px 30vh; }
 .travel-ai-composer textarea {
   width: 100%;
   min-height: 116px;
@@ -46,7 +51,9 @@
   color: var(--travel-text-primary);
   background: transparent;
   line-height: 1.55;
+  scroll-margin-block: 92px 30vh;
 }
+.travel-ai-composer textarea:focus-visible { outline: 0; }
 .travel-ai-composer textarea::placeholder { color: var(--travel-text-tertiary); }
 .travel-ai-composer__footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 6px 2px 0; color: var(--travel-text-tertiary); font-size: 12px; }
 .travel-ai-send {
@@ -75,6 +82,7 @@
   color: #365d65;
   background: rgba(255,255,255,.82);
   cursor: pointer;
+  white-space: normal;
 }
 .travel-starter-prompts button:hover { border-color: #a7d3d6; background: #fff; }
 .travel-capability-note { margin: 15px 0 0; color: var(--travel-text-tertiary); font-size: 12px; line-height: 1.55; }

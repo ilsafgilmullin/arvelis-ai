@@ -36,6 +36,24 @@ function MenuIcon() {
   return <span className="travel-menu-icon" aria-hidden="true"><i /><i /><i /></span>;
 }
 
+function NavIcon({ screen }: { screen: TravelScreen }) {
+  const pathByScreen: Partial<Record<TravelScreen, string[]>> = {
+    home: ['M3 10.5 10 4l7 6.5', 'M5.5 9.5V17h9V9.5'],
+    assistant: ['M4 5.5h12v9H9l-4 3v-3H4z', 'M7 9h6', 'M7 12h4'],
+    trips: ['M4 7h12v9H4z', 'M7 7V5.5h6V7'],
+    create: ['M10 4v12', 'M4 10h12'],
+    documents: ['M6 3.5h6l3 3V17H6z', 'M12 3.5V7h3', 'M8 10h5', 'M8 13h5'],
+    routes: ['M4 15.5c2.2-5 4-1 6-6s4-1 6-5', 'M4 15.5h3', 'M4 15.5V13'],
+    budgetService: ['M4 6h12v9H4z', 'M12.5 10.5h3', 'M6.5 8.5h3'],
+    legalService: ['M10 3.5 15 5v4.5c0 3.2-2 5.8-5 7-3-1.2-5-3.8-5-7V5z', 'm7.5 10 1.5 1.5 3.5-3.5'],
+    mapService: ['M6 4 3.5 5.5v11L6 15l4 1.5 4-1.5 2.5 1.5v-11L14 4l-4 1.5z', 'M6 4v11', 'M10 5.5v11', 'M14 4v11'],
+    profile: ['M10 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6', 'M4.5 17c.7-3 2.5-4.5 5.5-4.5s4.8 1.5 5.5 4.5'],
+    settings: ['M10 7.2A2.8 2.8 0 1 0 10 12.8 2.8 2.8 0 0 0 10 7.2', 'M10 3.5v2', 'M10 14.5v2', 'M3.5 10h2', 'M14.5 10h2', 'm5.4 5.4 1.4 1.4', 'm13.2 13.2 1.4 1.4', 'm14.6 5.4-1.4 1.4', 'm6.8 13.2-1.4 1.4'],
+    help: ['M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14', 'M8.2 8a1.9 1.9 0 1 1 2.5 1.8c-.9.4-1.3 1-1.3 1.8', 'M10 14h.01'],
+  };
+  return <svg className="travel-drawer__icon" viewBox="0 0 20 20" aria-hidden="true">{(pathByScreen[screen] ?? []).map((path) => <path key={path} d={path} />)}</svg>;
+}
+
 export function TravelApp({ ownerScopeId, profileName, online, dataRevision, renderProfile, renderStates }: {
   ownerScopeId: string;
   profileName: string;
@@ -183,12 +201,11 @@ export function TravelApp({ ownerScopeId, profileName, online, dataRevision, ren
   };
 
   const isNavSelected = (item: NavItem) => item.screen === 'trips' && screen === 'trip' ? true : screen === item.screen;
-  const renderNavItems = (items: NavItem[]) => items.map((item) => <button key={item.screen} type="button" className={isNavSelected(item) ? 'travel-drawer__item is-active' : 'travel-drawer__item'} aria-current={isNavSelected(item) ? 'page' : undefined} onClick={() => navigate(item.screen)}><span>{item.label}</span></button>);
+  const renderNavItems = (items: NavItem[]) => items.map((item) => <button key={item.screen} type="button" className={isNavSelected(item) ? 'travel-drawer__item is-active' : 'travel-drawer__item'} aria-current={isNavSelected(item) ? 'page' : undefined} onClick={() => navigate(item.screen)}><NavIcon screen={item.screen} /><span>{item.label}</span></button>);
 
   const header = screen === 'states' ? null : <header className="travel-header">
     <button ref={menuButtonRef} type="button" className="travel-menu-button" aria-label="Открыть меню" aria-expanded={menuOpen} aria-controls="travel-navigation-drawer" onClick={() => setMenuOpen(true)}><MenuIcon /></button>
     <button type="button" className="travel-brand-button" onClick={() => navigate('home')} aria-label="ARVELIS AI — на главную"><BrandLockup compact variant="travel" /></button>
-    <div className="travel-header__status" aria-label={online ? 'Сеть доступна' : 'Офлайн'}><span className={online ? 'travel-online-dot is-online' : 'travel-online-dot'} /><span>{online ? 'Онлайн' : 'Офлайн'}</span></div>
   </header>;
 
   const drawer = menuOpen ? <div className="travel-drawer-overlay" onPointerDown={(event) => { if (event.target === event.currentTarget) setMenuOpen(false); }}>

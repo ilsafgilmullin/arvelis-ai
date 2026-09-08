@@ -9,8 +9,6 @@ import './runtime-polish.css';
 import './layout-hardening.css';
 import './product-polish.css';
 import './post-merge-mobile-qa.css';
-import './smart-entry.css';
-import './smart-entry-responsive.css';
 import './chat-experience.css';
 import './chat-features.css';
 import './chat-refactor-v2.css';
@@ -30,6 +28,7 @@ import './travel/travel-v2-shell.css';
 import './travel/travel-v2-home.css';
 import './travel/travel-v2-workspace.css';
 import './travel/travel-v2-responsive.css';
+import './travel/travel-v2-auth.css';
 
 const root = document.getElementById('root');
 
@@ -44,9 +43,3 @@ createRoot(root).render(
     </ErrorBoundary>
   </StrictMode>,
 );
-
-window.requestAnimationFrame(() => {
-  window.requestAnimationFrame(() => {
-    document.getElementById('arvelis-preboot')?.remove();
-  });
-});
