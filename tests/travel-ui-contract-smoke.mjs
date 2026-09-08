@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
-const [app, assistant, workspace, home, createTrip, services, assistantContext, profile, brand, shellCss, homeCss, workspaceCss, responsiveCss, main, domain] = await Promise.all([
+const [app, assistant, workspace, home, createTrip, services, assistantContext, profile, brand, shellCss, homeCss, workspaceCss, responsiveCss, main, domain, ui] = await Promise.all([
   read('../src/travel/TravelApp.tsx'),
   read('../src/travel/AssistantScreen.tsx'),
   read('../src/travel/TripWorkspace.tsx'),
@@ -18,6 +18,7 @@ const [app, assistant, workspace, home, createTrip, services, assistantContext, 
   read('../src/travel/travel-v2-responsive.css'),
   read('../src/main.tsx'),
   read('../src/travel/domain.ts'),
+  read('../src/travel/ui.tsx'),
 ]);
 
 // AI-first information architecture.
@@ -25,7 +26,11 @@ for (const label of ['Главная', 'ARVELIS AI', 'Мои поездки', '�
   assert.ok(app.includes(`label: '${label}'`) || app.includes(`label: \"${label}\"`) || app.includes(`>${label}<`) || app.includes(label), `Missing navigation label: ${label}`);
 }
 assert.ok(home.includes('Куда отправимся?'), 'Home must be AI-first');
-assert.ok(home.includes('StarterPrompt'), 'Home starter prompts missing');
+assert.ok(home.includes('STARTER_PROMPTS.map'), 'Home must render starter prompts');
+assert.ok(home.includes('onClick={() => onPromptChange(starter)}'), 'Starter prompt must fill the composer instead of auto-sending');
+for (const prompt of ['Куда поехать на 80 000 ₽', 'Найти выгодный маршрут', 'Проверить правила въезда', 'Спланировать поездку']) {
+  assert.ok(ui.includes(prompt), `Starter prompt missing: ${prompt}`);
+}
 assert.ok(app.includes("createGeneralAssistantContext('assistant')"), 'General assistant context missing');
 assert.ok(app.includes('createTripAssistantContext(trip)'), 'Trip-scoped assistant context missing');
 assert.ok(assistantContext.includes("scope: 'general'"));
