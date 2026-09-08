@@ -7,13 +7,11 @@ import {
   normalizePreviewProfileName,
   validatePreviewProfileName,
 } from './auth/previewProfile';
-import { AppBootScreen } from './components/AppBootScreen';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { loadProfileModule, loadStatesModule } from './lib/appModules';
 import { canUseDemoStorage, loadDemoWorkspace, resetDemoWorkspace, saveDemoWorkspace } from './lib/demoStorage';
 import { AuthScreen } from './screens/AuthScreen';
 import { RealAuthScreen } from './screens/RealAuthScreen';
-import { WelcomeScreen } from './screens/WelcomeScreen';
 import { TravelApp } from './travel/TravelApp';
 import { clearBrowserTrips } from './travel/storage';
 import type { EntryScreen } from './types';
@@ -23,19 +21,14 @@ const StatesScreen = lazy(() => loadStatesModule().then((module) => ({ default: 
 const REAL_AUTH_ENABLED = import.meta.env.VITE_REAL_AUTH_ENABLED === 'true';
 const LOCAL_PREVIEW_TRAVEL_SCOPE = 'preview:local';
 
-const waitForBootPaint = (): Promise<void> => new Promise((resolve) => {
-  if (typeof window === 'undefined' || document.visibilityState !== 'visible') {
-    resolve();
-    return;
-  }
-  window.requestAnimationFrame(() => resolve());
-});
-
 export default function App() {
-  const [entry, setEntry] = useState<EntryScreen>('splash');
+  const [entry, setEntry] = useState<EntryScreen>(() => REAL_AUTH_ENABLED ? 'resolving' : 'auth');
   const [activeProfileName, setActiveProfileName] = useState(DEFAULT_PREVIEW_PROFILE_NAME);
-  const [pendingProfileName, setPendingProfileName] = useState<string | undefined>();
-  const [loadError, setLoadError] = useState(false);
+  const [pendingProfileName, setPendingProfileName] = useState<string | undefined>(() => {
+    if (REAL_AUTH_ENABLED) return undefined;
+    const storedProfileName = loadDemoWorkspace().profileName;
+    return isDefaultPreviewProfileName(storedProfileName) ? undefined : storedProfileName;
+  });
   const [persistenceAvailable, setPersistenceAvailable] = useState(true);
   const [realSession, setRealSession] = useState<AuthSession | null>(null);
   const [sessions, setSessions] = useState<AuthSessionSummary[]>([]);
@@ -46,6 +39,39 @@ export default function App() {
   const online = useOnlineStatus();
 
   const ownerScopeId = realSession?.account.id ?? LOCAL_PREVIEW_TRAVEL_SCOPE;
+
+  useEffect(() => {
+    if (!REAL_AUTH_ENABLED) return;
+    let active = true;
+
+    void realAuthGateway.restoreSession().then((session) => {
+      if (!active) return;
+      if (!session) {
+        setEntry('auth');
+        return;
+      }
+
+      setRealSession(session);
+      setActiveProfileName(session.account.displayName);
+      setPersistenceAvailable(canUseDemoStorage());
+      setSignOutError(false);
+      setEntry('app');
+    }).catch(() => {
+      if (!active) return;
+      setEntry('auth');
+    });
+
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (entry !== 'app') return;
+    const preloadId = window.setTimeout(() => {
+      void loadProfileModule();
+      void loadStatesModule();
+    }, 0);
+    return () => window.clearTimeout(preloadId);
+  }, [entry]);
 
   useEffect(() => {
     if (!REAL_AUTH_ENABLED || entry !== 'app' || !realSession) return;
@@ -63,52 +89,27 @@ export default function App() {
     return () => { active = false; };
   }, [entry, realSession]);
 
-  const launchApp = async (profileName?: string) => {
-    if (profileName !== undefined && validatePreviewProfileName(profileName) !== null) {
-      setPendingProfileName(undefined);
-      setLoadError(false);
-      setEntry('auth');
-      return;
-    }
-
-    const normalizedName = profileName === undefined ? DEFAULT_PREVIEW_PROFILE_NAME : normalizePreviewProfileName(profileName);
-    setPendingProfileName(normalizedName);
-    setLoadError(false);
-    setEntry('boot');
-
-    try {
-      await waitForBootPaint();
-      setActiveProfileName(normalizedName);
-
-      if (REAL_AUTH_ENABLED && realSession) {
-        setPersistenceAvailable(canUseDemoStorage());
-      } else {
-        const current = loadDemoWorkspace();
-        setPersistenceAvailable(saveDemoWorkspace({ ...current, profileName: normalizedName }));
-      }
-
-      setEntry('app');
-      setPendingProfileName(undefined);
-    } catch {
-      setLoadError(true);
-    }
-  };
-
-  const openAuth = () => {
-    if (REAL_AUTH_ENABLED) {
+  const launchPreviewApp = (profileName: string) => {
+    if (validatePreviewProfileName(profileName) !== null) {
       setPendingProfileName(undefined);
       setEntry('auth');
       return;
     }
-    const storedProfileName = loadDemoWorkspace().profileName;
-    setPendingProfileName(isDefaultPreviewProfileName(storedProfileName) ? undefined : storedProfileName);
-    setEntry('auth');
+
+    const normalizedName = normalizePreviewProfileName(profileName);
+    const current = loadDemoWorkspace();
+    setPersistenceAvailable(saveDemoWorkspace({ ...current, profileName: normalizedName }));
+    setActiveProfileName(normalizedName);
+    setPendingProfileName(undefined);
+    setEntry('app');
   };
 
   const handleRealAuthenticated = (session: AuthSession) => {
     setRealSession(session);
+    setActiveProfileName(session.account.displayName);
+    setPersistenceAvailable(canUseDemoStorage());
     setSignOutError(false);
-    void launchApp(session.account.displayName);
+    setEntry('app');
   };
 
   const saveProfileName = (profileName: string) => {
@@ -122,7 +123,6 @@ export default function App() {
 
   const signOutPreview = () => {
     setPendingProfileName(activeProfileName && !isDefaultPreviewProfileName(activeProfileName) ? activeProfileName : undefined);
-    setLoadError(false);
     setEntry('auth');
   };
 
@@ -136,7 +136,6 @@ export default function App() {
       setSessions([]);
       setSessionsStatus('idle');
       setPendingProfileName(undefined);
-      setLoadError(false);
       setEntry('auth');
     } catch {
       setSignOutError(true);
@@ -183,15 +182,11 @@ export default function App() {
     setEntry('auth');
   };
 
-  if (entry === 'splash') return <WelcomeScreen onComplete={openAuth} />;
+  if (entry === 'resolving') return null;
 
   if (entry === 'auth') {
     if (REAL_AUTH_ENABLED) return <RealAuthScreen onAuthenticated={handleRealAuthenticated} />;
-    return <AuthScreen initialName={pendingProfileName ?? activeProfileName} onContinue={(name) => { void launchApp(name); }} />;
-  }
-
-  if (entry === 'boot') {
-    return <AppBootScreen progress={{ completed: loadError ? 0 : 1, total: 1, label: loadError ? 'Не удалось подготовить Travel workspace' : 'Подготавливаем Travel workspace', completedTasks: [] }} profileName={pendingProfileName} error={loadError} onRetry={() => { void launchApp(pendingProfileName); }} />;
+    return <AuthScreen initialName={pendingProfileName ?? activeProfileName} onContinue={launchPreviewApp} />;
   }
 
   const fallback = <section className="module-loading" role="status" aria-live="polite"><span className="module-loading__pulse" aria-hidden="true" /><div><strong>Открываем раздел</strong><p>Подгружаем интерфейс в фоне.</p></div></section>;

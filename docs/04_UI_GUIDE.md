@@ -1,46 +1,183 @@
 # ARVELIS AI — UI Guide
 
-## Visual direction — unchanged brand
+## 2026-09-08 — Light AI-first Travel UI
 
-- deep black/graphite background;
-- gold is an accent/status signal, not a full-surface fill;
-- strict clean geometry;
-- professional premium feel without theatrical luxury;
-- restrained shadows/glow/motion;
-- strong readability and contrast;
-- approved ARVELIS A/orbit/dotted-arc geometry is not redesigned.
+Это руководство описывает активный пользовательский Travel UI после `Travel UI Redesign V2`.
 
-Travel pivot must not turn ARVELIS into a generic blue tourism site.
+Предыдущее dark/gold пользовательское Travel-направление считается **superseded**. Историческая graphite/gold система остаётся частью истории бренда и legacy preview, но больше не является основной presentation model Travel-продукта.
 
-## Travel visual language
+## Visual direction
 
-Travel context is expressed through useful product information:
+Основная тема:
 
-- destinations;
-- future verified place photography;
-- transport indicators;
-- budget structure;
-- itinerary/timeline;
-- real map provider data;
-- Trip Book structure.
+- light;
+- white / soft blue-white backgrounds;
+- teal / turquoise / blue;
+- restrained green accents;
+- clean premium travel-tech character;
+- больше воздуха и меньше технических рамок;
+- карточки с лёгкой границей и soft shadow;
+- travel visuals только там, где они объясняют продукт.
 
-Forbidden travel clichés:
+Не использовать:
 
-- decorative palm trees/airplanes as brand replacement;
-- bright blue gradients;
-- fake maps/routes;
-- postcard-style visual noise;
-- invented booking cards/prices.
+- доминирующую золотую заливку;
+- чёрный пользовательский Travel UI как primary theme;
+- acid neon;
+- cyberpunk / HUD;
+- excessive glass effects;
+- constant glow;
+- fake maps, fake routes или postcard-noise;
+- random external destination photography без media/provider policy.
 
-Existing generic forbidden patterns remain: acid neon, overloaded space backgrounds, futuristic HUD, excessive glow, cheap 3D robots, random gold frames and chatbot cloning.
+## Brand
 
-## Information architecture
+Геометрия ARVELIS не меняется:
 
-Primary V1 contour:
+- геометрическая `A`;
+- круговая орбита;
+- точечная правая дуга;
+- ARVELIS AI wordmark structure.
 
-`Главная · Поездки · Создать · Профиль`
+Для light Travel UI разрешён отдельный teal/blue gradient colorway. Он не является новым логотипом и не меняет форму знака.
 
-Trip Workspace contains:
+## Design tokens
+
+V2 использует централизованные Travel tokens вместо размножения hex-значений:
+
+- `--travel-background-primary`;
+- `--travel-background-secondary`;
+- `--travel-surface`;
+- `--travel-surface-elevated`;
+- `--travel-text-primary`;
+- `--travel-text-secondary`;
+- `--travel-border`;
+- `--travel-accent-teal`;
+- `--travel-accent-blue`;
+- `--travel-accent-green`;
+- `--travel-gradient-primary`;
+- `--travel-success`;
+- `--travel-warning`;
+- `--travel-danger`;
+- `--travel-focus`;
+- `--travel-shadow-sm` / `--travel-shadow-md`;
+- radius, spacing, touch и input sizes.
+
+Минимальный touch target: `44px`. Базовая input height: `48px`.
+
+## AI-first Home
+
+Home — основной AI-first entry point.
+
+Главная структура:
+
+1. ARVELIS AI identity;
+2. короткий travel-first heading `Куда отправимся?`;
+3. большой composer;
+4. starter prompts;
+5. recent trips или truthful empty state;
+6. editorial/static travel inspiration, явно не выдаваемая за персональную AI recommendation.
+
+Starter prompt только заполняет composer и не отправляет запрос автоматически.
+
+Voice и attachments не показываются как работающие функции до их фактической реализации.
+
+## ARVELIS AI
+
+Есть два UI-контекста:
+
+### General
+
+Для выбора направления, общих travel-вопросов, legal/transport идей и планирования до создания Trip.
+
+### Trip-scoped
+
+Контекст включает текущую поездку: `tripId`, origin/destination, dates, travelers, budget, preferences, itinerary, legal и map state.
+
+UI не зависит от конкретного AI provider и должен позднее передавать эти контексты в AI Gateway без переписывания Chat surface.
+
+Пока реальный AI не подключён:
+
+- user message может отображаться;
+- fake assistant reply запрещён;
+- показывается truthful state `ARVELIS AI пока не подключён`.
+
+## Primary navigation
+
+Primary navigation — left side drawer.
+
+Основные пункты:
+
+- Главная;
+- ARVELIS AI;
+- Мои поездки;
+- Создать поездку;
+- Документы.
+
+Сервисы:
+
+- Маршруты;
+- Бюджет;
+- Travel Legal;
+- Карта.
+
+Аккаунт:
+
+- Профиль;
+- Настройки;
+- Помощь.
+
+Legacy bottom navigation не является активной Travel navigation model.
+
+Drawer contract:
+
+- left slide-in;
+- overlay dismiss;
+- Escape close;
+- focus trap;
+- focus return на menu button;
+- `aria-expanded`, `aria-current`, semantic nav;
+- body-scroll lock только во время открытия;
+- safe-area aware layout;
+- reduced motion support.
+
+## My Trips
+
+Trip cards показывают только persisted Trip data:
+
+- направление;
+- даты / flexible state;
+- travelers;
+- duration;
+- user budget limit;
+- status.
+
+User-created draft не получает fake destination photo. Используется нейтральный visual slot.
+
+Если поездок нет — один чистый empty state и один главный CTA.
+
+## Create Trip
+
+Presentation разделена на логические секции:
+
+1. Основное;
+2. Даты и путешественники;
+3. Бюджет;
+4. Предпочтения.
+
+Сохраняются существующие domain validation и persistence boundaries.
+
+Основной реальный CTA до подключения AI: `Сохранить поездку`.
+
+Не показывать рабочую кнопку `Найти варианты с ARVELIS AI`, пока реального AI нет.
+
+## Trip Workspace
+
+Trip Workspace — структурированный результат работы пользователя и будущего AI.
+
+Header содержит destination, dates, status и action `Спросить ARVELIS`.
+
+Context navigation:
 
 - Обзор;
 - Маршрут;
@@ -50,111 +187,88 @@ Trip Workspace contains:
 - Legal;
 - Trip Book.
 
-Chat is not a primary navigation item in Travel Foundation V1. A future chat/assistant surface may exist only as a trip-scoped interaction layer after a separate product decision.
+На mobile tab strip прокручивается горизонтально внутри себя и не создаёт page overflow.
 
-## Home
+Keyboard: ArrowLeft / ArrowRight / Home / End.
 
-Home must prioritize:
+## Truthful provider states
 
-1. ARVELIS brand;
-2. concise AI Travel Assistant positioning;
-3. primary CTA `Создать поездку`;
-4. recent user-created trips if present;
-5. honest empty state if not;
-6. clear entry to `Мои поездки`.
+Если данные отсутствуют, UI говорит об этом прямо.
 
-No fake statistics, fake AI results, seeded conversations or invented prices.
+- Route: `Маршрут по дням пока пуст`;
+- Map: provider не подключён, fake map не рисуется;
+- Budget: показывается только пользовательский лимит, если нет реальных items;
+- Legal: `Юридическая проверка ещё не выполнялась`;
+- Documents: нет fake documents;
+- Trip Book: PDF generation не выдаётся за доступную.
 
-## Create Trip
+## Profile
 
-The form is mobile-first and grouped into understandable blocks instead of one dense questionnaire.
+Profile — пользовательский account screen, а не developer dashboard.
 
-Required foundation inputs:
+Основной слой:
 
-- origin;
-- destination or `Не знаю куда`;
-- dates or flexible dates;
-- duration;
-- traveler count;
-- budget;
-- vacation type;
-- interests;
-- transport preferences;
-- additional wishes.
+- avatar;
+- name;
+- account identity;
+- edit profile для preview-профиля;
+- личные данные;
+- travel preferences;
+- security;
+- documents;
+- notifications;
+- privacy;
+- help;
+- about;
+- logout.
 
-Rules:
+Technical diagnostics не находятся в основном Profile.
 
-- fields have visible labels;
-- numeric/date inputs use suitable mobile input types;
-- disabled state is explicit for flexible/unknown choices;
-- errors appear next to the relevant field/group;
-- draft-save is a real local operation, not an AI action;
-- no fake progress like «ищем лучшие билеты» while no provider exists.
+В development mode diagnostics доступны через `Settings → Advanced / Diagnostics`.
 
-## Trip cards
+## Responsive
 
-Cards show only persisted Trip data:
+Обязательные размеры automated acceptance:
 
-- title/direction;
-- dates/flex dates;
-- status;
-- traveler count/duration;
-- user budget limit;
-- updated time.
+- `390×844`;
+- `844×390`;
+- `360×800`;
+- `1440×900`.
 
-## Empty/provider states
+Контракт:
 
-If a provider does not exist, the UI says so directly.
-
-Examples:
-
-- itinerary: plan not generated;
-- map: provider not connected;
-- Legal: check not run, use official sources;
-- Budget: automatic prices absent;
-- Documents: upload/processing not included.
-
-A placeholder must never visually impersonate a completed provider result.
-
-## Mobile-first
-
-- iPhone top/bottom/left/right safe areas;
-- minimum practical touch target ≈44px;
+- iPhone / Android mobile-first;
+- `env(safe-area-inset-*)`;
 - no horizontal page overflow;
-- horizontal tab scroller only where intentional;
-- fixed bottom navigation leaves content padding below it;
-- sticky form actions must not collide with bottom nav;
-- phone landscape stays a phone layout;
-- explicitly harden 320–360px widths;
-- narrow Android viewport follows the same touch/overflow contract;
-- desktop is a separate layout adaptation, not a stretched mobile screen.
-
-## Keyboard/forms
-
-- inputs remain readable on iPhone without accidental zoom;
-- page/form scroll must allow the focused field to remain reachable;
-- no fixed-element collision with software keyboard;
-- submit validation is deterministic and does not silently discard data.
+- form controls остаются достижимыми при focus/keyboard;
+- drawer не выходит за viewport;
+- touch targets ≥44px;
+- Trip tabs имеют internal horizontal scrolling;
+- landscape остаётся usable phone layout.
 
 ## Accessibility
 
-- semantic `button`, `nav`, `main`, `form`, `label` elements;
-- `aria-pressed` for toggle chips;
-- `aria-selected` for workspace tabs;
-- `aria-live`/role states where status feedback matters;
-- visible keyboard focus;
-- color is not the only status cue;
-- desktop keyboard navigation works without pointer;
-- `prefers-reduced-motion` disables nonessential motion.
+Обязательно:
 
-## Smart Entry / performance
+- semantic `main`, `nav`, `form`, `label`, `button`;
+- visible `focus-visible`;
+- drawer focus trap;
+- Escape;
+- focus return;
+- `aria-expanded`;
+- `aria-current`;
+- `aria-selected`;
+- ≥44px touch targets;
+- contrast не зависит от одного цвета;
+- `prefers-reduced-motion`;
+- screen-reader labels для icon-only controls.
 
-- no artificial loading timers;
-- Home/Create must not preload a heavy map SDK;
-- Profile/System States may remain lazy;
-- real providers will be loaded on demand;
-- first Travel render shows user-owned data without waiting for external APIs.
+Physical VoiceOver / Safari acceptance не заменяется Chromium и остаётся manual item, если реальный iPhone runner недоступен.
 
-## Legacy UI
+## Performance
 
-Old Chat/Home/History CSS/components remain in repository for history and potential future reuse, but they are no longer the product source of truth. Do not polish or extend them inside Travel Pivot Foundation V1.
+- Home не должен загружать map SDK;
+- real providers подключаются позже и lazy/on-demand;
+- no heavy hero media blocking first paint;
+- CSS/React presentation layer не должен тащить real provider dependencies;
+- domain/auth/server boundaries остаются отдельными от UI.

@@ -1,102 +1,70 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BrandLockup } from '../components/Brand';
-import {
-  calculateBudget,
-  createTripDraft,
-  TRAVEL_CAPABILITY_STATE,
-  validateCreateTripInput,
-  type CreateTripInput,
-  type Trip,
-  type TripStatus,
-  type TripValidationError,
-} from './domain';
+import { createTripDraft, validateCreateTripInput, type CreateTripInput, type Trip, type TripValidationError } from './domain';
+import { createGeneralAssistantContext, createTripAssistantContext, type TravelAssistantContext, type TravelAssistantUiStatus } from './assistantContext';
 import { canUseTravelStorage, createBrowserTripRepository } from './storage';
+import { AssistantScreen } from './AssistantScreen';
+import { CreateTripScreen } from './CreateTripScreen';
+import { HomeScreen, TripsScreen } from './HomeTripsScreens';
+import { HelpScreen, ServiceFoundation, SettingsScreen } from './ServiceScreens';
+import { TripWorkspace, type WorkspaceTab } from './TripWorkspace';
+import { EMPTY_FORM, EmptyState } from './ui';
 
-type TravelScreen = 'home' | 'trips' | 'create' | 'trip' | 'profile' | 'states';
-type WorkspaceTab = 'overview' | 'itinerary' | 'map' | 'budget' | 'documents' | 'legal' | 'tripBook';
+type TravelScreen = 'home' | 'assistant' | 'trips' | 'create' | 'trip' | 'documents' | 'routes' | 'budgetService' | 'legalService' | 'mapService' | 'profile' | 'settings' | 'help' | 'states';
+type NavItem = { screen: TravelScreen; label: string };
 
-const STATUS_LABELS: Record<TripStatus, string> = {
-  draft: 'Черновик',
-  planning: 'Планирование',
-  ready: 'Готово',
-  active: 'В поездке',
-  completed: 'Завершено',
-  archived: 'Архив',
-};
+const PRIMARY_NAV: NavItem[] = [
+  { screen: 'home', label: 'Главная' },
+  { screen: 'assistant', label: 'ARVELIS AI' },
+  { screen: 'trips', label: 'Мои поездки' },
+  { screen: 'create', label: 'Создать поездку' },
+  { screen: 'documents', label: 'Документы' },
+];
 
-const VACATION_TYPES = ['Море', 'Город', 'Природа', 'Культура', 'Активный отдых', 'Спокойный отдых'];
-const INTERESTS = ['Еда', 'История', 'Архитектура', 'Пляжи', 'Музеи', 'Прогулки', 'Природа'];
-const TRANSPORT = ['Самолёт', 'Поезд', 'Автобус', 'Автомобиль', 'Минимум пересадок'];
+const SERVICE_NAV: NavItem[] = [
+  { screen: 'routes', label: 'Маршруты' },
+  { screen: 'budgetService', label: 'Бюджет' },
+  { screen: 'legalService', label: 'Юридическая проверка' },
+  { screen: 'mapService', label: 'Карта' },
+];
 
-const EMPTY_FORM: CreateTripInput = {
-  origin: '',
-  destination: '',
-  destinationUnknown: false,
-  startDate: '',
-  endDate: '',
-  flexibleDates: false,
-  durationDays: 7,
-  travelerCount: 2,
-  budgetLimitRub: 120000,
-  vacationTypes: [],
-  interests: [],
-  transportPreferences: [],
-  additionalNotes: '',
-};
+const ACCOUNT_NAV: NavItem[] = [
+  { screen: 'profile', label: 'Профиль' },
+  { screen: 'settings', label: 'Настройки' },
+  { screen: 'help', label: 'Помощь' },
+];
 
-function formatDate(value?: string): string {
-  if (!value) return 'Гибкие даты';
-  return new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`));
+const DIAGNOSTICS_ENABLED = import.meta.env.DEV && import.meta.env.VITE_SHOW_DIAGNOSTICS === 'true';
+
+function MenuIcon() {
+  return <span className="travel-menu-icon" aria-hidden="true"><i /><i /><i /></span>;
 }
 
-function formatUpdated(value: string): string {
-  return new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+function NavIcon({ screen }: { screen: TravelScreen }) {
+  const pathByScreen: Partial<Record<TravelScreen, string[]>> = {
+    home: ['M3 10.5 10 4l7 6.5', 'M5.5 9.5V17h9V9.5'],
+    assistant: ['M4 5.5h12v9H9l-4 3v-3H4z', 'M7 9h6', 'M7 12h4'],
+    trips: ['M4 7h12v9H4z', 'M7 7V5.5h6V7'],
+    create: ['M10 4v12', 'M4 10h12'],
+    documents: ['M6 3.5h6l3 3V17H6z', 'M12 3.5V7h3', 'M8 10h5', 'M8 13h5'],
+    routes: ['M4 15.5c2.2-5 4-1 6-6s4-1 6-5', 'M4 15.5h3', 'M4 15.5V13'],
+    budgetService: ['M4 6h12v9H4z', 'M12.5 10.5h3', 'M6.5 8.5h3'],
+    legalService: ['M10 3.5 15 5v4.5c0 3.2-2 5.8-5 7-3-1.2-5-3.8-5-7V5z', 'm7.5 10 1.5 1.5 3.5-3.5'],
+    mapService: ['M6 4 3.5 5.5v11L6 15l4 1.5 4-1.5 2.5 1.5v-11L14 4l-4 1.5z', 'M6 4v11', 'M10 5.5v11', 'M14 4v11'],
+    profile: ['M10 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6', 'M4.5 17c.7-3 2.5-4.5 5.5-4.5s4.8 1.5 5.5 4.5'],
+    settings: ['M10 7.2A2.8 2.8 0 1 0 10 12.8 2.8 2.8 0 0 0 10 7.2', 'M10 3.5v2', 'M10 14.5v2', 'M3.5 10h2', 'M14.5 10h2', 'm5.4 5.4 1.4 1.4', 'm13.2 13.2 1.4 1.4', 'm14.6 5.4-1.4 1.4', 'm6.8 13.2-1.4 1.4'],
+    help: ['M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14', 'M8.2 8a1.9 1.9 0 1 1 2.5 1.8c-.9.4-1.3 1-1.3 1.8', 'M10 14h.01'],
+  };
+  return <svg className="travel-drawer__icon" viewBox="0 0 20 20" aria-hidden="true">{(pathByScreen[screen] ?? []).map((path) => <path key={path} d={path} />)}</svg>;
 }
 
-function formatMoney(value: number): string {
-  return new Intl.NumberFormat('ru-RU').format(Math.round(value));
+function resetContentScroll() {
+  const scrollingElement = document.scrollingElement;
+  if (scrollingElement) scrollingElement.scrollTop = 0;
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 }
 
-function ToggleGroup({ values, selected, onChange }: { values: string[]; selected: string[]; onChange: (next: string[]) => void }) {
-  return (
-    <div className="travel-toggle-grid">
-      {values.map((value) => {
-        const active = selected.includes(value);
-        return (
-          <button
-            type="button"
-            key={value}
-            className={active ? 'travel-toggle is-active' : 'travel-toggle'}
-            aria-pressed={active}
-            onClick={() => onChange(active ? selected.filter((item) => item !== value) : [...selected, value])}
-          >
-            {value}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function EmptyState({ title, text, action }: { title: string; text: string; action?: ReactNode }) {
-  return (
-    <section className="travel-empty" role="status">
-      <div className="travel-empty__mark" aria-hidden="true">A</div>
-      <h2>{title}</h2>
-      <p>{text}</p>
-      {action}
-    </section>
-  );
-}
-
-export function TravelApp({
-  ownerScopeId,
-  profileName,
-  online,
-  dataRevision,
-  renderProfile,
-  renderStates,
-}: {
+export function TravelApp({ ownerScopeId, profileName, online, dataRevision, renderProfile, renderStates }: {
   ownerScopeId: string;
   profileName: string;
   online: boolean;
@@ -112,22 +80,133 @@ export function TravelApp({
   const [form, setForm] = useState<CreateTripInput>(EMPTY_FORM);
   const [errors, setErrors] = useState<TripValidationError[]>([]);
   const [storageAvailable, setStorageAvailable] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [homePrompt, setHomePrompt] = useState('');
+  const [assistantMessages, setAssistantMessages] = useState<string[]>([]);
+  const [assistantContext, setAssistantContext] = useState<TravelAssistantContext>(() => createGeneralAssistantContext('assistant'));
+  const [assistantStatus, setAssistantStatus] = useState<TravelAssistantUiStatus>('empty');
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const drawerScrollRef = useRef(0);
+  const preserveDrawerScrollRef = useRef(true);
 
   useEffect(() => {
     setStorageAvailable(canUseTravelStorage());
     setTrips(repository.list());
   }, [repository, dataRevision]);
 
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'auto' });
+  useLayoutEffect(() => {
+    resetContentScroll();
   }, [screen, workspaceTab]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const drawer = drawerRef.current;
+    if (!drawer) return;
+    const previousOverflow = document.body.style.overflow;
+    drawerScrollRef.current = window.scrollY;
+    preserveDrawerScrollRef.current = true;
+    document.body.style.overflow = 'hidden';
+    const focusableSelector = 'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusable = () => [...drawer.querySelectorAll<HTMLElement>(focusableSelector)].filter((element) => element.getClientRects().length > 0);
+    focusable()[0]?.focus();
+
+    const closeDrawer = () => {
+      preserveDrawerScrollRef.current = true;
+      setMenuOpen(false);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeDrawer();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const items = focusable();
+      if (items.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (preserveDrawerScrollRef.current) {
+        requestAnimationFrame(() => window.scrollTo({ top: drawerScrollRef.current, left: 0, behavior: 'auto' }));
+      }
+      menuButtonRef.current?.focus();
+    };
+  }, [menuOpen]);
 
   const selectedTrip = selectedTripId ? trips.find((trip) => trip.id === selectedTripId) ?? repository.get(selectedTripId) : null;
 
+  const navigate = (nextScreen: TravelScreen) => {
+    if (menuOpen) preserveDrawerScrollRef.current = false;
+    setScreen(nextScreen);
+    setMenuOpen(false);
+    if (nextScreen !== 'trip') setWorkspaceTab('overview');
+    if (nextScreen === 'assistant') {
+      setAssistantContext(createGeneralAssistantContext('assistant'));
+      setAssistantMessages([]);
+      setAssistantStatus(online ? 'empty' : 'offline');
+    }
+  };
+
   const openTrip = (tripId: string) => {
+    if (menuOpen) preserveDrawerScrollRef.current = false;
     setSelectedTripId(tripId);
     setWorkspaceTab('overview');
     setScreen('trip');
+    setMenuOpen(false);
+  };
+
+  const openGeneralAssistant = (message = '', source: 'home' | 'assistant' | 'service' = 'assistant') => {
+    const normalized = message.trim();
+    setAssistantContext(createGeneralAssistantContext(source));
+    setAssistantMessages(normalized ? [normalized] : []);
+    setAssistantStatus(!online ? 'offline' : normalized ? 'not_connected' : 'empty');
+    setScreen('assistant');
+  };
+
+  const openTripAssistant = (trip: Trip) => {
+    setAssistantContext(createTripAssistantContext(trip));
+    setAssistantMessages([]);
+    setAssistantStatus(online ? 'not_connected' : 'offline');
+    setScreen('assistant');
+  };
+
+  const submitHomePrompt = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const message = homePrompt.trim();
+    if (!message) return;
+    openGeneralAssistant(message, 'home');
+    setHomePrompt('');
+  };
+
+  const submitAssistantPrompt = (event: FormEvent<HTMLFormElement>, value: string): boolean => {
+    event.preventDefault();
+    const message = value.trim();
+    if (!message) return false;
+    try {
+      setAssistantMessages((current) => [...current, message]);
+      setAssistantStatus(online ? 'not_connected' : 'offline');
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const createTrip = (event: FormEvent<HTMLFormElement>) => {
@@ -135,7 +214,6 @@ export function TravelApp({
     const nextErrors = validateCreateTripInput(form);
     setErrors(nextErrors);
     if (nextErrors.length > 0) return;
-
     const trip = createTripDraft(form, ownerScopeId);
     try {
       repository.save(trip);
@@ -148,136 +226,77 @@ export function TravelApp({
     setSelectedTripId(trip.id);
     setWorkspaceTab('overview');
     setForm(EMPTY_FORM);
+    setErrors([]);
     setScreen('trip');
   };
 
-  const fieldError = (field: TripValidationError['field']) => errors.find((error) => error.field === field)?.message;
+  const chooseTripAction = () => {
+    if (trips.length > 0) navigate('trips');
+    else navigate('create');
+  };
+  const chooseTripLabel = trips.length > 0 ? 'Выбрать поездку' : 'Создать поездку';
 
-  const header = (
-    <header className="travel-header">
-      <button type="button" className="travel-brand-button" onClick={() => setScreen('home')} aria-label="ARVELIS AI — на главную">
-        <BrandLockup compact />
-      </button>
-      <div className="travel-header__status" aria-label={online ? 'Онлайн' : 'Офлайн'}>
-        <span className={online ? 'travel-online-dot is-online' : 'travel-online-dot'} />
-        {online ? 'Онлайн' : 'Офлайн'}
+  const isNavSelected = (item: NavItem) => item.screen === 'trips' && screen === 'trip' ? true : screen === item.screen;
+  const renderNavItems = (items: NavItem[]) => items.map((item) => <button
+    key={item.screen}
+    type="button"
+    className={isNavSelected(item) ? 'travel-drawer__item is-active' : 'travel-drawer__item'}
+    aria-current={isNavSelected(item) ? 'page' : undefined}
+    onClick={() => navigate(item.screen)}
+  ><NavIcon screen={item.screen} /><span>{item.label}</span></button>);
+
+  const header = screen === 'states' ? null : <header className="travel-header">
+    <button ref={menuButtonRef} type="button" className="travel-menu-button" aria-label="Открыть меню" aria-expanded={menuOpen} aria-controls="travel-navigation-drawer" onClick={() => setMenuOpen(true)}><MenuIcon /></button>
+    <button type="button" className="travel-brand-button" onClick={() => navigate('home')} aria-label="ARVELIS AI — на главную"><BrandLockup compact variant="travel" /></button>
+  </header>;
+
+  const drawer = menuOpen ? <div className="travel-drawer-overlay" onPointerDown={(event) => {
+    if (event.target === event.currentTarget) {
+      preserveDrawerScrollRef.current = true;
+      setMenuOpen(false);
+    }
+  }}>
+    <aside id="travel-navigation-drawer" ref={drawerRef} className="travel-drawer is-open" role="dialog" aria-modal="true" aria-label="Навигация ARVELIS AI">
+      <div className="travel-drawer__top">
+        <div className="travel-drawer__brand"><BrandLockup compact variant="travel" /></div>
+        <button type="button" className="travel-drawer__close" onClick={() => { preserveDrawerScrollRef.current = true; setMenuOpen(false); }} aria-label="Закрыть меню">×</button>
       </div>
-    </header>
-  );
+      <nav className="travel-drawer__nav" aria-label="Основная навигация">{renderNavItems(PRIMARY_NAV)}<div className="travel-drawer__section" aria-label="Сервисы"><p>Сервисы</p>{renderNavItems(SERVICE_NAV)}</div></nav>
+      <nav className="travel-drawer__account" aria-label="Аккаунт"><p>Аккаунт</p>{renderNavItems(ACCOUNT_NAV)}</nav>
+    </aside>
+  </div> : null;
 
-  const bottomNav = screen === 'states' ? null : (
-    <nav className="travel-bottom-nav" aria-label="Основная навигация">
-      <button className={screen === 'home' ? 'is-active' : ''} type="button" onClick={() => setScreen('home')}><span>Главная</span></button>
-      <button className={screen === 'trips' || screen === 'trip' ? 'is-active' : ''} type="button" onClick={() => setScreen('trips')}><span>Поездки</span></button>
-      <button className={screen === 'create' ? 'is-active travel-bottom-nav__create' : 'travel-bottom-nav__create'} type="button" onClick={() => setScreen('create')}><span>Создать</span></button>
-      <button className={screen === 'profile' ? 'is-active' : ''} type="button" onClick={() => setScreen('profile')}><span>Профиль</span></button>
-    </nav>
-  );
+  const tripScreen = selectedTrip
+    ? <TripWorkspace trip={selectedTrip} tab={workspaceTab} onTab={setWorkspaceTab} onBack={() => navigate('trips')} onAsk={() => openTripAssistant(selectedTrip)} />
+    : <main className="travel-page"><EmptyState title="Поездка не найдена" text="Эта поездка недоступна." action={<button className="travel-secondary" type="button" onClick={() => navigate('trips')}>К поездкам</button>} /></main>;
 
-  const home = (
-    <main className="travel-page travel-home">
-      <section className="travel-hero">
-        <p className="travel-kicker">AI TRAVEL ASSISTANT</p>
-        <h1>Путешествие начинается с точного плана.</h1>
-        <p>ARVELIS объединяет бюджет, транспорт, время, комфорт, legal-проверки, маршрут, карту и Trip Book в одном рабочем пространстве.</p>
-        <button className="travel-primary" type="button" onClick={() => setScreen('create')}>Создать поездку</button>
-        <div className="travel-truth-note">Реальный AI и внешние travel-провайдеры пока не подключены. Созданные вами поездки сохраняются как локальные черновики.</div>
-      </section>
-
-      <section className="travel-section">
-        <div className="travel-section__heading">
-          <div><p className="travel-kicker">ВАШИ ДАННЫЕ</p><h2>Последние поездки</h2></div>
-          <button className="travel-link" type="button" onClick={() => setScreen('trips')}>Мои поездки</button>
-        </div>
-        {trips.length === 0 ? (
-          <EmptyState title="У вас пока нет поездок" text="Создайте первый черновик — ARVELIS сохранит только введённые вами параметры, без выдуманных рейсов, цен и рекомендаций." action={<button className="travel-secondary" type="button" onClick={() => setScreen('create')}>Создать поездку</button>} />
-        ) : (
-          <div className="travel-card-grid">
-            {trips.slice(0, 3).map((trip) => <TripCard key={trip.id} trip={trip} onOpen={() => openTrip(trip.id)} />)}
-          </div>
-        )}
-      </section>
-    </main>
-  );
-
-  const tripsScreen = (
-    <main className="travel-page">
-      <div className="travel-title-row"><div><p className="travel-kicker">TRIPS</p><h1>Мои поездки</h1><p>Реальные черновики, созданные в этом аккаунте или локальном профиле.</p></div><button className="travel-primary travel-primary--compact" type="button" onClick={() => setScreen('create')}>Создать поездку</button></div>
-      {trips.length === 0 ? <EmptyState title="У вас пока нет поездок" text="Начните с основных параметров: откуда, даты, длительность, состав и бюджет." action={<button className="travel-secondary" type="button" onClick={() => setScreen('create')}>Создать поездку</button>} /> : <div className="travel-card-grid">{trips.map((trip) => <TripCard key={trip.id} trip={trip} onOpen={() => openTrip(trip.id)} />)}</div>}
-    </main>
-  );
-
-  const createScreen = (
-    <main className="travel-page travel-create">
-      <div className="travel-title-row"><div><p className="travel-kicker">NEW TRIP</p><h1>Создать поездку</h1><p>Сейчас создаётся только ваш локальный черновик. Поиск билетов, отелей и AI-планирование не запускаются.</p></div></div>
-      {!storageAvailable ? <div className="travel-alert" role="alert">Локальное хранилище недоступно. Черновик нельзя надёжно сохранить на этом устройстве.</div> : null}
-      <form className="travel-form" onSubmit={createTrip} noValidate>
-        <section className="travel-form-section"><h2>Основа поездки</h2><div className="travel-form-grid">
-          <label><span>Откуда</span><input value={form.origin} onChange={(e) => setForm({ ...form, origin: e.target.value })} placeholder="Например, Казань" autoComplete="address-level2" aria-invalid={Boolean(fieldError('origin'))} />{fieldError('origin') ? <small className="travel-field-error">{fieldError('origin')}</small> : null}</label>
-          <label><span>Куда</span><input value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} disabled={form.destinationUnknown} placeholder="Страна или город" aria-invalid={Boolean(fieldError('destination'))} />{fieldError('destination') ? <small className="travel-field-error">{fieldError('destination')}</small> : null}</label>
-        </div><label className="travel-check"><input type="checkbox" checked={form.destinationUnknown} onChange={(e) => setForm({ ...form, destinationUnknown: e.target.checked, destination: e.target.checked ? '' : form.destination })} /><span>Не знаю куда — направление будет подбираться на следующем real-data этапе</span></label></section>
-
-        <section className="travel-form-section"><h2>Даты и состав</h2><label className="travel-check"><input type="checkbox" checked={form.flexibleDates} onChange={(e) => setForm({ ...form, flexibleDates: e.target.checked })} /><span>Гибкие даты</span></label><div className="travel-form-grid travel-form-grid--three">
-          <label><span>Начало</span><input type="date" value={form.startDate} disabled={form.flexibleDates} onChange={(e) => setForm({ ...form, startDate: e.target.value })} /></label>
-          <label><span>Окончание</span><input type="date" value={form.endDate} disabled={form.flexibleDates} onChange={(e) => setForm({ ...form, endDate: e.target.value })} /></label>
-          <label><span>Количество дней</span><input type="number" min="1" max="90" inputMode="numeric" value={form.durationDays} onChange={(e) => setForm({ ...form, durationDays: Number(e.target.value) })} aria-invalid={Boolean(fieldError('durationDays'))} /></label>
-          <label><span>Путешественников</span><input type="number" min="1" max="20" inputMode="numeric" value={form.travelerCount} onChange={(e) => setForm({ ...form, travelerCount: Number(e.target.value) })} aria-invalid={Boolean(fieldError('travelerCount'))} /></label>
-          <label><span>Бюджет, ₽</span><input type="number" min="1" step="1000" inputMode="numeric" value={form.budgetLimitRub} onChange={(e) => setForm({ ...form, budgetLimitRub: Number(e.target.value) })} aria-invalid={Boolean(fieldError('budgetLimitRub'))} /></label>
-        </div>{fieldError('dates') ? <p className="travel-field-error">{fieldError('dates')}</p> : null}</section>
-
-        <section className="travel-form-section"><h2>Предпочтения</h2><div className="travel-field-block"><span>Тип отдыха</span><ToggleGroup values={VACATION_TYPES} selected={form.vacationTypes} onChange={(vacationTypes) => setForm({ ...form, vacationTypes })} /></div><div className="travel-field-block"><span>Интересы</span><ToggleGroup values={INTERESTS} selected={form.interests} onChange={(interests) => setForm({ ...form, interests })} /></div><div className="travel-field-block"><span>Транспортные предпочтения</span><ToggleGroup values={TRANSPORT} selected={form.transportPreferences} onChange={(transportPreferences) => setForm({ ...form, transportPreferences })} /></div><label><span>Дополнительные пожелания</span><textarea rows={4} value={form.additionalNotes} onChange={(e) => setForm({ ...form, additionalNotes: e.target.value })} placeholder="Например: не хотим сложных пересадок" /></label></section>
-
-        <div className="travel-form-actions"><button className="travel-secondary" type="button" onClick={() => setScreen('home')}>Отмена</button><button className="travel-primary" type="submit" disabled={!storageAvailable}>Сохранить черновик</button></div>
-      </form>
-    </main>
-  );
-
-  const tripScreen = selectedTrip ? <TripWorkspace trip={selectedTrip} tab={workspaceTab} onTab={setWorkspaceTab} onBack={() => setScreen('trips')} /> : <main className="travel-page"><EmptyState title="Поездка не найдена" text="Черновик отсутствует в текущем пользовательском контуре." action={<button className="travel-secondary" type="button" onClick={() => setScreen('trips')}>К поездкам</button>} /></main>;
-
-  return (
-    <div className="travel-app">
-      {screen !== 'states' ? header : null}
-      <div className="travel-shell" data-storage={storageAvailable ? 'ready' : 'unavailable'}>
-        {screen === 'home' ? home : null}
-        {screen === 'trips' ? tripsScreen : null}
-        {screen === 'create' ? createScreen : null}
-        {screen === 'trip' ? tripScreen : null}
-        {screen === 'profile' ? <main className="travel-page travel-legacy-slot">{renderProfile(() => setScreen('states'))}</main> : null}
-        {screen === 'states' ? <div className="travel-states-wrap"><button type="button" className="travel-back" onClick={() => setScreen('profile')}>← Профиль</button>{renderStates()}</div> : null}
-      </div>
-      {bottomNav}
-      <span className="travel-sr-only" aria-live="polite">Профиль: {profileName}. AI: {TRAVEL_CAPABILITY_STATE.aiProvider}.</span>
+  return <div className="travel-app">
+    {header}{drawer}
+    <div className="travel-shell" data-storage={storageAvailable ? 'ready' : 'unavailable'}>
+      {screen === 'home' ? <HomeScreen trips={trips} prompt={homePrompt} onPromptChange={setHomePrompt} onSubmitPrompt={submitHomePrompt} onNavigate={navigate} onOpenTrip={openTrip} /> : null}
+      {screen === 'assistant' ? <AssistantScreen
+        context={assistantContext}
+        messages={assistantMessages}
+        status={assistantStatus}
+        online={online}
+        onSubmit={submitAssistantPrompt}
+        onBackTrip={assistantContext.scope === 'trip' ? () => setScreen('trip') : undefined}
+        onCreateTrip={() => navigate('create')}
+        onOpenTrips={() => navigate('trips')}
+      /> : null}
+      {screen === 'trips' ? <TripsScreen trips={trips} onCreate={() => navigate('create')} onOpenTrip={openTrip} /> : null}
+      {screen === 'create' ? <CreateTripScreen form={form} setForm={setForm} errors={errors} storageAvailable={storageAvailable} onSubmit={createTrip} onCancel={() => navigate('trips')} /> : null}
+      {screen === 'trip' ? tripScreen : null}
+      {screen === 'documents' ? <ServiceFoundation kicker="ДОКУМЕНТЫ" icon="document" title="Документы поездки" text="Здесь будут храниться билеты, страховка, бронирования и другие документы." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
+      {screen === 'routes' ? <ServiceFoundation kicker="МАРШРУТЫ" icon="route" title="Маршруты" text="Здесь ARVELIS будет сравнивать самолёты, поезда, автобусы и смешанные варианты." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
+      {screen === 'budgetService' ? <ServiceFoundation kicker="БЮДЖЕТ" icon="budget" title="Бюджет поездки" text="Расходы и лимит бюджета ведутся внутри конкретной поездки." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
+      {screen === 'legalService' ? <ServiceFoundation kicker="ПРАВИЛА И ДОКУМЕНТЫ" icon="shield" title="Проверка документов и правил" text="Выберите поездку, чтобы проверить правила въезда, транзита и документы для конкретного маршрута." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
+      {screen === 'mapService' ? <ServiceFoundation kicker="КАРТА" icon="map" title="Карта маршрута" text="После подключения картографического сервиса здесь появится маршрут поездки." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
+      {screen === 'profile' ? <main className="travel-page travel-profile-slot">{renderProfile(() => { if (DIAGNOSTICS_ENABLED) setScreen('states'); })}</main> : null}
+      {screen === 'settings' ? <SettingsScreen onOpenDiagnostics={() => { if (DIAGNOSTICS_ENABLED) setScreen('states'); }} /> : null}
+      {screen === 'help' ? <HelpScreen /> : null}
+      {screen === 'states' && DIAGNOSTICS_ENABLED ? <div className="travel-diagnostics"><button type="button" className="travel-back" onClick={() => setScreen('settings')}>← Настройки</button>{renderStates()}</div> : null}
     </div>
-  );
-}
-
-function TripCard({ trip, onOpen }: { trip: Trip; onOpen: () => void }) {
-  return (
-    <button className="travel-trip-card" type="button" onClick={onOpen}>
-      <div className="travel-trip-card__top"><span className="travel-status">{STATUS_LABELS[trip.status]}</span><span>{formatUpdated(trip.updatedAt)}</span></div>
-      <h3>{trip.title}</h3>
-      <p>{trip.destination ?? 'Направление ещё не выбрано'}</p>
-      <div className="travel-trip-card__meta"><span>{trip.startDate ? `${formatDate(trip.startDate)} — ${formatDate(trip.endDate)}` : 'Гибкие даты'}</span><span>{trip.durationDays} дн.</span><span>{trip.travelers.length} чел.</span></div>
-      <div className="travel-trip-card__budget"><span>Лимит бюджета</span><strong>{formatMoney(trip.budget.limitRub)} ₽</strong></div>
-    </button>
-  );
-}
-
-function TripWorkspace({ trip, tab, onTab, onBack }: { trip: Trip; tab: WorkspaceTab; onTab: (tab: WorkspaceTab) => void; onBack: () => void }) {
-  const budget = calculateBudget(trip.budget);
-  const tabs: Array<[WorkspaceTab, string]> = [['overview','Обзор'],['itinerary','Маршрут'],['map','Карта'],['budget','Бюджет'],['documents','Документы'],['legal','Legal'],['tripBook','Trip Book']];
-  return (
-    <main className="travel-page travel-workspace">
-      <button className="travel-back" type="button" onClick={onBack}>← Мои поездки</button>
-      <section className="travel-workspace__hero"><div><p className="travel-kicker">TRIP WORKSPACE</p><h1>{trip.title}</h1><p>{trip.origin} · {trip.destination ?? 'Направление подбирается'} · {trip.durationDays} дней</p></div><span className="travel-status travel-status--large">{STATUS_LABELS[trip.status]}</span></section>
-      <div className="travel-tabs" role="tablist" aria-label="Разделы поездки">{tabs.map(([value,label]) => <button key={value} type="button" role="tab" aria-selected={tab === value} className={tab === value ? 'is-active' : ''} onClick={() => onTab(value)}>{label}</button>)}</div>
-      {tab === 'overview' ? <section className="travel-workspace-grid"><article className="travel-panel"><p className="travel-kicker">ПАРАМЕТРЫ</p><h2>Поездка</h2><dl><div><dt>Даты</dt><dd>{trip.startDate ? `${formatDate(trip.startDate)} — ${formatDate(trip.endDate)}` : 'Гибкие'}</dd></div><div><dt>Путешественники</dt><dd>{trip.travelers.length}</dd></div><div><dt>Бюджет</dt><dd>{formatMoney(trip.budget.limitRub)} ₽</dd></div><div><dt>Статус</dt><dd>{STATUS_LABELS[trip.status]}</dd></div></dl></article><article className="travel-panel"><p className="travel-kicker">ПЛАН</p><h2>AI-план ещё не создан</h2><p>Реальный AI provider в этом Foundation slice не подключён. Здесь появится план только после отдельной интеграции и явного запуска пользователем.</p></article><article className="travel-panel travel-panel--wide"><p className="travel-kicker">ПОЖЕЛАНИЯ</p><h2>Параметры</h2><p>{trip.preferences.additionalNotes || 'Дополнительные пожелания не указаны.'}</p><div className="travel-chip-row">{[...trip.preferences.vacationTypes, ...trip.preferences.interests, ...trip.preferences.transportPreferences].map((item) => <span key={item}>{item}</span>)}</div></article></section> : null}
-      {tab === 'itinerary' ? <EmptyState title="Маршрут по дням пока пуст" text="ARVELIS не создаёт демонстрационный маршрут и не выдаёт sample-точки за реальные. Здесь появятся пользовательские или подтверждённые provider-данные." /> : null}
-      {tab === 'map' ? <EmptyState title="Карта ещё не подключена" text="MapProvider заложен архитектурно, но реальный картографический сервис в этом проходе не подключался. Фиктивная карта не отображается." /> : null}
-      {tab === 'budget' ? <section className="travel-budget"><div className="travel-budget__metric"><span>Лимит</span><strong>{formatMoney(budget.limitRub)} ₽</strong></div><div className="travel-budget__metric"><span>Рассчитанные расходы</span><strong>{formatMoney(budget.spentRub)} ₽</strong></div><div className="travel-budget__metric"><span>Резерв</span><strong>{formatMoney(budget.reserveRub)} ₽</strong></div><div className="travel-budget__metric"><span>Остаток</span><strong>{formatMoney(budget.remainingRub)} ₽</strong></div><p className="travel-truth-note">Автоматические цены отсутствуют. Сейчас расходы равны только фактически добавленным BudgetItem; новых элементов система не выдумывает.</p></section> : null}
-      {tab === 'documents' ? <EmptyState title="Документы не добавлены" text="Документный контур предусмотрен в Trip Book, но загрузка и обработка travel-документов вынесены в отдельный безопасный slice." /> : null}
-      {tab === 'legal' ? <section className="travel-panel"><p className="travel-kicker">LEGAL</p><h2>Юридическая проверка не запускалась</h2><p>Правила въезда и визовые требования не генерируются автоматически. Будущие результаты должны содержать источник, URL, дату проверки, период действия и статус уверенности.</p><div className="travel-alert travel-alert--neutral">Правила путешествий меняются. До подключения проверенного LegalSourceProvider ориентируйтесь только на официальные источники.</div></section> : null}
-      {tab === 'tripBook' ? <section className="travel-panel"><p className="travel-kicker">TRIP BOOK</p><h2>Структура книги поездки</h2><div className="travel-tripbook-grid">{trip.tripBook.sections.map((section) => <div key={section.key}><span>{section.key}</span><strong>{section.status === 'empty' ? 'Не заполнено' : section.status}</strong></div>)}</div><p>PDF-генерация не включена в этот slice.</p></section> : null}
-    </main>
-  );
+    <span className="travel-sr-only" aria-live="polite">Профиль: {profileName}.</span>
+  </div>;
 }

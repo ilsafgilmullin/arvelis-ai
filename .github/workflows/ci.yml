@@ -2,10 +2,11 @@ name: ARVELIS CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/travel-foundation-v1]
   push:
     branches:
       - 'codex/**'
+      - 'feat/travel-ui-redesign-v2'
   workflow_dispatch:
 
 permissions:
