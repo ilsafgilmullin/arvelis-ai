@@ -1,38 +1,76 @@
 # ARVELIS AI
 
-Профессиональный универсальный ИИ-ассистент для работы, учёбы и решения сложных повседневных задач.
+**ARVELIS AI — AI Travel Assistant** для русскоязычных самостоятельных путешественников.
 
-Текущий репозиторий содержит product/frontend foundation и изолированные auth foundations. Реальный AI пока не подключён; demo/mock элементы должны оставаться явно маркированными.
+Слоган: `INTELLIGENCE. PRECISION. RESULTS.`
+
+С 2026-09-08 прежнее позиционирование универсального AI-ассистента считается **superseded** решением `Travel Product Pivot`. Бренд, логотип и графитово-золотая визуальная система не изменялись.
+
+## Текущий engineering slice
+
+`Travel Pivot Foundation V1` переводит существующий frontend foundation на Trip-first архитектуру без подключения реального AI или внешних travel API.
+
+Реализуемый пользовательский контур:
+
+- Главная;
+- Мои поездки;
+- Создать поездку;
+- Trip Workspace;
+- Профиль.
+
+Основной доменный объект — `Trip`. Пользовательские черновики поездок сохраняются локально и изолируются по account scope. Реальные AI/transport/map/legal/weather/stay/currency providers пока не подключены; интерфейс не генерирует фальшивые рейсы, цены, гостиницы, визовые правила или рекомендации.
 
 ## Development
 
-Текущий стабильный frontend-preview:
+Frontend:
 
 ```bash
 npm run dev
 ```
 
-Real Email OTP auth candidate находится за rollout flag и не должен включаться без test secrets/checks.
-
-Закрытый бесплатный auth-test path:
-
-- SQLite (`AUTH_DB_PROVIDER=sqlite`, `.data/arvelis-auth.sqlite`);
-- generic SMTP через отдельный test mailbox;
-- same-origin Auth API;
-- HttpOnly server session;
-- `VITE_REAL_AUTH_ENABLED=false` до фактического E2E smoke.
-
-После настройки protected environment auth runtime запускается командой:
+Закрытый Email OTP runtime после настройки protected environment:
 
 ```bash
 npm run dev:auth
 ```
 
-## Safety
+Проверки:
 
-- Не помещать `.env`, SQLite data, SMTP password, OTP/session peppers, API keys или другие secrets в GitHub.
-- Не использовать локальный SQLite-файл как production database.
-- Не выдавать local/demo chat state за реальный AI/backend.
+```bash
+npm run typecheck
+npm run test:auth
+npm run test:server-auth
+npm run test:server-sqlite
+npm run test:travel
+npm run build:auth-server
+npm run build
+```
+
+Полный бесплатный локальный check:
+
+```bash
+npm run check
+```
+
+## Auth foundation
+
+Существующая auth foundation сохранена:
+
+- passwordless Email OTP;
+- same-origin Auth API;
+- HttpOnly server session;
+- SQLite для development/closed test;
+- PostgreSQL-compatible persistence;
+- protected OTP/session peppers и SMTP credentials;
+- `VITE_REAL_AUTH_ENABLED=false` до отдельного rollout решения.
+
+## Truth & security boundary
+
+- Реальный AI provider в этом slice отсутствует.
+- Реальные transport/booking/map/legal/weather/stay/currency integrations отсутствуют.
+- User-created Trip drafts — реальные пользовательские локальные данные, но не production server persistence.
+- Sample/mock content не должен смешиваться с пользовательскими Trip-данными.
+- `.env`, SQLite data, SMTP password, OTP/session peppers, API keys и production credentials не коммитятся.
 - Merge в `main` и production publish выполняются только после отдельного подтверждения.
 
-См. `docs/07_DECISIONS.md`, `docs/36_AUTH_PERSISTENCE_V1.md`, `docs/37_FREE_YANDEX_MAIL_AUTH_SETUP.md`, `docs/38_FREE_SQLITE_AUTH_DB.md`.
+См. `docs/00_PROJECT_CONTEXT.md`, `docs/01_PRODUCT.md`, `docs/02_ARCHITECTURE.md`, `docs/06_MVP_GATES.md`, `docs/07_DECISIONS.md` и `docs/42_TRAVEL_PIVOT_FOUNDATION_V1.md`.
