@@ -118,7 +118,7 @@ for (const forbidden of ['Travel preferences', 'Advanced / Diagnostics', 'TRIP W
 }
 assert.ok(workspace.includes('ПЛАНИРОВАНИЕ ПОЕЗДКИ'));
 assert.ok(workspace.includes('Книга поездки'));
-assert.ok(workspace.includes('Юридическая проверка'));
+assert.ok(ui.includes('Юридическая проверка'));
 
 // Home is compact, truthful, and keeps prompt fill-only behavior.
 assert.ok(home.includes('ARVELIS AI · АССИСТЕНТ ПУТЕШЕСТВИЙ'));
