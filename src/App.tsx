@@ -21,6 +21,7 @@ import type { EntryScreen } from './types';
 const ProfileScreen = lazy(() => loadProfileModule().then((module) => ({ default: module.ProfileScreen })));
 const StatesScreen = lazy(() => loadStatesModule().then((module) => ({ default: module.StatesScreen })));
 const REAL_AUTH_ENABLED = import.meta.env.VITE_REAL_AUTH_ENABLED === 'true';
+const LOCAL_PREVIEW_TRAVEL_SCOPE = 'preview:local';
 
 const waitForBootPaint = (): Promise<void> => new Promise((resolve) => {
   if (typeof window === 'undefined' || document.visibilityState !== 'visible') {
@@ -44,7 +45,7 @@ export default function App() {
   const [dataRevision, setDataRevision] = useState(0);
   const online = useOnlineStatus();
 
-  const ownerScopeId = realSession?.account.id ?? `preview:${activeProfileName.toLocaleLowerCase('ru-RU')}`;
+  const ownerScopeId = realSession?.account.id ?? LOCAL_PREVIEW_TRAVEL_SCOPE;
 
   useEffect(() => {
     if (!REAL_AUTH_ENABLED || entry !== 'app' || !realSession) return;
@@ -78,7 +79,14 @@ export default function App() {
     try {
       await waitForBootPaint();
       setActiveProfileName(normalizedName);
-      setPersistenceAvailable(canUseDemoStorage());
+
+      if (REAL_AUTH_ENABLED && realSession) {
+        setPersistenceAvailable(canUseDemoStorage());
+      } else {
+        const current = loadDemoWorkspace();
+        setPersistenceAvailable(saveDemoWorkspace({ ...current, profileName: normalizedName }));
+      }
+
       setEntry('app');
       setPendingProfileName(undefined);
     } catch {
