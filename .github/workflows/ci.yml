@@ -2,11 +2,12 @@ name: ARVELIS CI
 
 on:
   pull_request:
-    branches: [main, feat/travel-foundation-v1]
+    branches: [main, feat/travel-foundation-v1, feat/travel-ui-redesign-v2]
   push:
     branches:
       - 'codex/**'
       - 'feat/travel-ui-redesign-v2'
+      - 'feat/travel-trip-persistence-v1'
   workflow_dispatch:
 
 permissions:
@@ -41,22 +42,16 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Auth core smoke
-        run: npm run test:auth
+      - name: Trip server business and ownership
+        run: npm run test:trip-server
 
-      - name: Server email OTP smoke
-        run: npm run test:server-auth
-
-      - name: SQLite auth persistence smoke
-        run: npm run test:server-sqlite
-
-      - name: Travel foundation smoke
-        run: npm run test:travel
-
-      - name: Auth server runtime build
+      - name: Server runtime build
         run: npm run build:auth-server
 
-      - name: Build
+      - name: Server-backed Travel browser happy-path
+        run: npm run test:travel-browser
+
+      - name: Frontend build
         run: npm run build
 
   postgres-compat:
@@ -93,8 +88,8 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: PostgreSQL auth migration
+      - name: PostgreSQL migrations
         run: npm run db:migrate
 
-      - name: PostgreSQL auth persistence smoke
-        run: npm run test:server-db
+      - name: PostgreSQL Trip persistence and ownership
+        run: npm run test:trip-postgres

@@ -4,17 +4,17 @@ import { resolve } from 'node:path';
 import pg from 'pg';
 
 const { Pool } = pg;
-const migrationId = '001_auth_foundation';
-const migrationPath = resolve('server/db/migrations/001_auth_foundation.sql');
+const migrations = [
+  ['001_auth_foundation', 'server/db/migrations/001_auth_foundation.sql'],
+  ['002_travel_trip_persistence', 'server/db/migrations/002_travel_trip_persistence.sql'],
+];
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
   throw new Error('DATABASE_URL is not configured. Add it only to protected environment/secrets before running migrations.');
 }
 
-const sql = await readFile(migrationPath, 'utf8');
-const checksum = createHash('sha256').update(sql).digest('hex');
-const pool = new Pool({ connectionString, max: 2, application_name: 'arvelis-auth-migrate' });
+const pool = new Pool({ connectionString, max: 2, application_name: 'arvelis-db-migrate' });
 const client = await pool.connect();
 
 try {
@@ -28,27 +28,32 @@ try {
     )
   `);
 
-  const existing = await client.query(
-    'SELECT checksum FROM arvelis_schema_migrations WHERE id = $1',
-    [migrationId],
-  );
+  for (const [migrationId, relativePath] of migrations) {
+    const sql = await readFile(resolve(relativePath), 'utf8');
+    const checksum = createHash('sha256').update(sql).digest('hex');
+    const existing = await client.query(
+      'SELECT checksum FROM arvelis_schema_migrations WHERE id = $1',
+      [migrationId],
+    );
 
-  if (existing.rowCount === 1) {
-    const storedChecksum = existing.rows[0]?.checksum;
-    if (storedChecksum !== checksum) {
-      throw new Error(`Migration ${migrationId} was already applied with a different checksum.`);
+    if (existing.rowCount === 1) {
+      const storedChecksum = existing.rows[0]?.checksum;
+      if (storedChecksum !== checksum) {
+        throw new Error(`Migration ${migrationId} was already applied with a different checksum.`);
+      }
+      console.log(`ARVELIS DB migration ${migrationId}: already applied`);
+      continue;
     }
-    await client.query('COMMIT');
-    console.log(`ARVELIS DB migration ${migrationId}: already applied`);
-  } else {
+
     await client.query(sql);
     await client.query(
       'INSERT INTO arvelis_schema_migrations (id, checksum) VALUES ($1, $2)',
       [migrationId, checksum],
     );
-    await client.query('COMMIT');
     console.log(`ARVELIS DB migration ${migrationId}: applied`);
   }
+
+  await client.query('COMMIT');
 } catch (error) {
   try {
     await client.query('ROLLBACK');

@@ -15,6 +15,8 @@
     "rootDir": "."
   },
   "include": [
+    "src/travel/domain.ts",
+    "src/travel/validation.ts",
     "server/auth/account/contracts.ts",
     "server/auth/account/displayName.ts",
     "server/auth/application/contracts.ts",
@@ -29,13 +31,17 @@
     "server/auth/session/policy.ts",
     "server/auth/session/service.ts",
     "server/auth/session/webCryptoSecurity.ts",
+    "server/travel/contracts.ts",
+    "server/travel/service.ts",
     "server/persistence/postgres/rows.ts",
     "server/persistence/postgres/accountIdentityStore.ts",
     "server/persistence/postgres/emailOtpChallengeStore.ts",
     "server/persistence/postgres/rateLimitStore.ts",
     "server/persistence/postgres/sessionStore.ts",
+    "server/persistence/postgres/tripStore.ts",
     "server/persistence/sqlite/database.ts",
     "server/persistence/sqlite/authStores.ts",
+    "server/persistence/sqlite/tripStore.ts",
     "server/runtime/config.ts",
     "server/runtime/http.ts",
     "server/runtime/server.ts"

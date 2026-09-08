@@ -39,11 +39,12 @@ function CalendarIcon() {
   return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 3.5v3M14.5 3.5v3M4 7.5h12M4.5 5.5h11v11h-11z" /></svg>;
 }
 
-export function CreateTripScreen({ form, setForm, errors, storageAvailable, onSubmit, onCancel }: {
+export function CreateTripScreen({ form, setForm, errors, storageAvailable, saving, onSubmit, onCancel }: {
   form: CreateTripInput;
   setForm: (next: CreateTripInput) => void;
   errors: TripValidationError[];
   storageAvailable: boolean;
+  saving: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
 }) {
@@ -68,6 +69,7 @@ export function CreateTripScreen({ form, setForm, errors, storageAvailable, onSu
   };
 
   const goBack = () => {
+    if (saving) return;
     setStepErrors([]);
     if (step === 1) {
       onCancel();
@@ -78,6 +80,10 @@ export function CreateTripScreen({ form, setForm, errors, storageAvailable, onSu
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (saving) {
+      event.preventDefault();
+      return;
+    }
     if (step !== 3) {
       event.preventDefault();
       goNext();
@@ -86,7 +92,7 @@ export function CreateTripScreen({ form, setForm, errors, storageAvailable, onSu
     onSubmit(event);
   };
 
-  return <main className="travel-page travel-create">
+  return <main className="travel-page travel-create" aria-busy={saving}>
     <header className="travel-create__header">
       <div>
         <p className="travel-kicker">ШАГ {step} ИЗ 3</p>
@@ -188,10 +194,10 @@ export function CreateTripScreen({ form, setForm, errors, storageAvailable, onSu
       </section> : null}
 
       <div className="travel-form-actions travel-form-actions--wizard">
-        <button className="travel-secondary" type="button" onClick={goBack}>Назад</button>
+        <button className="travel-secondary" type="button" onClick={goBack} disabled={saving}>Назад</button>
         {step < 3
-          ? <button className="travel-primary" type="submit" disabled={!storageAvailable}>Продолжить</button>
-          : <button className="travel-primary" type="submit" disabled={!storageAvailable}>Создать поездку</button>}
+          ? <button className="travel-primary" type="submit" disabled={!storageAvailable || saving}>Продолжить</button>
+          : <button className="travel-primary" type="submit" disabled={!storageAvailable || saving}>{saving ? 'Сохраняем…' : 'Создать поездку'}</button>}
       </div>
     </form>
   </main>;

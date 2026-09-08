@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 
-const PASS_MARKER = 'travel browser acceptance: PASS';
-const TIMEOUT_MS = 75_000;
+const PASS_MARKER = 'travel browser server-persistence happy-path: PASS';
+const TIMEOUT_MS = 90_000;
 
-const child = spawn(process.execPath, ['tests/travel-browser-acceptance.mjs'], {
+const child = spawn(process.execPath, ['--experimental-sqlite', 'tests/travel-browser-acceptance.mjs'], {
   detached: true,
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -65,7 +65,6 @@ const timeout = setTimeout(() => {
   fail(`Browser acceptance exceeded ${TIMEOUT_MS / 1000}s without PASS`);
 }, TIMEOUT_MS);
 
-// Keep this process alive until PASS, failure, or timeout.
 await new Promise((resolve) => {
   const interval = setInterval(() => {
     if (settled) {

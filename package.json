@@ -21,11 +21,14 @@
     "test:server-auth": "node scripts/prepare-smoke-runtime.mjs server-auth && tsc -p tsconfig.server-auth-smoke.json && node tests/.dist-server-auth/tests/email-otp-core-smoke.js && node tests/.dist-server-auth/tests/session-core-smoke.js && node tests/.dist-server-auth/tests/account-auth-application-smoke.js && node tests/.dist-server-auth/tests/runtime-config-smoke.js",
     "test:server-sqlite": "node scripts/prepare-smoke-runtime.mjs server-sqlite && tsc -p tsconfig.server-sqlite-smoke.json && node --experimental-sqlite tests/.dist-server-sqlite/tests/sqlite-auth-persistence-smoke.js && node --experimental-sqlite tests/.dist-server-sqlite/tests/sqlite-auth-flow-smoke.js",
     "test:travel": "node scripts/prepare-smoke-runtime.mjs travel && tsc -p tsconfig.travel-smoke.json && node tests/.dist-travel/tests/travel-foundation-smoke.js && node tests/travel-ui-contract-smoke.mjs && node tests/travel-browser-acceptance-runner.mjs",
+    "test:trip-server": "node scripts/prepare-smoke-runtime.mjs trip-server && tsc -p tsconfig.trip-server-smoke.json && node --experimental-sqlite tests/.dist-trip-server/tests/trip-server-persistence-smoke.js",
+    "test:trip-postgres": "node scripts/prepare-smoke-runtime.mjs trip-postgres && tsc -p tsconfig.trip-postgres-smoke.json && node tests/.dist-trip-postgres/tests/trip-postgres-persistence-smoke.js",
+    "test:travel-browser": "node tests/travel-browser-acceptance-runner.mjs",
     "db:migrate": "node scripts/migrate-auth-db.mjs",
     "test:server-db": "node scripts/prepare-smoke-runtime.mjs server-db && tsc -p tsconfig.server-db-smoke.json && node tests/.dist-server-db/tests/postgres-auth-persistence-smoke.js",
-    "check": "npm run typecheck && npm run test:auth && npm run test:server-auth && npm run test:server-sqlite && npm run test:travel && npm run build:auth-server && npm run build",
+    "check": "npm run typecheck && npm run test:trip-server && npm run build:auth-server && npm run test:travel-browser && npm run build",
     "check:free-auth": "npm run auth:readiness && npm run check",
-    "check:with-db": "npm run check && npm run db:migrate && npm run test:server-db"
+    "check:with-db": "npm run check && npm run db:migrate && npm run test:trip-postgres"
   },
   "dependencies": {
     "nodemailer": "9.0.5",

@@ -4,6 +4,7 @@ import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 const AUTH_SQLITE_MIGRATION_ID = '001_auth_foundation';
+const TRAVEL_SQLITE_MIGRATION_ID = '002_travel_trip_persistence';
 const AUTH_SQLITE_DATA_ROOT = resolve('.data');
 
 const AUTH_SQLITE_SCHEMA = `
@@ -92,8 +93,22 @@ CREATE TABLE IF NOT EXISTS auth_security_events (
 ) STRICT;
 `;
 
-function migrationChecksum(): string {
-  return createHash('sha256').update(AUTH_SQLITE_SCHEMA, 'utf8').digest('hex');
+const TRAVEL_SQLITE_SCHEMA = `
+CREATE TABLE IF NOT EXISTS travel_trips (
+  account_id TEXT NOT NULL REFERENCES auth_accounts(id) ON DELETE RESTRICT,
+  id TEXT NOT NULL,
+  document_json TEXT NOT NULL CHECK (json_valid(document_json)),
+  created_at INTEGER NOT NULL CHECK (created_at >= 0),
+  updated_at INTEGER NOT NULL CHECK (updated_at >= created_at),
+  PRIMARY KEY (account_id, id)
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS travel_trips_account_updated_idx
+  ON travel_trips(account_id, updated_at DESC, id ASC);
+`;
+
+function migrationChecksum(schema: string): string {
+  return createHash('sha256').update(schema, 'utf8').digest('hex');
 }
 
 function rollbackQuietly(database: DatabaseSync): void {
@@ -129,6 +144,27 @@ export function inSqliteTransaction<T>(database: DatabaseSync, work: () => T): T
   }
 }
 
+function ensureSqliteMigration(database: DatabaseSync, id: string, schema: string): void {
+  const checksum = migrationChecksum(schema);
+  const existing = database.prepare(
+    'SELECT checksum FROM auth_schema_migrations WHERE id = ?',
+  ).get(id) as { checksum?: unknown } | undefined;
+
+  if (existing) {
+    if (existing.checksum !== checksum) {
+      throw new Error(`ARVELIS SQLite migration checksum mismatch: ${id}`);
+    }
+    return;
+  }
+
+  inSqliteTransaction(database, () => {
+    database.exec(schema);
+    database.prepare(
+      'INSERT INTO auth_schema_migrations (id, checksum, applied_at) VALUES (?, ?, ?)',
+    ).run(id, checksum, Date.now());
+  });
+}
+
 export function ensureSqliteAuthSchema(database: DatabaseSync): void {
   database.exec(`
     CREATE TABLE IF NOT EXISTS auth_schema_migrations (
@@ -138,24 +174,8 @@ export function ensureSqliteAuthSchema(database: DatabaseSync): void {
     ) STRICT;
   `);
 
-  const checksum = migrationChecksum();
-  const existing = database.prepare(
-    'SELECT checksum FROM auth_schema_migrations WHERE id = ?',
-  ).get(AUTH_SQLITE_MIGRATION_ID) as { checksum?: unknown } | undefined;
-
-  if (existing) {
-    if (existing.checksum !== checksum) {
-      throw new Error('ARVELIS SQLite auth migration checksum mismatch');
-    }
-    return;
-  }
-
-  inSqliteTransaction(database, () => {
-    database.exec(AUTH_SQLITE_SCHEMA);
-    database.prepare(
-      'INSERT INTO auth_schema_migrations (id, checksum, applied_at) VALUES (?, ?, ?)',
-    ).run(AUTH_SQLITE_MIGRATION_ID, checksum, Date.now());
-  });
+  ensureSqliteMigration(database, AUTH_SQLITE_MIGRATION_ID, AUTH_SQLITE_SCHEMA);
+  ensureSqliteMigration(database, TRAVEL_SQLITE_MIGRATION_ID, TRAVEL_SQLITE_SCHEMA);
 }
 
 export function openSqliteAuthDatabase(location: string): DatabaseSync {

@@ -8,6 +8,8 @@ const allowed = new Map([
   ['server-db', 'tests/.dist-server-db'],
   ['server-sqlite', 'tests/.dist-server-sqlite'],
   ['travel', 'tests/.dist-travel'],
+  ['trip-server', 'tests/.dist-trip-server'],
+  ['trip-postgres', 'tests/.dist-trip-postgres'],
 ]);
 
 const relative = allowed.get(target);

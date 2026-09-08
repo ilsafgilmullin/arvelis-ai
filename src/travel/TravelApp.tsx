@@ -2,7 +2,7 @@ import { type FormEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, us
 import { BrandLockup } from '../components/Brand';
 import { createTripDraft, validateCreateTripInput, type CreateTripInput, type Trip, type TripValidationError } from './domain';
 import { createGeneralAssistantContext, createTripAssistantContext, type TravelAssistantContext, type TravelAssistantUiStatus } from './assistantContext';
-import { canUseTravelStorage, createBrowserTripRepository } from './storage';
+import { canUseTripPersistence, createTravelTripRepository, type TripPersistenceMode } from './repository';
 import { AssistantScreen } from './AssistantScreen';
 import { CreateTripScreen } from './CreateTripScreen';
 import { HomeScreen, TripsScreen } from './HomeTripsScreens';
@@ -64,15 +64,19 @@ function resetContentScroll() {
   window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 }
 
-export function TravelApp({ ownerScopeId, profileName, online, dataRevision, renderProfile, renderStates }: {
+export function TravelApp({ ownerScopeId, tripPersistenceMode, profileName, online, dataRevision, renderProfile, renderStates }: {
   ownerScopeId: string;
+  tripPersistenceMode: TripPersistenceMode;
   profileName: string;
   online: boolean;
   dataRevision: number;
   renderProfile: (openStates: () => void) => ReactNode;
   renderStates: () => ReactNode;
 }) {
-  const repository = useMemo(() => createBrowserTripRepository(ownerScopeId), [ownerScopeId]);
+  const repository = useMemo(
+    () => createTravelTripRepository(ownerScopeId, tripPersistenceMode),
+    [ownerScopeId, tripPersistenceMode],
+  );
   const [screen, setScreen] = useState<TravelScreen>('home');
   const [trips, setTrips] = useState<Trip[]>([]);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
@@ -80,6 +84,8 @@ export function TravelApp({ ownerScopeId, profileName, online, dataRevision, ren
   const [form, setForm] = useState<CreateTripInput>(EMPTY_FORM);
   const [errors, setErrors] = useState<TripValidationError[]>([]);
   const [storageAvailable, setStorageAvailable] = useState(true);
+  const [persistenceError, setPersistenceError] = useState<string | null>(null);
+  const [savingTrip, setSavingTrip] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [homePrompt, setHomePrompt] = useState('');
   const [assistantMessages, setAssistantMessages] = useState<string[]>([]);
@@ -91,9 +97,29 @@ export function TravelApp({ ownerScopeId, profileName, online, dataRevision, ren
   const preserveDrawerScrollRef = useRef(true);
 
   useEffect(() => {
-    setStorageAvailable(canUseTravelStorage());
-    setTrips(repository.list());
-  }, [repository, dataRevision]);
+    let active = true;
+    const available = canUseTripPersistence(tripPersistenceMode);
+    setStorageAvailable(available);
+    setPersistenceError(null);
+    if (!available) {
+      setTrips([]);
+      return () => { active = false; };
+    }
+
+    void repository.list().then((nextTrips) => {
+      if (!active) return;
+      setTrips(nextTrips);
+      setPersistenceError(null);
+    }).catch(() => {
+      if (!active) return;
+      setTrips([]);
+      setPersistenceError(tripPersistenceMode === 'server'
+        ? 'Не удалось загрузить поездки с сервера. Проверьте соединение и повторите попытку.'
+        : 'Не удалось загрузить поездки на этом устройстве.');
+    });
+
+    return () => { active = false; };
+  }, [repository, tripPersistenceMode, dataRevision]);
 
   useLayoutEffect(() => {
     resetContentScroll();
@@ -151,7 +177,7 @@ export function TravelApp({ ownerScopeId, profileName, online, dataRevision, ren
     };
   }, [menuOpen]);
 
-  const selectedTrip = selectedTripId ? trips.find((trip) => trip.id === selectedTripId) ?? repository.get(selectedTripId) : null;
+  const selectedTrip = selectedTripId ? trips.find((trip) => trip.id === selectedTripId) ?? null : null;
 
   const navigate = (nextScreen: TravelScreen) => {
     if (menuOpen) preserveDrawerScrollRef.current = false;
@@ -211,23 +237,30 @@ export function TravelApp({ ownerScopeId, profileName, online, dataRevision, ren
 
   const createTrip = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (savingTrip) return;
     const nextErrors = validateCreateTripInput(form);
     setErrors(nextErrors);
     if (nextErrors.length > 0) return;
     const trip = createTripDraft(form, ownerScopeId);
-    try {
-      repository.save(trip);
-      setStorageAvailable(true);
-    } catch {
-      setStorageAvailable(false);
-      return;
-    }
-    setTrips(repository.list());
-    setSelectedTripId(trip.id);
-    setWorkspaceTab('overview');
-    setForm(EMPTY_FORM);
-    setErrors([]);
-    setScreen('trip');
+    setSavingTrip(true);
+    setPersistenceError(null);
+
+    void repository.save(trip).then(async (savedTrip) => {
+      const nextTrips = await repository.list();
+      setTrips(nextTrips.length > 0 ? nextTrips : [savedTrip]);
+      setSelectedTripId(savedTrip.id);
+      setWorkspaceTab('overview');
+      setForm(EMPTY_FORM);
+      setErrors([]);
+      setPersistenceError(null);
+      setScreen('trip');
+    }).catch(() => {
+      setPersistenceError(tripPersistenceMode === 'server'
+        ? 'Не удалось сохранить поездку на сервере. Данные формы сохранены на экране — попробуйте ещё раз.'
+        : 'Не удалось сохранить поездку на этом устройстве.');
+    }).finally(() => {
+      setSavingTrip(false);
+    });
   };
 
   const chooseTripAction = () => {
@@ -272,7 +305,8 @@ export function TravelApp({ ownerScopeId, profileName, online, dataRevision, ren
 
   return <div className="travel-app">
     {header}{drawer}
-    <div className="travel-shell" data-storage={storageAvailable ? 'ready' : 'unavailable'}>
+    <div className="travel-shell" data-storage={storageAvailable ? 'ready' : 'unavailable'} data-trip-persistence={tripPersistenceMode}>
+      {persistenceError ? <div className="travel-alert travel-persistence-alert" role="alert">{persistenceError}</div> : null}
       {screen === 'home' ? <HomeScreen trips={trips} prompt={homePrompt} onPromptChange={setHomePrompt} onSubmitPrompt={submitHomePrompt} onNavigate={navigate} onOpenTrip={openTrip} /> : null}
       {screen === 'assistant' ? <AssistantScreen
         context={assistantContext}
@@ -285,7 +319,7 @@ export function TravelApp({ ownerScopeId, profileName, online, dataRevision, ren
         onOpenTrips={() => navigate('trips')}
       /> : null}
       {screen === 'trips' ? <TripsScreen trips={trips} onCreate={() => navigate('create')} onOpenTrip={openTrip} /> : null}
-      {screen === 'create' ? <CreateTripScreen form={form} setForm={setForm} errors={errors} storageAvailable={storageAvailable} onSubmit={createTrip} onCancel={() => navigate('trips')} /> : null}
+      {screen === 'create' ? <CreateTripScreen form={form} setForm={setForm} errors={errors} storageAvailable={storageAvailable} saving={savingTrip} onSubmit={createTrip} onCancel={() => navigate('trips')} /> : null}
       {screen === 'trip' ? tripScreen : null}
       {screen === 'documents' ? <ServiceFoundation kicker="ДОКУМЕНТЫ" icon="document" title="Документы поездки" text="Здесь будут храниться билеты, страховка, бронирования и другие документы." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
       {screen === 'routes' ? <ServiceFoundation kicker="МАРШРУТЫ" icon="route" title="Маршруты" text="Здесь ARVELIS будет сравнивать самолёты, поезда, автобусы и смешанные варианты." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
