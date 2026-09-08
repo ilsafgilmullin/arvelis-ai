@@ -1,6 +1,11 @@
 /* Travel Pivot Foundation V1 — acceptance-only mobile/accessibility hardening.
    Loaded after travel-foundation-v1.css so these narrow corrections do not redesign the flow. */
 
+/* Keep page-level layout from leaking horizontal overflow while preserving tab-strip scrolling. */
+.travel-app {
+  overflow-x: clip;
+}
+
 /* Interactive preference chips must meet the ~44px mobile touch-target floor. */
 .travel-toggle {
   min-height: 44px;
@@ -14,6 +19,14 @@
 
 .travel-check input {
   margin-top: 0;
+}
+
+/* Keep focused Create Trip controls clear of sticky actions/navigation when browsers auto-scroll them. */
+.travel-form input,
+.travel-form textarea,
+.travel-toggle,
+.travel-check {
+  scroll-margin-block: 72px calc(150px + env(safe-area-inset-bottom));
 }
 
 /* Keep keyboard focus unambiguous without changing the resting visual hierarchy. */
