@@ -249,3 +249,24 @@
 - production hosting;
 - критерии real-data/AI closed beta и public release;
 - дата публичного запуска.
+
+## 2026-09-08 — Light AI-first Travel UI Redesign
+
+Это решение **supersedes только пользовательскую Travel presentation model**, зафиксированную в `Travel Product Pivot Foundation V1`, где primary UI оставался dark/gold и навигация строилась вокруг `Главная · Поездки · Создать · Профиль`. Исторические решения выше сохраняются намеренно.
+
+- Прежний dark/gold user-facing Travel UI больше не является основной пользовательской темой.
+- Основная пользовательская Travel-тема — light: white / soft blue-white surfaces.
+- Основная visual system — teal / turquoise / blue с restrained green accents и зелёно-синим primary gradient.
+- Название, слоган и геометрия ARVELIS logo не меняются: сохраняются геометрическая `A`, круговая орбита и точечная дуга.
+- Для светлого Travel UI допускается отдельный teal/blue gradient colorway того же знака; это не новый логотип.
+- Home становится AI-first entry point с travel composer и starter prompts.
+- Primary navigation становится left side drawer; legacy bottom navigation больше не является активной Travel navigation model.
+- Trip Workspace остаётся структурированным результатом/объектом поездки, а AI становится центральным interaction layer.
+- Profile упрощается до пользовательского account/travel UI; technical diagnostics выносятся в `Settings → Advanced / Diagnostics` и доступны только в test/dev context.
+- ARVELIS AI архитектурно разделяется на `general` и `trip-scoped` contexts.
+- Trip-scoped context передаёт будущему AI Gateway Trip identity/state без изменения существующих Trip contracts.
+- Реальный AI Gateway в этом redesign slice не подключается; fake AI replies запрещены.
+- Transport/Map/Legal/Weather/Stay/Currency/PDF providers в V2 не подключаются; отсутствующие функции показывают truthful states.
+- Existing Trip domain, local persistence и auth/server foundation сохраняются и не переписываются ради presentation layer.
+- Automated responsive acceptance целится в `390×844`, `844×390`, `360×800`, `1440×900`; physical iPhone Safari/VoiceOver остаётся отдельным manual acceptance item, если соответствующая среда недоступна.
+- Следующий server/data/AI slice требует отдельного подтверждения и не начинается автоматически.
