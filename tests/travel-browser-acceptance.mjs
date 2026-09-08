@@ -45,14 +45,8 @@ class CdpClient {
     this.socket = new WebSocket(this.url);
     await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('CDP WebSocket connection timed out')), 5_000);
-      this.socket.addEventListener('open', () => {
-        clearTimeout(timeout);
-        resolve();
-      }, { once: true });
-      this.socket.addEventListener('error', () => {
-        clearTimeout(timeout);
-        reject(new Error('CDP WebSocket connection failed'));
-      }, { once: true });
+      this.socket.addEventListener('open', () => { clearTimeout(timeout); resolve(); }, { once: true });
+      this.socket.addEventListener('error', () => { clearTimeout(timeout); reject(new Error('CDP WebSocket connection failed')); }, { once: true });
     });
 
     this.socket.addEventListener('message', (event) => {
@@ -65,7 +59,6 @@ class CdpClient {
         else pending.resolve(message.result ?? {});
         return;
       }
-
       if (message.method === 'Runtime.exceptionThrown') {
         this.runtimeErrors.push(message.params?.exceptionDetails?.text ?? 'Runtime exception');
       }
@@ -86,20 +79,12 @@ class CdpClient {
   }
 
   async evaluate(expression) {
-    const result = await this.send('Runtime.evaluate', {
-      expression,
-      returnByValue: true,
-      awaitPromise: true,
-    });
-    if (result.exceptionDetails) {
-      throw new Error(`Browser evaluation failed: ${result.exceptionDetails.text ?? expression}`);
-    }
+    const result = await this.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+    if (result.exceptionDetails) throw new Error(`Browser evaluation failed: ${result.exceptionDetails.text ?? expression}`);
     return result.result?.value;
   }
 
-  close() {
-    this.socket?.close();
-  }
+  close() { this.socket?.close(); }
 }
 
 async function waitFor(client, expression, label, timeoutMs = 10_000) {
@@ -111,16 +96,17 @@ async function waitFor(client, expression, label, timeoutMs = 10_000) {
   throw new Error(`Timed out waiting for browser state: ${label}`);
 }
 
-async function clickButton(client, text) {
-  const clicked = await client.evaluate(`(() => {
-    const target = [...document.querySelectorAll('button')].find((button) =>
-      button.textContent?.trim() === ${JSON.stringify(text)} && button.getClientRects().length > 0 && !button.disabled
-    );
-    if (!target) return false;
-    target.click();
-    return true;
-  })()`);
-  assert.equal(clicked, true, `Visible button not found: ${text}`);
+async function setViewport(client, viewport) {
+  await client.send('Emulation.setDeviceMetricsOverride', {
+    width: viewport.width,
+    height: viewport.height,
+    deviceScaleFactor: viewport.mobile ? 3 : 1,
+    mobile: viewport.mobile,
+    screenWidth: viewport.width,
+    screenHeight: viewport.height,
+  });
+  await client.send('Emulation.setTouchEmulationEnabled', { enabled: viewport.mobile, maxTouchPoints: viewport.mobile ? 5 : 1 });
+  await sleep(100);
 }
 
 async function setControlValue(client, selector, value, index = 0) {
@@ -138,101 +124,139 @@ async function setControlValue(client, selector, value, index = 0) {
   assert.equal(changed, true, `Unable to set control: ${selector}[${index}]`);
 }
 
-async function setViewport(client, viewport) {
-  await client.send('Emulation.setDeviceMetricsOverride', {
-    width: viewport.width,
-    height: viewport.height,
-    deviceScaleFactor: viewport.mobile ? 3 : 1,
-    mobile: viewport.mobile,
-    screenWidth: viewport.width,
-    screenHeight: viewport.height,
-  });
-  await client.send('Emulation.setTouchEmulationEnabled', {
-    enabled: viewport.mobile,
-    maxTouchPoints: viewport.mobile ? 5 : 1,
-  });
-  await sleep(80);
+async function clickVisibleButton(client, text, root = 'document') {
+  const clicked = await client.evaluate(`(() => {
+    const root = ${root === 'document' ? 'document' : `document.querySelector(${JSON.stringify(root)})`};
+    if (!root) return false;
+    const target = [...root.querySelectorAll('button')].find((button) =>
+      button.textContent?.trim() === ${JSON.stringify(text)} && button.getClientRects().length > 0 && !button.disabled
+    );
+    if (!target) return false;
+    target.click();
+    return true;
+  })()`);
+  assert.equal(clicked, true, `Visible button not found: ${text} in ${root}`);
 }
 
-async function assertCreateLayout(client, viewportName) {
-  await client.evaluate('window.scrollTo(0, document.documentElement.scrollHeight)');
-  await sleep(120);
-
-  const layout = await client.evaluate(`(() => {
-    const visible = (element) => element.getClientRects().length > 0;
-    const selectors = [
-      '.travel-toggle', '.travel-check', '.travel-primary', '.travel-secondary',
-      '.travel-link', '.travel-back', '.travel-brand-button', '.travel-bottom-nav button',
-      '.travel-form input:not([type="checkbox"])', '.travel-form textarea'
-    ];
-    const targets = selectors.flatMap((selector) => [...document.querySelectorAll(selector)]);
-    const tooSmall = targets.filter(visible).map((element) => ({
-      selector: element.className || element.tagName,
-      text: element.textContent?.trim().slice(0, 40) ?? '',
-      height: element.getBoundingClientRect().height,
-    })).filter((item) => item.height < 43.5);
-
-    const nav = document.querySelector('.travel-bottom-nav')?.getBoundingClientRect();
-    const actions = document.querySelector('.travel-form-actions')?.getBoundingClientRect();
-    const actionsNavOverlap = Boolean(nav && actions && actions.bottom > nav.top && actions.top < nav.bottom);
-    const maxScrollWidth = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
-
-    return {
-      innerWidth,
-      innerHeight,
-      maxScrollWidth,
-      overflowX: getComputedStyle(document.querySelector('.travel-app')).overflowX,
-      tooSmall,
-      actionsNavOverlap,
-      navBottom: nav?.bottom ?? null,
-      actionsBottom: actions?.bottom ?? null,
-    };
+async function openDrawer(client) {
+  const clicked = await client.evaluate(`(() => {
+    const button = document.querySelector('button[aria-label="Открыть меню"]');
+    if (!(button instanceof HTMLButtonElement)) return false;
+    button.click();
+    return true;
   })()`);
-
-  assert.ok(layout.maxScrollWidth <= layout.innerWidth + 1, `${viewportName}: page has horizontal overflow (${layout.maxScrollWidth} > ${layout.innerWidth})`);
-  assert.equal(layout.overflowX, 'clip', `${viewportName}: Travel root overflow-x hardening is not active`);
-  assert.deepEqual(layout.tooSmall, [], `${viewportName}: undersized interactive targets found`);
-  assert.equal(layout.actionsNavOverlap, false, `${viewportName}: Create Trip actions overlap bottom navigation`);
-
-  const focusState = await client.evaluate(`(() => {
-    const input = document.querySelector('.travel-form input:not([type="checkbox"]):not(:disabled)');
-    if (!(input instanceof HTMLInputElement)) return null;
-    input.focus();
-    input.scrollIntoView({ block: 'center', inline: 'nearest' });
-    const rect = input.getBoundingClientRect();
-    return { top: rect.top, bottom: rect.bottom, height: rect.height, active: document.activeElement === input };
-  })()`);
-  await sleep(60);
-  assert.ok(focusState?.active, `${viewportName}: form control could not receive focus`);
-  assert.ok(focusState.top >= -1 && focusState.bottom <= layout.innerHeight + 1, `${viewportName}: focused form control is outside viewport`);
+  assert.equal(clicked, true, 'Menu button not found');
+  await waitFor(client, "Boolean(document.querySelector('.travel-drawer'))", 'drawer open');
 }
 
-async function assertWorkspaceLayout(client, viewportName) {
-  const layout = await client.evaluate(`(() => {
+async function navigateDrawer(client, label) {
+  await openDrawer(client);
+  await clickVisibleButton(client, label, '.travel-drawer');
+  await waitFor(client, "!document.querySelector('.travel-drawer')", `drawer close after ${label}`);
+}
+
+async function assertDrawerBehavior(client) {
+  await openDrawer(client);
+  const opened = await client.evaluate(`(() => ({
+    overflow: document.body.style.overflow,
+    activeInside: Boolean(document.activeElement?.closest('.travel-drawer')),
+    expanded: document.querySelector('button[aria-label="Открыть меню"]')?.getAttribute('aria-expanded'),
+    animationDuration: getComputedStyle(document.querySelector('.travel-drawer')).animationDuration,
+  }))()`);
+  assert.equal(opened.overflow, 'hidden', 'Drawer must lock body scroll');
+  assert.equal(opened.activeInside, true, 'Drawer must move focus inside');
+  assert.equal(opened.expanded, 'true', 'Menu button aria-expanded must be true while open');
+  assert.ok(Number.parseFloat(opened.animationDuration) <= 0.01, `Reduced motion must suppress drawer animation: ${opened.animationDuration}`);
+
+  const trapForward = await client.evaluate(`(() => {
+    const drawer = document.querySelector('.travel-drawer');
+    const items = [...drawer.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')].filter((el) => el.getClientRects().length > 0);
+    const first = items[0]; const last = items[items.length - 1];
+    last.focus();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    return document.activeElement === first;
+  })()`);
+  assert.equal(trapForward, true, 'Drawer forward focus trap failed');
+
+  const trapBackward = await client.evaluate(`(() => {
+    const drawer = document.querySelector('.travel-drawer');
+    const items = [...drawer.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')].filter((el) => el.getClientRects().length > 0);
+    const first = items[0]; const last = items[items.length - 1];
+    first.focus();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }));
+    return document.activeElement === last;
+  })()`);
+  assert.equal(trapBackward, true, 'Drawer backward focus trap failed');
+
+  await client.evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
+  await waitFor(client, "!document.querySelector('.travel-drawer')", 'drawer Escape close');
+  const escaped = await client.evaluate(`(() => ({
+    overflowRestored: document.body.style.overflow !== 'hidden',
+    focusReturned: document.activeElement === document.querySelector('button[aria-label="Открыть меню"]'),
+    expanded: document.querySelector('button[aria-label="Открыть меню"]')?.getAttribute('aria-expanded'),
+  }))()`);
+  assert.equal(escaped.overflowRestored, true, 'Body scroll must restore after Escape');
+  assert.equal(escaped.focusReturned, true, 'Focus must return to menu button after Escape');
+  assert.equal(escaped.expanded, 'false');
+
+  await openDrawer(client);
+  await client.evaluate(`(() => {
+    const overlay = document.querySelector('.travel-drawer-overlay');
+    overlay.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+  })()`);
+  await waitFor(client, "!document.querySelector('.travel-drawer')", 'drawer overlay dismiss');
+  assert.equal(await client.evaluate("document.body.style.overflow !== 'hidden'"), true, 'Body scroll must restore after overlay dismiss');
+}
+
+async function assertLayout(client, viewportName) {
+  const result = await client.evaluate(`(() => {
+    const visible = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
     const maxScrollWidth = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
-    const tabs = document.querySelector('.travel-tabs');
-    const tooSmallTabs = [...document.querySelectorAll('.travel-tabs button')]
-      .filter((button) => button.getClientRects().length > 0)
-      .map((button) => ({ text: button.textContent?.trim() ?? '', height: button.getBoundingClientRect().height }))
+    const controls = [...document.querySelectorAll('button, input:not([type="checkbox"]), textarea, summary, a[href]')]
+      .filter(visible)
+      .map((el) => ({ tag: el.tagName, text: (el.textContent || el.getAttribute('aria-label') || '').trim().slice(0, 50), height: el.getBoundingClientRect().height }))
       .filter((item) => item.height < 43.5);
+    const app = document.querySelector('.travel-app');
+    return { innerWidth, innerHeight, maxScrollWidth, controls, overflowX: app ? getComputedStyle(app).overflowX : '' };
+  })()`);
+  assert.ok(result.maxScrollWidth <= result.innerWidth + 1, `${viewportName}: horizontal page overflow ${result.maxScrollWidth} > ${result.innerWidth}`);
+  assert.equal(result.overflowX, 'clip', `${viewportName}: Travel root overflow-x hardening inactive`);
+  assert.deepEqual(result.controls, [], `${viewportName}: interactive controls below 44px`);
+}
+
+async function assertFocusedControlVisible(client, viewportName) {
+  const state = await client.evaluate(`(() => {
+    const control = document.querySelector('input:not([disabled]):not([type="checkbox"]), textarea:not([disabled]), button:not([disabled])');
+    if (!control) return null;
+    control.focus();
+    control.scrollIntoView({ block: 'center', inline: 'nearest' });
+    const rect = control.getBoundingClientRect();
+    return { active: document.activeElement === control, top: rect.top, bottom: rect.bottom, innerHeight };
+  })()`);
+  assert.ok(state?.active, `${viewportName}: focusable control could not receive focus`);
+  assert.ok(state.top >= -1 && state.bottom <= state.innerHeight + 1, `${viewportName}: focused control outside viewport`);
+}
+
+async function assertWorkspaceTabs(client, viewportName) {
+  const state = await client.evaluate(`(() => {
+    const tabs = document.querySelector('.travel-tabs');
+    const active = tabs?.querySelector('[role="tab"][aria-selected="true"]');
     return {
-      innerWidth,
-      maxScrollWidth,
-      tooSmallTabs,
-      tabClientWidth: tabs?.clientWidth ?? 0,
-      tabScrollWidth: tabs?.scrollWidth ?? 0,
-      tabOverflowX: tabs ? getComputedStyle(tabs).overflowX : '',
+      exists: Boolean(tabs),
+      overflowX: tabs ? getComputedStyle(tabs).overflowX : '',
+      active: Boolean(active),
+      scrollWidth: tabs?.scrollWidth ?? 0,
+      clientWidth: tabs?.clientWidth ?? 0,
     };
   })()`);
-
-  assert.ok(layout.maxScrollWidth <= layout.innerWidth + 1, `${viewportName}: workspace has horizontal page overflow`);
-  assert.deepEqual(layout.tooSmallTabs, [], `${viewportName}: workspace tab below 44px`);
-  assert.equal(layout.tabOverflowX, 'auto', `${viewportName}: workspace tab strip must retain internal horizontal scrolling`);
-  assert.ok(layout.tabScrollWidth >= layout.tabClientWidth, `${viewportName}: invalid tab strip geometry`);
+  assert.equal(state.exists, true, `${viewportName}: workspace tabs missing`);
+  assert.equal(state.overflowX, 'auto', `${viewportName}: workspace tabs must scroll internally`);
+  assert.equal(state.active, true, `${viewportName}: active workspace tab missing`);
+  assert.ok(state.scrollWidth >= state.clientWidth, `${viewportName}: invalid workspace tab geometry`);
 }
 
 const chrome = findChrome();
-const userDataDir = await mkdtemp(join(tmpdir(), 'arvelis-chrome-'));
+const userDataDir = await mkdtemp(join(tmpdir(), 'arvelis-v2-chrome-'));
 let vite;
 let chromeProcess;
 let client;
@@ -240,22 +264,13 @@ let viteLog = '';
 let chromeLog = '';
 
 try {
-  vite = spawn('npm', ['run', 'dev'], {
-    env: { ...process.env, VITE_REAL_AUTH_ENABLED: 'false' },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  vite = spawn('npm', ['run', 'dev'], { env: { ...process.env, VITE_REAL_AUTH_ENABLED: 'false' }, stdio: ['ignore', 'pipe', 'pipe'] });
   vite.stdout.on('data', (chunk) => { viteLog += chunk.toString(); });
   vite.stderr.on('data', (chunk) => { viteLog += chunk.toString(); });
   await waitForHttp(APP_URL);
 
   chromeProcess = spawn(chrome, [
-    '--headless=new',
-    '--no-sandbox',
-    '--disable-gpu',
-    '--disable-dev-shm-usage',
-    '--remote-debugging-port=9222',
-    `--user-data-dir=${userDataDir}`,
-    'about:blank',
+    '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--remote-debugging-port=9222', `--user-data-dir=${userDataDir}`, 'about:blank',
   ], { stdio: ['ignore', 'pipe', 'pipe'] });
   chromeProcess.stdout.on('data', (chunk) => { chromeLog += chunk.toString(); });
   chromeProcess.stderr.on('data', (chunk) => { chromeLog += chunk.toString(); });
@@ -268,93 +283,113 @@ try {
   await client.connect();
   await client.send('Page.enable');
   await client.send('Runtime.enable');
-  await client.send('Log.enable');
-  await client.send('Emulation.setEmulatedMedia', {
-    features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
-  });
+  await client.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
 
-  await setViewport(client, { width: 390, height: 844, mobile: true });
+  await setViewport(client, { name: '390x844', width: 390, height: 844, mobile: true });
   await client.send('Page.navigate', { url: APP_URL });
   await waitFor(client, "document.readyState === 'complete'", 'document ready');
-  await waitFor(client, "Boolean(document.querySelector('#preview-profile-name'))", 'preview registration');
+  const needsPreviewProfile = await client.evaluate("Boolean(document.querySelector('#preview-profile-name'))");
+  if (needsPreviewProfile) {
+    await setControlValue(client, '#preview-profile-name', 'Acceptance QA');
+    await clickVisibleButton(client, 'Продолжить');
+  }
+  await waitFor(client, "Boolean(document.querySelector('.travel-app'))", 'Travel app');
+  await waitFor(client, "document.body.textContent.includes('Куда отправимся?')", 'AI-first Home');
+  await assertLayout(client, '390x844 Home');
+  await assertDrawerBehavior(client);
 
-  await setControlValue(client, '#preview-profile-name', 'Acceptance QA');
-  await clickButton(client, 'Продолжить');
-  await waitFor(client, "Boolean(document.querySelector('.travel-app'))", 'Travel Home');
-  await waitFor(client, "document.querySelector('.travel-hero h1')?.textContent?.includes('Путешествие')", 'Travel hero');
+  // General ARVELIS AI: no fake response.
+  await navigateDrawer(client, 'ARVELIS AI');
+  await waitFor(client, "document.querySelector('.travel-assistant')?.dataset.assistantScope === 'general'", 'general assistant context');
+  await setControlValue(client, '#travel-assistant-prompt', 'Куда поехать на море в октябре?');
+  await client.evaluate("document.querySelector('button[aria-label=\"Отправить запрос\"]')?.click()");
+  await waitFor(client, "document.body.textContent.includes('ARVELIS AI пока не подключён')", 'general truthful AI unavailable');
+  assert.equal(await client.evaluate("!document.body.textContent.includes('MOCK')"), true, 'General assistant must not show mock output');
 
-  await clickButton(client, 'Создать поездку');
+  // My Trips -> Create -> save -> reopen.
+  await navigateDrawer(client, 'Мои поездки');
+  await waitFor(client, "document.body.textContent.includes('Мои поездки')", 'My Trips');
+  await navigateDrawer(client, 'Создать поездку');
   await waitFor(client, "document.querySelector('.travel-create h1')?.textContent?.trim() === 'Создать поездку'", 'Create Trip');
   await setControlValue(client, 'input[placeholder="Например, Казань"]', 'Казань');
   await setControlValue(client, 'input[placeholder="Страна или город"]', 'Сочи');
   await setControlValue(client, 'input[type="date"]', '2026-10-01', 0);
   await setControlValue(client, 'input[type="date"]', '2026-10-08', 1);
-  await setControlValue(client, '.travel-form textarea', 'Без сложных пересадок');
-  await clickButton(client, 'Море');
-  await clickButton(client, 'Минимум пересадок');
-  await clickButton(client, 'Сохранить черновик');
+  await setControlValue(client, 'textarea[placeholder*="пересадок"]', 'Без сложных пересадок');
+  await clickVisibleButton(client, 'Море');
+  await clickVisibleButton(client, 'Минимум пересадок');
+  await clickVisibleButton(client, 'Сохранить поездку');
   await waitFor(client, "Boolean(document.querySelector('.travel-workspace'))", 'saved Trip Workspace');
-  assert.ok(await client.evaluate("document.body.textContent.includes('Казань → Сочи')"), 'Saved Trip title is missing');
+  assert.ok(await client.evaluate("document.body.textContent.includes('Сочи')"), 'Saved Trip destination missing');
 
-  await clickButton(client, '← Мои поездки');
-  await waitFor(client, "document.querySelector('.travel-title-row h1')?.textContent?.trim() === 'Мои поездки'", 'My Trips');
-  const reopened = await client.evaluate(`(() => {
-    const card = document.querySelector('.travel-trip-card');
-    if (!card) return false;
-    card.click();
-    return true;
-  })()`);
-  assert.equal(reopened, true, 'Saved Trip card is missing from My Trips');
+  await clickVisibleButton(client, '← Мои поездки');
+  await waitFor(client, "Boolean(document.querySelector('.travel-trip-card'))", 'saved trip card');
+  assert.equal(await client.evaluate(`(() => { const card = document.querySelector('.travel-trip-card'); if (!card) return false; card.click(); return true; })()`), true, 'Unable to reopen saved Trip');
   await waitFor(client, "Boolean(document.querySelector('.travel-workspace'))", 'reopened Trip Workspace');
+
+  // Trip-scoped AI.
+  await clickVisibleButton(client, 'Спросить ARVELIS');
+  await waitFor(client, "document.querySelector('.travel-assistant')?.dataset.assistantScope === 'trip'", 'trip assistant context');
+  await waitFor(client, "document.body.textContent.includes('ARVELIS AI пока не подключён')", 'trip truthful AI unavailable');
+  assert.equal(await client.evaluate("!document.body.textContent.includes('MOCK')"), true, 'Trip assistant must not show mock output');
+  await clickVisibleButton(client, 'Вернуться к поездке');
+  await waitFor(client, "Boolean(document.querySelector('.travel-workspace'))", 'return to Trip');
 
   const truthStates = [
     ['Маршрут', 'Маршрут по дням пока пуст'],
-    ['Карта', 'Карта ещё не подключена'],
-    ['Бюджет', 'Автоматические цены отсутствуют'],
-    ['Legal', 'Юридическая проверка не запускалась'],
-    ['Trip Book', 'PDF-генерация не включена в этот slice'],
+    ['Карта', 'Карта будет доступна после подключения картографического сервиса.'],
+    ['Бюджет', 'Цены и расходы не рассчитаны'],
+    ['Документы', 'Документы не добавлены'],
+    ['Legal', 'Юридическая проверка ещё не выполнялась.'],
+    ['Trip Book', 'PDF-генерация пока не подключена'],
   ];
   for (const [tab, expected] of truthStates) {
-    await clickButton(client, tab);
-    await waitFor(client, `document.body.textContent.includes(${JSON.stringify(expected)})`, `${tab} truth state`);
+    await clickVisibleButton(client, tab, '.travel-tabs');
+    await waitFor(client, `document.body.textContent.includes(${JSON.stringify(expected)})`, `${tab} truthful state`);
   }
 
+  await navigateDrawer(client, 'Профиль');
+  await waitFor(client, "Boolean(document.querySelector('.travel-profile'))", 'Profile');
+  assert.equal(await client.evaluate("!document.body.textContent.includes('Диагностика preview')"), true, 'Technical diagnostics must not dominate Profile');
+
   const viewports = [
-    { name: 'iPhone portrait', width: 390, height: 844, mobile: true },
-    { name: 'iPhone landscape', width: 844, height: 390, mobile: true },
-    { name: 'Android narrow', width: 360, height: 800, mobile: true },
-    { name: 'desktop', width: 1440, height: 900, mobile: false },
+    { name: '390x844', width: 390, height: 844, mobile: true },
+    { name: '844x390', width: 844, height: 390, mobile: true },
+    { name: '360x800', width: 360, height: 800, mobile: true },
+    { name: '1440x900', width: 1440, height: 900, mobile: false },
   ];
 
   for (const viewport of viewports) {
     await setViewport(client, viewport);
-    await clickButton(client, 'Создать');
-    await waitFor(client, "Boolean(document.querySelector('.travel-create'))", `${viewport.name} Create Trip`);
-    await assertCreateLayout(client, viewport.name);
+    await navigateDrawer(client, 'Главная');
+    await waitFor(client, "document.body.textContent.includes('Куда отправимся?')", `${viewport.name} Home`);
+    await assertLayout(client, `${viewport.name} Home`);
+    await assertFocusedControlVisible(client, `${viewport.name} Home`);
 
-    await clickButton(client, 'Поездки');
-    await waitFor(client, "document.querySelector('.travel-title-row h1')?.textContent?.trim() === 'Мои поездки'", `${viewport.name} My Trips`);
-    const opened = await client.evaluate(`(() => {
-      const card = document.querySelector('.travel-trip-card');
-      if (!card) return false;
-      card.click();
-      return true;
-    })()`);
-    assert.equal(opened, true, `${viewport.name}: saved Trip card unavailable`);
+    await openDrawer(client);
+    await assertLayout(client, `${viewport.name} drawer`);
+    await client.evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
+    await waitFor(client, "!document.querySelector('.travel-drawer')", `${viewport.name} drawer close`);
+
+    await navigateDrawer(client, 'Мои поездки');
+    await waitFor(client, "Boolean(document.querySelector('.travel-trip-card'))", `${viewport.name} trip card`);
+    assert.equal(await client.evaluate(`(() => { const card = document.querySelector('.travel-trip-card'); if (!card) return false; card.click(); return true; })()`), true, `${viewport.name}: unable to open Trip`);
     await waitFor(client, "Boolean(document.querySelector('.travel-workspace'))", `${viewport.name} Trip Workspace`);
-    await assertWorkspaceLayout(client, viewport.name);
+    await assertLayout(client, `${viewport.name} Trip Workspace`);
+    await assertWorkspaceTabs(client, viewport.name);
+    await assertFocusedControlVisible(client, `${viewport.name} Trip Workspace`);
   }
 
   assert.deepEqual(client.runtimeErrors, [], `Browser runtime errors: ${client.runtimeErrors.join(' | ')}`);
-  console.log('travel browser acceptance: PASS (Chromium viewports: iPhone portrait/landscape, Android narrow, desktop)');
+  console.log('travel browser acceptance: PASS (V2 Chromium: 390x844, 844x390, 360x800, 1440x900)');
 } catch (error) {
-  if (viteLog) console.error(`\n--- Vite output ---\n${viteLog.slice(-6000)}`);
-  if (chromeLog) console.error(`\n--- Chrome output ---\n${chromeLog.slice(-6000)}`);
+  if (viteLog) console.error(`\n--- Vite output ---\n${viteLog.slice(-8000)}`);
+  if (chromeLog) console.error(`\n--- Chrome output ---\n${chromeLog.slice(-8000)}`);
   throw error;
 } finally {
   client?.close();
   if (chromeProcess && !chromeProcess.killed) chromeProcess.kill('SIGTERM');
   if (vite && !vite.killed) vite.kill('SIGTERM');
-  await sleep(100);
+  await sleep(120);
   await rm(userDataDir, { recursive: true, force: true });
 }
