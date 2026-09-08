@@ -92,7 +92,11 @@ export function TravelApp({ ownerScopeId, profileName, online, dataRevision, ren
         return;
       }
       const first = items[0];
-      const last = items[items.length - 1];
+      const last = items.at(-1);
+      if (!first || !last) {
+        event.preventDefault();
+        return;
+      }
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
