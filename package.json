@@ -31,7 +31,7 @@
     "check:with-db": "npm run check && npm run db:migrate && npm run test:trip-postgres"
   },
   "dependencies": {
-    "nodemailer": "9.0.5",
+    "nodemailer": "9.1.1",
     "pg": "8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
