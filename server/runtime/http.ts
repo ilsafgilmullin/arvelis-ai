@@ -10,7 +10,8 @@ export type SessionCookieCredential = {
   secret: string;
 };
 
-export async function readJsonObject(request: IncomingMessage): Promise<Record<string, unknown>> {
+export async function readJsonObject(request: IncomingMessage, maxBytes = MAX_JSON_BYTES): Promise<Record<string, unknown>> {
+  if (!Number.isInteger(maxBytes) || maxBytes < 1 || maxBytes > 1024 * 1024) throw new Error('invalid_body_limit');
   const contentType = request.headers['content-type'] ?? '';
   if (!contentType.toLowerCase().startsWith('application/json')) {
     throw new Error('unsupported_content_type');
@@ -21,7 +22,7 @@ export async function readJsonObject(request: IncomingMessage): Promise<Record<s
   for await (const chunk of request) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     total += buffer.byteLength;
-    if (total > MAX_JSON_BYTES) throw new Error('body_too_large');
+    if (total > maxBytes) throw new Error('body_too_large');
     chunks.push(buffer);
   }
 

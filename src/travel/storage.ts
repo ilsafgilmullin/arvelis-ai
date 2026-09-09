@@ -1,4 +1,5 @@
-import { isTripStatus, type Trip } from './domain';
+import type { Trip } from './domain';
+import { isTripForOwner } from './validation';
 
 const STORAGE_PREFIX = 'arvelis.travel.v1';
 const STORAGE_VERSION = 1;
@@ -19,30 +20,6 @@ function storageKey(ownerScopeId: string): string {
   return `${STORAGE_PREFIX}:${encodeURIComponent(ownerScopeId)}`;
 }
 
-function isTrip(value: unknown, ownerScopeId: string): value is Trip {
-  if (!value || typeof value !== 'object') return false;
-  const trip = value as Partial<Trip>;
-  return (
-    typeof trip.id === 'string' &&
-    trip.ownerScopeId === ownerScopeId &&
-    typeof trip.title === 'string' &&
-    typeof trip.origin === 'string' &&
-    typeof trip.durationDays === 'number' &&
-    Array.isArray(trip.travelers) &&
-    isTripStatus(trip.status) &&
-    Boolean(trip.preferences && typeof trip.preferences === 'object') &&
-    Boolean(trip.budget && typeof trip.budget === 'object') &&
-    Array.isArray(trip.destinationOptions) &&
-    Array.isArray(trip.transportRoutes) &&
-    Array.isArray(trip.itinerary) &&
-    Array.isArray(trip.legalChecks) &&
-    Array.isArray(trip.mapPoints) &&
-    Boolean(trip.tripBook && typeof trip.tripBook === 'object') &&
-    typeof trip.createdAt === 'string' &&
-    typeof trip.updatedAt === 'string'
-  );
-}
-
 export class TripRepository {
   constructor(private readonly ownerScopeId: string, private readonly storage: KeyValueStorage) {
     if (!ownerScopeId.trim()) throw new Error('Trip repository owner scope is required.');
@@ -56,7 +33,7 @@ export class TripRepository {
       if (parsed.version !== STORAGE_VERSION || parsed.ownerScopeId !== this.ownerScopeId || !Array.isArray(parsed.trips)) {
         return [];
       }
-      return parsed.trips.filter((trip) => isTrip(trip, this.ownerScopeId)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      return parsed.trips.filter((trip) => isTripForOwner(trip, this.ownerScopeId)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     } catch {
       return [];
     }

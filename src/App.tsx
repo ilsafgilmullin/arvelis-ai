@@ -39,6 +39,7 @@ export default function App() {
   const online = useOnlineStatus();
 
   const ownerScopeId = realSession?.account.id ?? LOCAL_PREVIEW_TRAVEL_SCOPE;
+  const tripPersistenceMode = REAL_AUTH_ENABLED && realSession ? 'server' as const : 'local' as const;
 
   useEffect(() => {
     if (!REAL_AUTH_ENABLED) return;
@@ -194,6 +195,7 @@ export default function App() {
   return (
     <TravelApp
       ownerScopeId={ownerScopeId}
+      tripPersistenceMode={tripPersistenceMode}
       profileName={activeProfileName}
       online={online}
       dataRevision={dataRevision}

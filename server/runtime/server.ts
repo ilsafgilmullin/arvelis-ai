@@ -7,13 +7,14 @@ import type { EmailOtpChallengeStore, EmailOtpFailure, EmailOtpRateLimitPort } f
 import { SmtpEmailOtpDelivery } from '../auth/emailOtp/smtpDelivery';
 import { EmailOtpService } from '../auth/emailOtp/service';
 import { WebCryptoEmailOtpSecurity } from '../auth/emailOtp/webCryptoSecurity';
-import type { SessionStore } from '../auth/session/contracts';
+import type { AuthenticatedSession, SessionStore } from '../auth/session/contracts';
 import { SessionService } from '../auth/session/service';
 import { WebCryptoSessionSecurity } from '../auth/session/webCryptoSecurity';
 import { PostgresAccountIdentityStore } from '../persistence/postgres/accountIdentityStore';
 import { PostgresEmailOtpChallengeStore } from '../persistence/postgres/emailOtpChallengeStore';
 import { PostgresEmailOtpRateLimitStore } from '../persistence/postgres/rateLimitStore';
 import { PostgresSessionStore } from '../persistence/postgres/sessionStore';
+import { PostgresTripStore } from '../persistence/postgres/tripStore';
 import {
   SqliteAccountIdentityStore,
   SqliteEmailOtpChallengeStore,
@@ -21,6 +22,9 @@ import {
   SqliteSessionStore,
 } from '../persistence/sqlite/authStores';
 import { openSqliteAuthDatabase } from '../persistence/sqlite/database';
+import { SqliteTripStore } from '../persistence/sqlite/tripStore';
+import { TripApplicationError, type ServerTripStore } from '../travel/contracts';
+import { TripApplicationService } from '../travel/service';
 import { loadAuthRuntimeConfig } from './config';
 import {
   getClientKey,
@@ -35,8 +39,31 @@ import {
 } from './http';
 
 const EMAIL_METHOD_ID = 'email_otp';
+const TRIP_JSON_LIMIT = 256 * 1024;
 
 type RuntimeAccounts = AccountIdentityStore & AccountAuthenticationReader;
+
+type RequestAuthentication =
+  | { kind: 'signed_out' }
+  | { kind: 'invalid' }
+  | { kind: 'unavailable' }
+  | {
+      kind: 'authenticated';
+      credential: { sessionId: string; secret: string };
+      authenticated: AuthenticatedSession;
+      publicSession: {
+        id: string;
+        account: {
+          id: string;
+          displayName: string;
+          primaryEmail: string;
+          emailVerified: boolean;
+          phoneVerified: boolean;
+        };
+        createdAt: string;
+        expiresAt: string;
+      };
+    };
 
 function iso(timestamp: number): string {
   return new Date(timestamp).toISOString();
@@ -83,6 +110,18 @@ function mapAccountFailure(code: string) {
   }
 }
 
+function tripIdFromPath(pathname: string): string | null {
+  const prefix = '/api/trips/';
+  if (!pathname.startsWith(prefix)) return null;
+  const encoded = pathname.slice(prefix.length);
+  if (!encoded || encoded.includes('/')) return null;
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    return null;
+  }
+}
+
 async function main(): Promise<void> {
   const config = loadAuthRuntimeConfig();
 
@@ -92,6 +131,7 @@ async function main(): Promise<void> {
   let challengeStore: EmailOtpChallengeStore;
   let rateLimits: EmailOtpRateLimitPort;
   let sessionStore: SessionStore;
+  let tripStore: ServerTripStore;
 
   if (config.database.provider === 'postgres') {
     pool = new Pool({
@@ -102,21 +142,27 @@ async function main(): Promise<void> {
     });
 
     await pool.query('SELECT 1');
-    const schema = await pool.query<{ accounts: string | null }>("SELECT to_regclass('public.auth_accounts')::text AS accounts");
-    if (!schema.rows[0]?.accounts) {
-      throw new Error('ARVELIS auth database migration is not applied');
+    const schema = await pool.query<{ accounts: string | null; trips: string | null }>(`
+      SELECT
+        to_regclass('public.auth_accounts')::text AS accounts,
+        to_regclass('public.travel_trips')::text AS trips
+    `);
+    if (!schema.rows[0]?.accounts || !schema.rows[0]?.trips) {
+      throw new Error('ARVELIS database migrations are not fully applied');
     }
 
     accounts = new PostgresAccountIdentityStore(pool);
     challengeStore = new PostgresEmailOtpChallengeStore(pool);
     rateLimits = new PostgresEmailOtpRateLimitStore(pool);
     sessionStore = new PostgresSessionStore(pool);
+    tripStore = new PostgresTripStore(pool);
   } else {
     sqlite = openSqliteAuthDatabase(config.database.path);
     accounts = new SqliteAccountIdentityStore(sqlite);
     challengeStore = new SqliteEmailOtpChallengeStore(sqlite);
     rateLimits = new SqliteEmailOtpRateLimitStore(sqlite);
     sessionStore = new SqliteSessionStore(sqlite);
+    tripStore = new SqliteTripStore(sqlite);
   }
 
   const delivery = new SmtpEmailOtpDelivery(config.smtp);
@@ -137,6 +183,7 @@ async function main(): Promise<void> {
     security: sessionSecurity,
   });
   const accountAuth = new AccountAuthApplicationService({ accounts, sessions });
+  const trips = new TripApplicationService(tripStore);
 
   const buildPublicSession = async (sessionId: string, createdAt: number, expiresAt: number, accountId: string) => {
     const account = await accounts.getAccount(accountId);
@@ -158,14 +205,14 @@ async function main(): Promise<void> {
     };
   };
 
-  const authenticateRequest = async (request: IncomingMessage) => {
+  const authenticateRequest = async (request: IncomingMessage): Promise<RequestAuthentication> => {
     const credential = readSessionCookie(request);
-    if (!credential) return { kind: 'signed_out' as const };
+    if (!credential) return { kind: 'signed_out' };
 
     const authenticated = await sessions.authenticate(credential);
     if (!authenticated.ok) {
-      if (authenticated.error === 'service_unavailable') return { kind: 'unavailable' as const };
-      return { kind: 'invalid' as const };
+      if (authenticated.error === 'service_unavailable') return { kind: 'unavailable' };
+      return { kind: 'invalid' };
     }
 
     const publicSession = await buildPublicSession(
@@ -174,14 +221,30 @@ async function main(): Promise<void> {
       authenticated.session.expiresAt,
       authenticated.session.account.id,
     );
-    if (!publicSession) return { kind: 'invalid' as const };
+    if (!publicSession) return { kind: 'invalid' };
 
     return {
-      kind: 'authenticated' as const,
+      kind: 'authenticated',
       credential,
       authenticated: authenticated.session,
       publicSession,
     };
+  };
+
+  const requireTripAccount = async (request: IncomingMessage, response: ServerResponse) => {
+    const current = await authenticateRequest(request);
+    if (current.kind === 'authenticated') return current;
+    if (current.kind === 'unavailable') {
+      sendJson(response, 503, { error: authFailure('service_unavailable', 'Service unavailable') });
+      return null;
+    }
+    sendJson(
+      response,
+      401,
+      { error: authFailure('access_denied', 'Authentication required') },
+      current.kind === 'invalid' ? { 'Set-Cookie': sessionClearCookie(request, config.cookieSecureMode) } : undefined,
+    );
+    return null;
   };
 
   const handler = async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
@@ -199,6 +262,7 @@ async function main(): Promise<void> {
         ok: true,
         service: 'arvelis-auth',
         persistence: config.database.provider,
+        trips: 'account_scoped',
       });
       return;
     }
@@ -229,6 +293,63 @@ async function main(): Promise<void> {
         ? { 'Set-Cookie': sessionClearCookie(request, config.cookieSecureMode) }
         : undefined;
       sendJson(response, 200, null, headers);
+      return;
+    }
+
+    if (method === 'GET' && url.pathname === '/api/trips') {
+      const current = await requireTripAccount(request, response);
+      if (!current) return;
+      try {
+        sendJson(response, 200, { trips: await trips.list(current.authenticated.account.id) });
+      } catch {
+        sendJson(response, 503, { error: authFailure('service_unavailable', 'Trip service unavailable') });
+      }
+      return;
+    }
+
+    const tripId = tripIdFromPath(url.pathname);
+    if (method === 'GET' && tripId !== null) {
+      const current = await requireTripAccount(request, response);
+      if (!current) return;
+      try {
+        const trip = await trips.get(current.authenticated.account.id, tripId);
+        if (!trip) {
+          sendJson(response, 404, { error: authFailure('not_found', 'Trip not found') });
+          return;
+        }
+        sendJson(response, 200, { trip });
+      } catch (error) {
+        if (error instanceof TripApplicationError && error.code === 'invalid_input') {
+          sendJson(response, 400, { error: authFailure('invalid_input', 'Invalid trip id') });
+        } else {
+          sendJson(response, 503, { error: authFailure('service_unavailable', 'Trip service unavailable') });
+        }
+      }
+      return;
+    }
+
+    if (method === 'PUT' && tripId !== null) {
+      const current = await requireTripAccount(request, response);
+      if (!current) return;
+      let body: Record<string, unknown>;
+      try {
+        body = await readJsonObject(request, TRIP_JSON_LIMIT);
+      } catch {
+        sendJson(response, 400, { error: authFailure('invalid_input', 'Invalid Trip request') });
+        return;
+      }
+
+      try {
+        const saved = await trips.save(current.authenticated.account.id, tripId, body.trip);
+        sendJson(response, 200, { trip: saved });
+      } catch (error) {
+        if (error instanceof TripApplicationError) {
+          const status = error.code === 'access_denied' ? 403 : 400;
+          sendJson(response, status, { error: authFailure(error.code, error.code === 'access_denied' ? 'Trip ownership rejected' : 'Invalid Trip request') });
+        } else {
+          sendJson(response, 503, { error: authFailure('service_unavailable', 'Trip service unavailable') });
+        }
+      }
       return;
     }
 
@@ -418,7 +539,7 @@ async function main(): Promise<void> {
   const server = createServer((request, response) => {
     void handler(request, response).catch(() => {
       if (!response.headersSent) {
-        sendJson(response, 500, { error: authFailure('service_unavailable', 'Auth service unavailable') });
+        sendJson(response, 500, { error: authFailure('service_unavailable', 'Service unavailable') });
       } else {
         response.destroy();
       }
@@ -429,7 +550,7 @@ async function main(): Promise<void> {
     server.once('error', reject);
     server.listen(config.port, '127.0.0.1', () => resolve());
   });
-  console.log(`ARVELIS auth API listening on 127.0.0.1:${config.port} (${config.database.provider})`);
+  console.log(`ARVELIS API listening on 127.0.0.1:${config.port} (${config.database.provider})`);
 
   const shutdown = async () => {
     server.close();
@@ -441,6 +562,6 @@ async function main(): Promise<void> {
 }
 
 void main().catch(() => {
-  console.error('ARVELIS auth API failed to start');
+  console.error('ARVELIS API failed to start');
   process.exitCode = 1;
 });
