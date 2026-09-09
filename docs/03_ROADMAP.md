@@ -13,110 +13,113 @@ Travel Product Pivot остаётся текущим продуктовым на
 - [x] Transport Normalized Route Contract V1 — Draft PR #30, green, not merged;
 - [x] Transport Provider Strategy & Adapter Foundation V1 — Draft PR #31, green, not merged;
 - [x] Yandex Rasp Live Adapter V1 — Draft PR #32, green, not merged; production key not activated;
-- [x] Map Provider Foundation & Route Map V1 — Draft PR #33, green, not merged; no real map provider;
-- [x] Legal Sources & Travel Legal Foundation V1 — Draft PR #34, green, not merged; no real Legal provider;
-- [x] ARVELIS AI Engine & Knowledge Foundation V1 — Draft PR #35, green, not merged; no real model/runtime activation.
+- [x] Map Provider Foundation & Route Map V1 — Draft PR #33, green, not merged;
+- [x] Legal Sources & Travel Legal Foundation V1 — Draft PR #34, green, not merged;
+- [x] ARVELIS AI Engine & Knowledge Foundation V1 — Draft PR #35, green, not merged;
+- [x] Retrieval & Knowledge Ingestion Foundation V1 — Draft PR #36, final HEAD `aab7f49c1dfc0909536e1afba7da84bcdf98be3d`, PR-triggered run #721 green including PostgreSQL 18 + pgvector.
 
-## Current checkpoint — Retrieval & Knowledge Ingestion Foundation V1
+## Current checkpoint — Qwen Runtime Adapter & AI Evaluation V1
 
-Branch: `feat/travel-retrieval-knowledge-ingestion-v1`  
-Base: `feat/travel-ai-knowledge-foundation-v1` / Draft PR #35.
+Branch: `feat/travel-qwen-runtime-evaluation-v1`  
+Base: `feat/travel-retrieval-knowledge-ingestion-v1` / Draft PR #36.
 
 Implemented scope:
 
-- [x] dated AI/RAG stack decision in `docs/07_DECISIONS.md`;
-- [x] source registry contracts;
-- [x] document/version/chunk contracts;
-- [x] source type / rights / status / jurisdiction / language metadata;
-- [x] fetched/verified/effective timestamps;
-- [x] SHA-256 normalized content hashing;
-- [x] namespace-scoped document-version deduplication;
-- [x] concurrent duplicate handling;
-- [x] ingestion lifecycle service;
-- [x] embedding port without production activation;
-- [x] PostgreSQL repository boundary;
-- [x] `pgvector` storage with `vector(1024)`;
-- [x] strict Global vs account namespace isolation;
-- [x] composite PK/FK namespace isolation in PostgreSQL;
-- [x] global rights fail-closed policy;
-- [x] bounded retrieval;
-- [x] source/version/language/jurisdiction/freshness filters;
-- [x] existing `KnowledgeRetriever` adapter;
-- [x] additive `003_knowledge_retrieval_foundation.sql` migration;
-- [x] signal-bearing in-memory Retrieval/Knowledge gate;
-- [x] signal-bearing PostgreSQL/pgvector migration/repository/isolation gate;
-- [x] CI PostgreSQL image switched to PostgreSQL 18 + pgvector;
-- [x] no crawler / no automatic external ingestion;
-- [x] no production embedding/model activation;
-- [x] README / Architecture / Roadmap / Security synchronization;
-- [x] dedicated `docs/52_RETRIEVAL_KNOWLEDGE_INGESTION_FOUNDATION_V1.md`.
+- [x] concrete adapter through existing `AiModelRuntime`;
+- [x] OpenAI-compatible vLLM `/v1/chat/completions` mapping;
+- [x] Qwen/vLLM-specific code isolated in adapter, not `AiGateway`;
+- [x] strict endpoint/config validation;
+- [x] remote HTTPS-only / loopback HTTP development policy;
+- [x] structured-output JSON-schema mapping;
+- [x] native OpenAI-style tool-call mapping;
+- [x] stable ARVELIS tool ID ↔ runtime function name translation;
+- [x] unknown/unavailable/malformed tool call fail-closed;
+- [x] Qwen3 non-thinking request mode;
+- [x] bounded sampling/max-token configuration;
+- [x] caller cancellation propagation;
+- [x] independent bounded adapter timeout;
+- [x] non-2xx/malformed/oversized response rejection;
+- [x] normalized `AiModelTurn` validation before Gateway use;
+- [x] unchanged Gateway protected-fact validation;
+- [x] two-round tool-backed price integration fixture through Gateway + Tool Registry;
+- [x] golden semantic evaluation harness;
+- [x] semantic coverage explicitly separated from JSON/schema success;
+- [x] no production model/GPU/weights/credentials activation;
+- [x] signal-bearing `test:qwen-runtime-evaluation` CI gate;
+- [x] server runtime compilation of adapter/evaluation code;
+- [x] dedicated `docs/53_QWEN_RUNTIME_ADAPTER_AI_EVALUATION_V1.md`;
+- [x] README / Architecture / Roadmap / Security synchronization.
 
-### Retrieval V1 policy
+### Implementation verification
 
-- storage: existing PostgreSQL + pgvector, no separate vector DB;
-- embedding dimension V1: 1024;
-- no ANN index yet; bounded exact cosine search is used until real corpus/performance measurements justify index parameters;
-- default AI retrieval: `global + authenticated account`, active sources, ready versions, Russian locale filters and `current_or_unknown` freshness;
-- Global Knowledge accepts only explicitly `public`/`licensed` ingestion;
-- account Knowledge never becomes Global Knowledge implicitly;
-- Trip/documents/chat are not training data and are not automatically ingested globally.
+Initial run #722 reached the Qwen gate and found a strict TypeScript optional-property typing defect. It was fixed without changing runtime security semantics.
 
-### Closure criterion
+Push run #723 on implementation HEAD `d202c5632ecd923a8e0ce2e9d0f38e8214023d53` is fully green:
 
-Retrieval V1 is CLOSED only when:
+- dependency audit PASS;
+- typecheck PASS;
+- Plan/Transport/Map/Legal regressions PASS;
+- AI Engine PASS;
+- Retrieval/Knowledge PASS;
+- Qwen Runtime/Evaluation PASS;
+- Yandex PASS;
+- Trip server PASS;
+- server build PASS;
+- server-backed Chromium happy-path PASS;
+- frontend build PASS.
 
-1. stacked Draft PR targets `feat/travel-ai-knowledge-foundation-v1`;
-2. exact final documentation HEAD receives PR-triggered CI;
-3. `validate` is PASS;
-4. `postgres-compat` is PASS on PostgreSQL 18 + pgvector, including migration `003` and repository/isolation gate;
-5. no production model/embedding/crawler/credentials are activated.
+### Golden evaluation policy
 
-## Next approved slice — Qwen Runtime Adapter & AI Evaluation V1
+Current deterministic harness cases:
 
-Start automatically only after Retrieval V1 is fully green and CLOSED.
+1. general advice remains inference;
+2. unsupported price is rejected;
+3. tool-backed current price may become authoritative;
+4. Knowledge-only Legal fact is rejected;
+5. stale protected fact is rejected;
+6. externally-checkable prose requires structured-claim coverage.
 
-Scope:
+For semantic-coverage cases, an explicit `semanticCoveragePassed=true` is mandatory. Missing semantic verdict fails the release gate.
 
-- [ ] adapter implementing existing `AiModelRuntime`;
-- [ ] OpenAI-compatible vLLM protocol mapping;
-- [ ] Qwen-specific/runtime-specific code remains inside adapter layer, not `AiGateway`;
-- [ ] structured output mapping;
-- [ ] tool-calling mapping;
-- [ ] cancellation and bounded timeout behavior;
-- [ ] untrusted runtime-response validation before Gateway use;
-- [ ] golden semantic evaluation fixtures/harness;
-- [ ] coverage for structured claims and protected-fact behavior through the existing Gateway;
-- [ ] no production GPU/runtime deployment.
-
-Local `llama.cpp` may remain a future/dev-compatible runtime boundary but is not required as a production backend.
+No live Qwen model has been executed yet; fixture success is not represented as live-model evaluation.
 
 ### Qwen checkpoint closure
 
-Qwen Runtime/Evaluation V1 may be called green only after its own signal-bearing adapter/evaluation tests, regression suite and stacked Draft PR CI pass on the exact final HEAD.
+Qwen Runtime Adapter & AI Evaluation V1 is CLOSED only when:
 
-## Real STOP boundary after Qwen Runtime/Evaluation
+1. documentation is synchronized;
+2. stacked Draft PR targets `feat/travel-retrieval-knowledge-ingestion-v1`;
+3. PR-triggered `validate` is PASS on exact final documentation HEAD;
+4. PR-triggered `postgres-compat` remains PASS on the same HEAD, preserving migrations `001→002→003`, Trip persistence and Knowledge pgvector regression;
+5. no production runtime/model deployment or credential activation occurs.
+
+## Mandatory STOP after Qwen Runtime/Evaluation
+
+After green Qwen checkpoint do **not** proceed automatically into deployment.
 
 Stop before:
 
-1. production GPU/runtime provisioning;
-2. downloading/placing production model weights;
-3. production model credentials/endpoints;
-4. paid AI APIs;
-5. production embedding activation;
-6. automated external Knowledge ingestion;
-7. production deployment;
-8. destructive migrations;
-9. merge to `main`.
+1. production GPU provisioning;
+2. actual vLLM server/runtime deployment;
+3. model weights download/placement;
+4. production model endpoint or credentials;
+5. paid AI API;
+6. production embedding activation;
+7. automatic external Knowledge ingestion;
+8. production deployment;
+9. destructive migrations;
+10. merge to `main`.
 
-Further deployment requires separate explicit approval.
+A future real-model deployment decision must separately approve runtime topology, model/version/licensing/checksum, network/auth policy, capacity/cost limits, live-model golden semantic evaluation, monitoring/rollback and privacy impact.
 
 ## Later roadmap — not started
 
-- production runtime/GPU topology;
+- real GPU/runtime deployment;
+- live Qwen semantic evaluation;
 - production Knowledge source approval and ingestion operations;
 - retention/refresh/deletion policy for Knowledge;
-- reranker decision based on evaluation;
-- Budget provider inputs / Currency contract;
+- reranker decision based on measured evaluation;
+- Budget/Currency provider inputs;
 - real Legal source adapters;
 - real Map adapter/provider activation;
 - Stay/Weather integrations;
