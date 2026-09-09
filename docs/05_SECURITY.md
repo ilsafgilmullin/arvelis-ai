@@ -1,6 +1,6 @@
 # ARVELIS AI — безопасность
 
-**Актуальность:** ARVELIS AI Engine & Knowledge Foundation V1 / бесплатная user-facing модель, 2026-09-09.
+**Актуальность:** Retrieval & Knowledge Ingestion Foundation V1 / бесплатная user-facing модель, 2026-09-10.
 
 ## Global invariants
 
@@ -11,62 +11,137 @@
 - provider/model-specific credentials and IDs do not enter `Trip`;
 - no provider response, model prompt, raw evidence payload, auth secret, document or payment data is logged by default;
 - billing/subscriptions/paywall remain outside Travel Domain;
-- no fake/model-generated external fact is promoted to authoritative data.
+- no fake/model-generated external fact is promoted to authoritative data;
+- private account Knowledge and Global Knowledge are different security namespaces;
+- user Trips, documents and conversation history are not training data by default and are not automatically promoted into Global Knowledge.
 
-## Existing provider boundaries
+## Existing AI Gateway boundary
 
-Yandex Rasp remains closed without production activation or live key. Map V1 remains provider-neutral with no real map vendor/credentials. Legal V1 remains route-general and source-backed with no real Legal provider. Existing Transport/Map/Legal ownership, provenance, freshness and fail-closed rules stay in force.
+`AiGateway` remains provider-neutral. Authenticated account scope is held in `AiGatewayServerContext` and is not exposed to `AiModelRuntime` input.
 
-## AI Gateway data minimization
+Trip-scoped execution requires an already-authorized Trip ID. Missing/invalid authorization fails before model execution.
 
-`AiGatewayRequest` contains only:
+The Gateway does not contain Qwen/vLLM-specific code and this Retrieval slice does not activate a real model runtime.
 
-- contract version;
-- prompt;
-- locale;
-- `general | trip` scope.
+## Knowledge namespace isolation
 
-The authenticated account scope remains in `AiGatewayServerContext` and is never exposed to `AiModelRuntime` input.
+Knowledge namespace is explicit:
 
-For trip-scoped execution the server must provide an already-authorized Trip ID. Missing/invalid trip authorization fails before model execution.
+- `global`;
+- `account:<accountId>`.
 
-The model runtime must not receive cookies, session secrets, provider keys, account identifiers, raw user documents or unrestricted Trip persistence objects through this foundation boundary.
+PostgreSQL stores namespace identity in `namespace_kind + namespace_key`, and those columns participate in source/document/version/chunk primary and foreign keys.
 
-## Runtime/retrieval/tool isolation
+Security properties:
 
-The AI execution stack is split into independent server-side ports:
+- account A cannot reference account B source/document/version/chunk through valid FK relations;
+- account A retrieval cannot request a second account namespace;
+- Global rows contain no account ID;
+- account rows reference an existing server account;
+- application validation rejects malformed/duplicate/multi-account namespace requests;
+- PostgreSQL constraints remain a second fail-closed boundary if application validation is bypassed.
 
-- `AiModelRuntime`;
-- `KnowledgeRetriever`;
-- `AiToolRegistry` handlers.
+Default Gateway retrieval is restricted to `global + authenticated account`.
 
-A real vendor adapter is not present in V1.
+## Global Knowledge rights boundary
 
-All external outputs are validated before use:
+Global Knowledge must not silently absorb user/private content.
 
-- retriever output validates source/chunk shape, IDs, references, HTTPS URLs and bounds;
-- model turns validate request identity, tool calls and structured answers;
-- tool output validates evidence shape and allowed domains;
-- unknown/unregistered tools fail closed.
+- global source cannot be `sourceType=user`;
+- global source cannot be `rights=user_owned`;
+- ingestion service requires explicit `public` or `licensed` rights for Global Knowledge;
+- `restricted` or `unknown` rights are rejected for Global ingestion;
+- source type alone does not prove rights;
+- URL presence does not imply permission to ingest.
 
-## Tool allowlist and provenance
+No crawler or automatic external importer exists in Retrieval V1.
 
-Only the following V1 tool IDs exist:
+## Source / document / version validation
 
-- `trip.read`;
-- `transport.search`;
-- `map.route`;
-- `legal.check`.
+Source metadata is bounded and validated for:
 
-The model sees only tools with registered server handlers.
+- source type;
+- rights;
+- lifecycle status;
+- jurisdiction;
+- language;
+- optional HTTPS canonical URL;
+- timestamps.
 
-Tool evidence is stamped by the server with the actual executed `toolId`. A model cannot grant itself authority by inventing tool provenance inside its answer.
+Document versions record:
 
-Server tool handlers receive the authenticated account/trip context; model-visible tool descriptors do not contain credentials or account scope.
+- normalized SHA-256 content hash;
+- size;
+- lifecycle status;
+- fetched/verified timestamps;
+- effective date range.
+
+Chunks record bounded text, domain, jurisdiction/language, SHA-256 hash and embedding lifecycle state.
+
+Malformed metadata fails closed before trusted persistence/use.
+
+## Deduplication security/data-integrity policy
+
+Document content is normalized before hashing (`NFC`, normalized line endings, trim) and SHA-256 is calculated server-side.
+
+Deduplication key is scoped to:
+
+`namespace + document + contentHash`.
+
+This prevents a private account document from becoming deduplicated against or aliased to another account's document purely because its bytes are identical.
+
+Concurrent same-namespace duplicate ingestion is resolved through a database unique constraint plus lookup of the authoritative existing version. The service does not create a second canonical version after a race.
+
+## Embedding boundary
+
+`KnowledgeEmbeddingPort` is an injected server-side interface.
+
+- expected V1 dimension: 1024;
+- every returned value must be finite;
+- batch size must match request size;
+- invalid embedding response fails closed;
+- without an embedding port, chunks remain `pending` and no fake vector is generated;
+- Qwen3-Embedding-0.6B is approved as the target V1 embedding model but is not activated here;
+- no embedding credentials or production endpoint are configured.
+
+## PostgreSQL / pgvector boundary
+
+Migration `003_knowledge_retrieval_foundation.sql` is additive only.
+
+It runs `CREATE EXTENSION IF NOT EXISTS vector` and creates new Knowledge tables. Existing migration files `001` and `002` remain immutable/checksummed.
+
+`embedding vector(1024)` is nullable and must be present only when `embedding_status=ready`.
+
+No approximate ANN index is created in V1. Retrieval uses bounded exact cosine similarity so isolation/filter correctness is validated before future performance tuning.
+
+## Retrieval filtering / freshness
+
+Search requests validate and bound:
+
+- namespaces;
+- 1024-dimensional query embedding;
+- maximum result count;
+- source status;
+- version status;
+- languages;
+- jurisdictions;
+- freshness mode;
+- explicit `asOf` timestamp.
+
+Default AI retrieval accepts only active sources and ready versions.
+
+Freshness rules do not treat retrieval time as proof of validity:
+
+- `effectiveUntil` in the future/present can be current;
+- missing `effectiveUntil` is unknown;
+- expired content is filtered out when current/current-or-unknown policy requires it;
+- `fetchedAt` and `verifiedAt` are provenance metadata, not a universal authority guarantee.
 
 ## Protected factual domains
 
-The following domains are protected:
+RAG does not bypass existing tool authority policy.
+
+Protected domains remain:
 
 - transport schedule;
 - price;
@@ -75,116 +150,70 @@ The following domains are protected:
 - legal;
 - weather.
 
-A model inference is never authoritative for these domains.
+A retrieved chunk, even from an official source, cannot by itself authorize Legal/Transport/Map protected facts where the Gateway requires matching current normalized tool evidence.
 
-Authority requirements:
+## Data-use/privacy boundary
 
-- schedule/price/availability => current evidence from `transport.search`;
-- map route => current evidence from `map.route`;
-- legal => current official HTTPS evidence from `legal.check`;
-- weather => authoritative status impossible in V1 because no Weather tool exists.
+Retrieval V1 does not implement:
 
-Stale or unknown-freshness evidence is not sufficient.
+- automatic Trip → Knowledge ingestion;
+- automatic chat/conversation → Knowledge ingestion;
+- automatic user-document → Global Knowledge promotion;
+- training or fine-tuning on user data;
+- outbound sending of account Knowledge to a real model/embedding service;
+- crawler/download of external sources.
 
-## Knowledge / RAG security boundary
-
-Knowledge/RAG retrieval is untrusted and independently validated.
-
-Knowledge sources may be `official`, `editorial` or `user`, but source type alone does not bypass protected-tool rules.
-
-In particular:
-
-- an official RAG chunk does not establish an authoritative Legal fact;
-- RAG does not replace Transport, Map or Legal provider boundaries;
-- missing `validUntil` produces freshness `unknown`;
-- expired source evidence is non-authoritative;
-- malformed/insecure source references fail closed.
-
-No production source set, crawler, embedding model, vector store or ingestion service is configured in Foundation V1.
-
-## Structured-output security
-
-Final AI output contains a user-visible `message` plus typed `claims`.
-
-Each claim declares:
-
-- domain;
-- `fact | inference` mode;
-- evidence references.
-
-Protected facts without the correct current tool evidence are rejected as invalid model output rather than silently downgraded to trusted content.
-
-Important limitation: deterministic schema validation can verify declared claims/evidence, but cannot semantically prove that free-form prose contains no undeclared factual assertion. Therefore a future real-model activation requires semantic evaluation that all externally-checkable assertions are represented in structured claims.
+A future user-document ingestion feature requires an explicit consent, purpose, retention, deletion, access-control and provider-transfer decision before activation.
 
 ## Bounded execution / denial-of-service controls
 
-Foundation limits include:
+Foundation bounds include:
 
-- bounded prompt/output/evidence sizes;
-- bounded retrieval source/chunk counts;
-- allowlisted tool count;
-- maximum two tool-call rounds;
-- global Gateway timeout;
-- caller cancellation;
-- bounded audit metadata.
-
-A timeout/abort propagates through runtime/retriever/tool execution via `AbortSignal`.
+- document max size;
+- chunk count/text size;
+- embedding dimensions/batch shape;
+- search result limit;
+- maximum namespace count;
+- source/language/jurisdiction filter sizes;
+- existing Gateway evidence/tool limits;
+- timeout/cancellation through the embedding/runtime interfaces where applicable.
 
 ## Audit / observability
 
-AI Gateway audit may contain only operational metadata such as:
+Operational logs/audit must not contain raw source documents, chunk text, user private content, embeddings, prompts, credentials, cookies or model response bodies by default.
 
-- request ID;
-- runtime/retriever ID;
-- scope and authorized Trip ID;
-- timing/status;
-- retrieval status;
-- tool-call count;
-- evidence count;
-- validation error codes.
+Allowed operational metadata may include opaque IDs, lifecycle status, timing, counts and validation/error codes when needed.
 
-Audit must not contain raw prompt text, raw evidence/source text, model credentials, provider secrets, cookies or user documents.
+## Signal-bearing security tests
 
-## Evaluation / activation policy
+`test:retrieval-knowledge-foundation` covers:
 
-A future real AI runtime must not be activated solely because API connectivity works.
+- namespace validation/isolation;
+- rights fail-closed behavior;
+- source/version/dedup lifecycle;
+- embedding shape failure;
+- bounded retrieval/normalization.
 
-Mandatory evaluation coverage includes:
+`test:knowledge-postgres-foundation` on PR CI covers:
 
-- account-scope isolation;
-- trip authorization boundary;
-- unknown tools;
-- unsupported/stale price, schedule, availability, map, legal and weather facts;
-- malformed retriever/tool/model output;
-- protected-fact enforcement;
-- server tool provenance stamping;
-- timeout/cancellation;
-- semantic structured-claim coverage for externally-checkable assertions.
+- PostgreSQL 18 + pgvector migration compatibility;
+- `vector(1024)` storage/search;
+- SQL/FK cross-account isolation;
+- status/language/jurisdiction/freshness filtering;
+- database-backed dedup compatibility.
 
-The foundation release gate fails when required critical evaluation cases are missing or failed.
+Existing AI Engine, Plan, Transport, Map, Legal, Yandex and Trip security regressions remain required.
 
-## Persistence / retention
+## Runtime/evaluation next boundary
 
-Foundation V1 does not introduce model conversation persistence, vector storage, embedding storage or production Knowledge ingestion.
+After Retrieval V1 closes, Qwen Runtime Adapter & AI Evaluation V1 may implement an OpenAI-compatible vLLM adapter only through the existing `AiModelRuntime` interface.
 
-Any future retention requires a separate privacy/security/source-rights decision covering source terms, personal data, refresh, deletion and audit requirements.
+Qwen/vLLM-specific response parsing, structured-output mapping and tool-call mapping must stay inside the adapter. `AiGateway` remains policy/vendor-neutral.
 
-## CI security
-
-Important AI/Knowledge V1 gates:
-
-- `npm audit --audit-level=high`;
-- strict project typecheck;
-- lower Plan/Transport/Map/Legal/Yandex/Trip regressions;
-- one AI/Knowledge business/security/evidence gate;
-- server runtime build including Gateway/Knowledge files;
-- existing server-backed Chromium regression;
-- frontend build;
-- stacked PR PostgreSQL lower-layer regression;
-- GitHub Actions `contents: read`.
+Golden semantic evaluation must run before any real model deployment so syntactically valid responses are not treated as semantically safe merely because they satisfy JSON shape.
 
 ## Production / STOP boundaries
 
-No real model/runtime provider, embedding provider, vector database, AI credential or production Knowledge ingestion is connected in this foundation.
+No production GPU, production model weights, production runtime endpoint, model credential, paid AI API, production embedding activation, crawler or automatic external Knowledge ingestion is authorized.
 
-After the AI/Knowledge checkpoint, stop before selecting/activating those components. Production deployment, paid services, destructive migrations and merge to `main` remain forbidden without separate confirmation.
+No merge to `main`, production deployment or destructive migration is authorized by this slice.

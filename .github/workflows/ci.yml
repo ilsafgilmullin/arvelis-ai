@@ -2,7 +2,7 @@ name: ARVELIS CI
 
 on:
   pull_request:
-    branches: [main, feat/travel-foundation-v1, feat/travel-ui-redesign-v2, feat/travel-trip-persistence-v1, feat/travel-plan-orchestration-contract-v1, feat/travel-transport-contract-v1, feat/travel-transport-provider-foundation-v1, feat/travel-yandex-rasp-live-adapter-v1, feat/travel-map-provider-foundation-v1, feat/travel-legal-sources-foundation-v1]
+    branches: [main, feat/travel-foundation-v1, feat/travel-ui-redesign-v2, feat/travel-trip-persistence-v1, feat/travel-plan-orchestration-contract-v1, feat/travel-transport-contract-v1, feat/travel-transport-provider-foundation-v1, feat/travel-yandex-rasp-live-adapter-v1, feat/travel-map-provider-foundation-v1, feat/travel-legal-sources-foundation-v1, feat/travel-ai-knowledge-foundation-v1]
   push:
     branches:
       - 'codex/**'
@@ -15,6 +15,7 @@ on:
       - 'feat/travel-map-provider-foundation-v1'
       - 'feat/travel-legal-sources-foundation-v1'
       - 'feat/travel-ai-knowledge-foundation-v1'
+      - 'feat/travel-retrieval-knowledge-ingestion-v1'
   workflow_dispatch:
 
 permissions:
@@ -61,6 +62,9 @@ jobs:
       - name: ARVELIS AI Engine and Knowledge Foundation
         run: npm run test:ai-knowledge-foundation
 
+      - name: Retrieval and Knowledge Ingestion Foundation
+        run: npm run test:retrieval-knowledge-foundation
+
       - name: Yandex Rasp live adapter HTTP and freshness
         run: npm run test:yandex-rasp-live
 
@@ -82,7 +86,7 @@ jobs:
     timeout-minutes: 12
     services:
       postgres:
-        image: postgres:18.4
+        image: pgvector/pgvector:0.8.6-pg18
         env:
           POSTGRES_DB: arvelis_test
           POSTGRES_USER: arvelis
@@ -115,3 +119,6 @@ jobs:
 
       - name: PostgreSQL Trip persistence and ownership
         run: npm run test:trip-postgres
+
+      - name: PostgreSQL pgvector Knowledge isolation and retrieval
+        run: npm run test:knowledge-postgres-foundation

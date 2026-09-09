@@ -12,88 +12,125 @@ ARVELIS AI на текущем этапе полностью бесплатен 
 
 ## Current engineering slice
 
-`ARVELIS AI Engine & Knowledge Foundation V1` развивается в `feat/travel-ai-knowledge-foundation-v1` поверх закрытого `Legal Sources & Travel Legal Foundation V1` (Draft PR #34).
+`ARVELIS Retrieval & Knowledge Ingestion Foundation V1` развивается в `feat/travel-retrieval-knowledge-ingestion-v1` поверх закрытого `ARVELIS AI Engine & Knowledge Foundation V1` (Draft PR #35).
 
-**Реальная модель, embedding provider, vector database, RAG storage, production knowledge ingestion и AI credentials не подключены.** Активный пользовательский AI runtime остаётся truthful `not_connected`.
+Этот slice добавляет реальную persistence/retrieval foundation для будущего RAG, но **не активирует реальную модель, embedding runtime или production Knowledge ingestion**.
+
+Зафиксированный стек для дальнейшего AI/RAG направления:
+
+- primary open-weight model candidate V1 — `Qwen3-8B`;
+- model runtime boundary — OpenAI-compatible `vLLM`;
+- local development runtime может использовать `llama.cpp` через отдельный adapter;
+- embedding V1 — `Qwen3-Embedding-0.6B`;
+- reranker — disabled;
+- retrieval storage — существующий PostgreSQL + `pgvector`;
+- отдельная vector DB не вводится;
+- `AiGateway` остаётся vendor-neutral и не содержит Qwen/vLLM-specific logic.
+
+## Retrieval / Knowledge contracts
+
+`src/travel/knowledgeIngestionContracts.ts` задаёт:
+
+- `global | account` namespace;
+- source registry;
+- document / document version / chunk contracts;
+- source type, rights, status, jurisdiction и language;
+- `fetchedAt`, `verifiedAt`, `effectiveFrom`, `effectiveUntil`;
+- embedding lifecycle/status;
+- bounded vector-search request и result contracts.
+
+`server/travel/knowledgeEmbeddingPort.ts` оставляет embedding model заменяемым. Production embedding model не подключён; без embedding port новые chunks сохраняются с `embeddingStatus: pending`.
+
+## Namespace isolation
+
+Global Knowledge и private account Knowledge разделены на application и database уровнях.
+
+- `global` namespace не содержит `accountId`;
+- `account` namespace обязан иметь конкретный authenticated account ID;
+- PostgreSQL primary/foreign keys включают `namespace_kind + namespace_key`;
+- cross-account source/document/version/chunk linkage отклоняется БД;
+- retrieval для запроса конкретного аккаунта допускает только `global + этот account`;
+- private Trip, документы и переписка не продвигаются автоматически в Global Knowledge и не используются для обучения.
+
+Global source не может быть `user`/`user_owned`; ingestion в Global Knowledge разрешён только для явно `public` или `licensed` rights.
+
+## Ingestion / deduplication
+
+`server/travel/knowledgeIngestionService.ts`:
+
+- нормализует текст (`NFC`, LF, trim);
+- вычисляет SHA-256 content hash;
+- deduplicate выполняется внутри `(namespace, document, content_hash)`;
+- duplicate version в другом account namespace не считается тем же документом;
+- concurrent duplicate insert обрабатывается fail-safe через PostgreSQL uniqueness + повторный lookup;
+- malformed metadata, rights, namespace, timestamps и embedding batch отклоняются до trusted use.
+
+Автоматического crawler/import pipeline нет. Реальные внешние источники этим slice не скачиваются и не индексируются.
+
+## PostgreSQL + pgvector
+
+Additive migration:
+
+`server/db/migrations/003_knowledge_retrieval_foundation.sql`
+
+Она:
+
+- выполняет `CREATE EXTENSION IF NOT EXISTS vector`;
+- не изменяет `001_auth_foundation.sql` и `002_travel_trip_persistence.sql`;
+- создаёт `knowledge_sources`, `knowledge_documents`, `knowledge_document_versions`, `knowledge_chunks`;
+- хранит embedding как `vector(1024)`;
+- хранит source/version status, rights, jurisdiction/language и freshness timestamps;
+- сохраняет namespace isolation в composite PK/FK;
+- не создаёт approximate vector index до появления реальных объёмов и измерений производительности.
+
+V1 repository использует bounded exact cosine search через pgvector. Максимальный пользовательский retrieval result — 20 элементов; текущий Gateway retriever запрашивает не более 12.
+
+## Retrieval policy
+
+`server/travel/postgresKnowledgeRetriever.ts` адаптирует PostgreSQL repository к уже существующему `KnowledgeRetriever`.
+
+Default AI retrieval:
+
+- namespaces: `global + authenticated account`;
+- source status: `active`;
+- version status: `ready`;
+- locale `ru-RU`: `ru-RU | ru`;
+- freshness: `current_or_unknown`;
+- bounded result count;
+- repository output повторно нормализуется и проходит существующую `KnowledgeRetrievalResult` validation до попадания в `AiGateway`.
+
+Freshness semantics:
+
+- `effectiveUntil >= asOf` => current;
+- отсутствующий `effectiveUntil` => unknown;
+- expired version исключается при `current`/`current_or_unknown` согласно filter policy;
+- retrieval/fetched time сам по себе не означает юридическую или provider freshness.
+
+RAG по-прежнему не обходится вокруг protected-fact policies: Legal/Transport/Map authoritative facts требуют соответствующий validated tool evidence.
 
 ## Provider-neutral AI Gateway
 
-`server/travel/aiGateway.ts` отделяет application policy от конкретного model/runtime vendor.
+Existing `server/travel/aiGateway.ts` не получил Qwen/vLLM-specific logic.
 
 Gateway:
 
-- принимает bounded structured request;
-- хранит authenticated account scope только server-side;
-- передаёт model runtime только prompt/locale/scope, уже-authorized Trip ID, evidence и список реально подключённых tools;
-- поддерживает global timeout/cancellation;
-- ограничивает tool-call rounds и evidence budget;
-- валидирует retrieval output, model turns, tool calls, tool evidence и final structured answer;
-- возвращает truthful `not_connected`, если runtime отсутствует;
-- не логирует prompt, raw evidence, provider response bodies или secrets в orchestration audit.
-
-Existing `PlanOrchestrator` не заменён: он остаётся отдельным high-level planning contract. Generic AI Gateway — новый нижний execution/evidence boundary для будущего runtime.
-
-## Runtime / retrieval ports
-
-`server/travel/aiEnginePorts.ts` задаёт injected interfaces:
-
-- `AiModelRuntime`;
-- `KnowledgeRetriever`;
-- AI tool handlers.
-
-Ни один concrete vendor adapter в V1 не выбран.
-
-Knowledge/RAG boundary нормализует `KnowledgeSource`, `KnowledgeChunk` и retrieval result. Retriever output считается untrusted и проходит deterministic validation до попадания в model context.
-
-## Tool registry
-
-Allowlisted tool IDs:
-
-- `trip.read`;
-- `transport.search`;
-- `map.route`;
-- `legal.check`.
-
-Model видит только фактически зарегистрированные handlers. Произвольный tool ID отклоняется. Evidence после tool execution получает server-stamped `origin: tool` и реальный `toolId`; модель не может самостоятельно объявить provider/tool provenance.
-
-## Protected facts
-
-Модель **не является источником фактов** для:
-
-- цен;
-- расписаний транспорта;
-- availability;
-- route-map geometry/facts;
-- legal requirements;
-- weather.
-
-Price/schedule/availability требуют current evidence от `transport.search`. Map facts — от `map.route`. Legal facts — current official HTTPS evidence от `legal.check`. Weather в Foundation V1 не имеет authoritative tool, поэтому weather fact не может стать authoritative вообще.
-
-Knowledge/RAG evidence само по себе не может сделать protected fact authoritative, даже если retrieved source помечен official. Например Legal fact обязан пройти normalized Legal tool boundary.
-
-## Structured output / provenance
-
-Model answer содержит явные structured claims:
-
-- domain;
-- `fact | inference`;
-- evidence IDs.
-
-Inference всегда non-authoritative. Fact без evidence отклоняется. Protected fact без matching current tool evidence отклоняется целиком как invalid model output.
-
-Free-form `message` является presentation text, а не доказательством factual authority. Перед подключением real runtime обязательна semantic evaluation, что externally-checkable assertions из prose также представлены в structured claims; deterministic schema alone этого доказать не может.
-
-## Evaluation policy
-
-`server/travel/aiEvaluationPolicy.ts` задаёт mandatory release-eval checklist. Real runtime adapter нельзя активировать, пока critical cases не имеют явного PASS: not-connected behavior, account-scope isolation, unknown tools, unsupported protected facts, official Legal evidence, stale evidence, retrieval validation, cancellation/timeout и structured-claim coverage prose.
+- хранит authenticated account scope server-side;
+- передаёт model runtime только normalized input;
+- валидирует retriever/model/tool output;
+- поддерживает timeout/cancellation;
+- ограничивает tool/evidence rounds;
+- возвращает truthful `not_connected`, если runtime отсутствует.
 
 ## Verification
+
+Signal-bearing gates:
 
 ```bash
 npm ci
 npm audit --audit-level=high
 npm run typecheck
 npm run test:ai-knowledge-foundation
+npm run test:retrieval-knowledge-foundation
 npm run test:transport-provider-foundation
 npm run test:yandex-rasp-live
 npm run test:trip-server
@@ -102,19 +139,34 @@ npm run test:travel-browser
 npm run build
 ```
 
-Новый AI test — один signal-bearing business/security/evidence gate; отдельный browser suite не добавлен, потому что этот foundation slice не выполняет active AI UI/runtime wiring.
+PR-triggered PostgreSQL/pgvector gate дополнительно выполняет:
 
-## STOP boundary
+```bash
+npm run db:migrate
+npm run test:trip-postgres
+npm run test:knowledge-postgres-foundation
+```
 
-После green AI/Knowledge Foundation checkpoint **не выбирать и не активировать самостоятельно**:
+PostgreSQL CI image: `pgvector/pgvector:0.8.6-pg18`.
 
-- model/runtime vendor;
-- embedding provider;
-- vector DB;
-- production knowledge source set/ingestion pipeline;
-- AI production credentials;
-- paid AI/RAG services.
+## Scope boundaries
 
-Также не выполнять production deployment или merge в `main` без отдельного подтверждения.
+Retrieval/Knowledge Ingestion V1 **не включает**:
 
-См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/51_ARVELIS_AI_ENGINE_KNOWLEDGE_FOUNDATION_V1.md`.
+- crawler или автоматическое скачивание внешних источников;
+- production source set;
+- production embedding activation;
+- Qwen/vLLM runtime activation;
+- production GPU/model weights;
+- credentials или paid API;
+- reranker;
+- отдельную vector DB;
+- automatic Trip/chat/document → Global Knowledge ingestion;
+- training/fine-tuning на пользовательских данных;
+- production deployment;
+- merge в `main`;
+- destructive migrations.
+
+После полного green Retrieval checkpoint следующий утверждённый slice — `Qwen Runtime Adapter & AI Evaluation V1`. Реальный GPU/runtime deployment остаётся отдельным STOP boundary.
+
+См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/07_DECISIONS.md`, `docs/52_RETRIEVAL_KNOWLEDGE_INGESTION_FOUNDATION_V1.md`.
