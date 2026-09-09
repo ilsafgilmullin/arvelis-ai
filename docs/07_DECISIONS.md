@@ -270,3 +270,25 @@
 - Existing Trip domain, local persistence и auth/server foundation сохраняются и не переписываются ради presentation layer.
 - Automated responsive acceptance целится в `390×844`, `844×390`, `360×800`, `1440×900`; physical iPhone Safari/VoiceOver остаётся отдельным manual acceptance item, если соответствующая среда недоступна.
 - Следующий server/data/AI slice требует отдельного подтверждения и не начинается автоматически.
+
+## 2026-09-09 — Server-side Trip Persistence & API V1
+
+Это решение заменяет local-only persistence **только для реально authenticated Travel account** и сохраняет preview/local storage как отдельный тестовый контур.
+
+- Server API V1: `GET /api/trips`, `GET /api/trips/:id`, `PUT /api/trips/:id`.
+- `DELETE` в V1 намеренно отсутствует до отдельного решения по retention/deletion/recovery.
+- Владение Trip определяется только authenticated HttpOnly session; client `ownerScopeId` не является authorization credential.
+- Foreign-owned payload отклоняется; list/get всегда account-scoped.
+- Trip ID scoped составным ключом `(account_id, id)`, поэтому одинаковые IDs разных аккаунтов не смешивают данные.
+- `createdAt` и `updatedAt` являются server-authoritative.
+- V1 хранит валидированный `Trip` как aggregate JSON document: SQLite `TEXT`, PostgreSQL `jsonb`; account/timestamps вынесены в authoritative columns.
+- Выбрана additive migration `002_travel_trip_persistence`; auth migration `001` не переписывается, destructive migration не выполняется.
+- Real-auth frontend переключается на same-origin HTTP repository за существующим repository boundary; preview остаётся local-only.
+- Server failure не маскируется silent fallback-записью в browser localStorage.
+- Mutations используют существующий same-origin request guard и bounded JSON body.
+- Persistence CI оставляет только signal-bearing gates: high-severity audit, typecheck, SQLite business/ownership/migration, server build, один server-backed Chromium happy-path, frontend build и PostgreSQL migration/ownership PR gate.
+- Browser happy-path проверяет `HttpOnly-compatible session → /api/trips → SQLite → reload → reopen` на `390×844` и не выдаёт preview/localStorage за server persistence.
+- Во время slice обнаружены новые high-severity advisories Nodemailer `9.0.5`; dependency/lock обновлены до `9.1.1`, после чего audit вернулся к zero vulnerabilities.
+- Временный self-mutating workflow для npm-generated lock удалён; финальный CI снова имеет `contents: read`.
+- Production DB provider/region, backups, retention/export/deletion, real AI/provider integrations и production deployment этим решением не утверждены.
+- После полного PostgreSQL PASS следующий согласованный slice — `Plan real-data contract / AI orchestration policy`; переход не означает автоматическое подключение конкретного AI vendor.
