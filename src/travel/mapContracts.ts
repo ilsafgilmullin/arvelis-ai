@@ -168,6 +168,7 @@ export function validateMapRouteResponse(
   const requestById = new Map(request.points.map((point) => [point.id, point]));
   const points = response.points as MapResolvedPoint[];
   if (new Set(points.map((point) => point.id)).size !== points.length) errors.push({ path: 'points', code: 'duplicate_id' });
+  const responsePointByRequestId = new Map<string, MapResolvedPoint>();
   for (const [index, point] of points.entries()) {
     const prefix = `points[${index}]`;
     if (!validId(point.id) || !validId(point.requestPointId) || !validText(point.label, 160) || !validCoordinate(point.coordinate)) {
@@ -179,17 +180,36 @@ export function validateMapRouteResponse(
       errors.push({ path: `${prefix}.requestPointId`, code: 'request_point_mismatch' });
       continue;
     }
+    if (responsePointByRequestId.has(point.requestPointId)) {
+      errors.push({ path: `${prefix}.requestPointId`, code: 'duplicate_id' });
+    } else {
+      responsePointByRequestId.set(point.requestPointId, point);
+    }
     if (!['provided', 'provider_resolved'].includes(point.resolution)) errors.push({ path: `${prefix}.resolution`, code: 'invalid_value' });
-    if (point.resolution === 'provided') {
-      if (!requested.coordinate
+
+    if (requested.coordinate) {
+      if (point.resolution !== 'provided'
         || requested.coordinate.latitude !== point.coordinate.latitude
         || requested.coordinate.longitude !== point.coordinate.longitude) {
         errors.push({ path: `${prefix}.coordinate`, code: 'coordinate_mismatch' });
       }
+    } else if (point.resolution !== 'provider_resolved') {
+      errors.push({ path: `${prefix}.resolution`, code: 'coordinate_mismatch' });
+    }
+  }
+
+  for (const requiredRole of ['origin', 'destination'] as const) {
+    const requested = request.points.find((point) => point.role === requiredRole);
+    if (requested && !responsePointByRequestId.has(requested.id)) {
+      errors.push({ path: `points.${requiredRole}`, code: 'request_point_mismatch' });
     }
   }
 
   const pointIds = new Set(points.map((point) => point.id));
+  const requiredRoutePointIds = request.points
+    .filter((point) => point.role === 'origin' || point.role === 'destination')
+    .map((point) => responsePointByRequestId.get(point.id)?.id)
+    .filter((id): id is string => id !== undefined);
   const routes = response.routes as MapRouteGeometry[];
   if (new Set(routes.map((route) => route.id)).size !== routes.length) errors.push({ path: 'routes', code: 'duplicate_id' });
   for (const [index, route] of routes.entries()) {
@@ -198,7 +218,9 @@ export function validateMapRouteResponse(
       errors.push({ path: prefix, code: 'invalid_value' });
       continue;
     }
-    if (route.pointIds.some((id) => !pointIds.has(id))) errors.push({ path: `${prefix}.pointIds`, code: 'request_point_mismatch' });
+    if (route.pointIds.some((id) => !pointIds.has(id)) || requiredRoutePointIds.some((id) => !route.pointIds.includes(id))) {
+      errors.push({ path: `${prefix}.pointIds`, code: 'request_point_mismatch' });
+    }
     if (!Array.isArray(route.geometry) || route.geometry.length < 2 || route.geometry.length > 4096 || route.geometry.some((point) => !validCoordinate(point))) {
       errors.push({ path: `${prefix}.geometry`, code: 'invalid_shape' });
     }
