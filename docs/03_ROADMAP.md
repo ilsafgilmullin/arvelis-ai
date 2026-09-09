@@ -37,9 +37,9 @@
 
 Physical-device checks остаются acceptance QA и не меняют product scope.
 
-## Server-side Trip Persistence & API V1 — CURRENT RELEASE GATE
+## Server-side Trip Persistence & API V1 — DoD CLOSED / Draft PR #28
 
-Реализация собрана в `feat/travel-trip-persistence-v1` поверх Travel UI V2.
+Реализация собрана в `feat/travel-trip-persistence-v1` поверх Travel UI V2 и оставлена Draft без merge.
 
 - [x] account-scoped server Trip repository contract;
 - [x] `GET /api/trips`;
@@ -53,36 +53,39 @@ Physical-device checks остаются acceptance QA и не меняют produ
 - [x] real-auth frontend switched behind repository boundary to same-origin API;
 - [x] preview remains explicit local-only mode;
 - [x] no silent server→local fallback;
-- [x] dependency audit restored to zero high vulnerabilities (`nodemailer 9.1.1`);
+- [x] dependency audit restored to zero vulnerabilities (`nodemailer 9.1.1`);
 - [x] CI restored to `contents: read`; self-mutating lock step removed;
 - [x] typecheck;
 - [x] SQLite migration/business/ownership test;
 - [x] server runtime build;
 - [x] one real server-backed Chromium happy-path at `390×844`;
 - [x] frontend build;
-- [ ] PostgreSQL migration/ownership PR gate;
-- [ ] Draft PR final status recorded.
+- [x] PostgreSQL 18.4 migrations `001 + 002`;
+- [x] PostgreSQL migration/persistence/ownership gate;
+- [x] Draft PR #28 records the checkpoint.
 
-DoD закрывается только после зелёного PostgreSQL PR gate. Merge в main не является частью DoD.
+Merge в `main` не является частью DoD и не выполнялся.
 
-## Следующий согласованный slice — только после зелёного persistence DoD
+## Next agreed slice — CURRENT AFTER PERSISTENCE DoD
 
 ### Plan real-data contract / AI orchestration policy
 
 Цель — определить, как ARVELIS формирует Plan из user constraints, verified source/provider inputs и будущего AI reasoning, не подключая vendor «любой ценой».
 
-Ожидаемые boundaries:
+Boundaries текущего следующего этапа:
 
-1. входной `PlanRequest` / Trip snapshot;
+1. входной `PlanRequest` / immutable Trip snapshot;
 2. provenance каждой значимой части результата;
 3. разделение user facts, provider facts, model inference и unknown;
 4. provider-neutral AI orchestration port;
 5. timeout/cancellation/error/fallback policy;
 6. запрет model-generated legal/price/availability facts без authoritative source;
-7. structured Plan result, который можно безопасно записать в Trip;
-8. audit metadata без хранения secrets/лишнего sensitive content.
+7. structured Plan result, который можно безопасно применить к Trip;
+8. audit metadata без хранения secrets/лишнего sensitive content;
+9. deterministic validation до записи результата;
+10. никакого real vendor adapter в contract slice.
 
-Реальный AI/provider connection в этот contract slice не подразумевается автоматически.
+Реальный AI/provider connection этим этапом не подразумевается автоматически.
 
 ## Later Travel sequence
 
@@ -97,11 +100,10 @@ DoD закрывается только после зелёного PostgreSQL P
 
 Каждый внешний provider — отдельное engineering/security/legal решение. Paid integration не подразумевается roadmap автоматически.
 
-## Explicitly not in current persistence slice
+## Still outside approved scope
 
-- real AI provider/model;
 - booking/ticket purchase;
-- production transport/stay/map/legal/weather APIs;
+- production transport/stay/map/legal/weather providers;
 - payments/billing/subscriptions;
 - production deployment/public registration rollout;
 - destructive Trip deletion/retention API;
