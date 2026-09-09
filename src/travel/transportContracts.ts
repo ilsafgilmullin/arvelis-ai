@@ -267,9 +267,9 @@ export function validateTransportSearchResponse(
 }
 
 export function getTransportRouteMetrics(route: NormalizedTransportRoute): TransportRouteMetrics {
-  if (route.segments.length === 0) return { durationMinutes: 0, transferCount: 0 };
   const first = route.segments[0];
   const last = route.segments[route.segments.length - 1];
+  if (first === undefined || last === undefined) return { durationMinutes: 0, transferCount: 0 };
   const durationMinutes = Math.max(0, Math.round((Date.parse(last.arrivalAt) - Date.parse(first.departureAt)) / 60_000));
   return { durationMinutes, transferCount: Math.max(0, route.segments.length - 1) };
 }
