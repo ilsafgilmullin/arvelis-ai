@@ -11,6 +11,7 @@ const allowed = new Map([
   ['trip-server', 'tests/.dist-trip-server'],
   ['trip-postgres', 'tests/.dist-trip-postgres'],
   ['plan-policy', 'tests/.dist-plan-policy'],
+  ['transport-policy', 'tests/.dist-transport-policy'],
 ]);
 
 const relative = allowed.get(target);
