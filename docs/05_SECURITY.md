@@ -1,6 +1,6 @@
 # ARVELIS AI — безопасность
 
-**Актуальность:** Plan Real-Data Contract & AI Orchestration Policy V1, 2026-09-09.
+**Актуальность:** Transport Normalized Route Contract V1 / бесплатная user-facing модель, 2026-09-09.
 
 ## Auth / ownership invariants
 
@@ -9,7 +9,7 @@
 - OTP/session peppers находятся только в protected environment;
 - session cookie HttpOnly;
 - Account/Session server-authoritative;
-- Trip `accountId` определяется из authenticated session;
+- Trip owner определяется из authenticated session;
 - client `ownerScopeId` не является authorization credential;
 - foreign Trip access fail closed.
 
@@ -17,152 +17,105 @@
 
 Server-side Trip API V1 account-scoped. SQLite используется для development/closed test, PostgreSQL adapter проверяется regression gate. Production DB/region/backups/retention остаются отдельным решением.
 
+## Product monetization boundary
+
+На текущем этапе ARVELIS AI — полностью бесплатный пользовательский сервис.
+
+- billing, subscriptions и paywall не проектируются и не подключаются;
+- Travel Domain не должен содержать тарифные/платёжные поля;
+- provider usage/cost controls допустимы только как внутренняя эксплуатационная защита backend;
+- выбор внешнего provider не должен делать бесплатность пользователя частью domain contract;
+- возможность будущего изменения коммерческой модели должна решаться вне `Trip`/Transport domain, отдельным application/access layer.
+
 ## Plan data minimization
 
-Будущий AI/provider не получает raw Trip aggregate автоматически.
+Будущий AI/provider не получает raw Trip aggregate автоматически. `PlanRequest` содержит только необходимые planning constraints. Session secrets, OTP, документы, банковские данные, live location, database credentials и provider keys не передаются.
 
-`PlanRequest` V1 содержит только planning data:
+## Transport data minimization
+
+`TransportSearchRequest` передаёт transport provider только данные, необходимые для поиска:
 
 - Trip ID/revision;
-- origin/destination;
-- dates/duration;
 - traveler count;
-- budget limit;
-- travel preferences;
-- bounded optional prompt.
+- budget limit как constraint;
+- transport preference hints;
+- origin/destination/date для legs.
 
-Не передаются автоматически:
+Не передаются cookies, session secrets, traveler identity labels, документы, payment details или полный Trip aggregate.
 
-- auth cookie/session secret;
-- OTP/peppers;
-- `ownerScopeId` как credential;
-- traveler identity labels;
-- passport/document data;
-- bank/payment data;
-- legal/map arrays;
-- live location;
-- provider/API credentials;
-- database connection data.
+## Provider response = untrusted input
 
-## Provider response is untrusted input
+Transport provider response проходит deterministic validation до использования:
 
-Даже типизированный `AIProvider` не является trusted source.
-
-Перед использованием `PlanProposal` проходит deterministic validation:
-
-- contract version;
-- Trip identity;
-- bounded array/text sizes;
+- contract/provider/request identity;
+- bounded route/segment counts;
 - unique IDs;
-- source reference integrity;
-- provenance values;
-- claim category/confidence;
-- destination/itinerary claim references;
-- HTTPS URL validation.
+- valid timestamps/HTTPS URL/value shape;
+- non-negative safe-integer price minor units;
+- segment chronology;
+- validity deadline not before retrieval time.
 
-Invalid provider response fail closed и не превращается в успешный Plan.
+Malformed provider response fail closed.
 
-## Provenance / authoritative facts
+## Freshness / authoritative transport facts
 
-Provenance V1:
+Schedule, price и availability считаются authoritative-current только если route имеет explicit `validUntil`, который не истёк.
 
-- `user_input`;
-- `provider_fact`;
-- `model_inference`;
-- `unknown`.
+- stale route не выдаётся за текущий;
+- route без freshness bound получает `unspecified`;
+- mixed-currency price comparison fail closed;
+- автоматический FX conversion не выполняется без отдельного Currency contract/provider;
+- AI/model inference не заменяет transport provider fact.
 
-Критические external facts:
+## Provider orchestration
 
-- transport schedule;
-- price;
-- availability;
-- legal;
-- weather.
+`TransportOrchestrator` обязан:
 
-Для них model inference не является authoritative независимо от confidence.
-
-`provider_fact` обязан ссылаться на declared source. Legal provider fact требует official HTTPS source. Expired provider evidence не используется как authoritative.
-
-User input подтверждает только то, что пользователь это сообщил; он не заменяет внешний authoritative source.
-
-## Timeout / cancellation / failure policy
-
-Server orchestration задаёт bounded timeout и принимает caller cancellation через `AbortSignal`.
-
-Ошибки разделяются на:
-
-- invalid input;
-- access denied;
-- provider not connected;
-- cancellation;
-- timeout;
-- provider failure;
-- invalid provider response;
-- invalid configuration.
-
-Нет silent fallback на mock result, local fake answer или альтернативного provider без явно реализованной policy.
+- проверить account scope/Trip ownership до provider call;
+- вернуть честный `not_connected`, если adapter отсутствует;
+- применять bounded timeout и caller cancellation;
+- валидировать output до use;
+- не делать silent/mock fallback;
+- не выполнять booking/purchase;
+- не мутировать Trip автоматически.
 
 ## Audit minimization
 
-Audit V1 хранит только технические metadata:
+Разрешены только минимальные технические metadata: request ID, Trip ID/revision, provider ID, timestamps/duration, status и validation codes.
 
-- request ID;
-- Trip ID/revision;
-- provider ID;
-- timestamps/duration;
-- orchestration status;
-- validation error codes.
+Не логируются route response body, user documents, cookies/session secrets, provider API keys, payment information и полный пользовательский prompt/context.
 
-Audit V1 **не** хранит:
+## External provider terms gate
 
-- user prompt;
-- provider response body;
-- documents;
-- cookies/session secrets;
-- API keys;
-- raw model/tool traces.
+Перед реальным подключением **каждого** transport API обязательна отдельная проверка актуальных официальных условий:
 
-Это снижает риск утечки чувствительного travel context через logs/audit.
+1. разрешённый тип проекта и география;
+2. attribution/branding requirements;
+3. quotas/rate limits;
+4. правила caching/storage/processing;
+5. deeplink/booking/affiliate requirements;
+6. право показывать price/availability;
+7. требования к бесплатному/платному пользовательскому доступу;
+8. credentials/security handling;
+9. изменение условий/termination risk;
+10. возможность замены provider без изменения Travel Domain.
 
-## Prompt injection / tool boundary
+Проверка должна фиксироваться датой и ссылками на официальные источники. Неофициальный reverse-engineered API не является production provider strategy.
 
-В Plan V1 нет tool execution, RAG, browser/search tools или document retrieval. Поэтому provider output не может самостоятельно инициировать privileged server action.
+## Secrets
 
-До будущего tool/RAG layer обязательны отдельные решения по:
-
-- prompt injection isolation;
-- tool allowlists;
-- per-tool authorization;
-- data minimization;
-- source provenance;
-- output encoding;
-- rate/cost controls;
-- sensitive-document policy.
-
-## Legal data
-
-AI-generated legal conclusion не является authoritative source. При отсутствии official verified source юридический claim остаётся non-authoritative/unverified.
-
-## Provider secrets
-
-Все будущие AI/travel provider credentials должны находиться только server-side в protected environment. Frontend не получает vendor keys.
+Все реальные transport/API credentials — только server-side protected environment. Frontend не получает vendor keys. Ключи не помещаются в GitHub, docs, screenshots или пользовательские ответы.
 
 ## CI security
 
 - `npm audit --audit-level=high` обязателен;
-- Nodemailer зафиксирован на `9.1.1` после security patch;
-- GitHub Actions permissions: `contents: read`;
-- self-mutating workflow отсутствует;
-- Plan policy smoke проверяет ownership, source requirements, cancellation, timeout и invalid response.
+- project typecheck обязателен;
+- Plan/Transport business-security smoke проверяют ownership, validation, timeout/cancellation и truthful not-connected states;
+- GitHub Actions permissions остаются `contents: read`;
+- self-mutating workflow отсутствует.
 
 ## Production / Russia review
 
-До public launch отдельно проверяются:
+До public production rollout отдельно проверяются персональные данные, трансграничная передача provider-ам, retention/deletion/export, consent/legal notices и фактическая доступность выбранных provider endpoints из России без обязательного VPN там, где это продуктово требуется.
 
-- требования к персональным данным и региону хранения;
-- трансграничная передача данных будущим AI/travel providers;
-- retention/deletion/export;
-- consent/legal notices;
-- доступность выбранной инфраструктуры в России без VPN, где это продуктово требуется.
-
-ARVELIS нельзя называть production-ready до фактического security/privacy/infrastructure audit.
+ARVELIS нельзя называть production-ready до фактического security/privacy/infrastructure/provider-terms audit.

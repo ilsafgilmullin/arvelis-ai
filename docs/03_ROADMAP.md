@@ -2,123 +2,90 @@
 
 **Актуальность:** 2026-09-09.
 
-Предыдущая universal/chat-first roadmap superseded решением `Travel Product Pivot`. Исторические этапы и PR не удаляются.
+Исторические universal/chat-first этапы сохраняются, но Travel Product Pivot остаётся текущим продуктовым направлением.
 
-## Foundation — сохранено
+## Закрытые foundation layers
 
-- [x] ARVELIS AI name/tagline/brand geometry.
-- [x] React + TypeScript + Vite frontend foundation.
-- [x] mobile-first/safe-area/reduced-motion UI hardening.
-- [x] Passwordless Email OTP + Account/Session foundation.
-- [x] SQLite closed-test auth persistence.
-- [x] PostgreSQL-compatible auth persistence.
-- [x] Replit runtime configuration.
-- [x] CI/npm lockfile/build foundation.
+- [x] Travel Pivot Foundation V1;
+- [x] Travel UI Redesign V2;
+- [x] Server-side Trip Persistence & API V1 — Draft PR #28, green, not merged;
+- [x] Plan Real-Data Contract & AI Orchestration Policy V1 — Draft PR #29, green, not merged;
+- [x] Transport Normalized Route Contract V1 — Draft PR #30, green, not merged.
 
-## Travel Pivot Foundation V1 — завершённый foundation
+## Transport Normalized Route Contract V1 — DoD CLOSED
 
-- [x] Travel vertical / target user / main problem / main flow fixed.
-- [x] `Trip` primary aggregate.
-- [x] local preview Trip repository boundary.
-- [x] Trip Workspace / Itinerary / Map / Budget / Legal / Trip Book foundations.
-- [x] provider-neutral AI/Transport/Map/Legal/Weather/Stay/Currency contracts.
-- [x] existing auth/server foundation preserved.
+Branch: `feat/travel-transport-contract-v1`  
+Base: Plan V1 / `7e99c1f118f037fcf90b488a1c2b24e409bedcf6`
 
-## Travel UI Redesign V2 — завершённый presentation slice
-
-- [x] light AI-first Home;
-- [x] side drawer primary navigation;
-- [x] general + trip-scoped ARVELIS AI UI contexts;
-- [x] mobile-first Create Trip wizard;
-- [x] responsive Trip Workspace;
-- [x] truthful provider unavailable/empty states;
-- [x] simplified Profile / dev-only diagnostics;
-- [x] iPhone UI polish.
-
-## Server-side Trip Persistence & API V1 — DoD CLOSED / Draft PR #28
-
-- [x] account-scoped server Trip repository/API;
-- [x] server-authoritative ownership/timestamps;
-- [x] SQLite + PostgreSQL adapters/migrations;
-- [x] authenticated frontend same-origin repository;
-- [x] no silent server→local fallback;
-- [x] typecheck/server build/browser/frontend build;
-- [x] PostgreSQL 18.4 migration/persistence/ownership;
-- [x] final read-only CI (`contents: read`).
-
-Merge в `main` не выполнялся.
-
-## Plan Real-Data Contract & AI Orchestration Policy V1 — CURRENT RELEASE GATE / Draft PR #29
-
-Base: `feat/travel-trip-persistence-v1` / `9d147e8955e158b8684a0a9ef399415ff64358c8`.
-
-Цель — зафиксировать trusted planning boundary до подключения реальной модели/RAG/provider.
-
-- [x] typed `PlanRequest` с минимизированным Trip snapshot;
-- [x] typed `PlanProposal`;
-- [x] declared sources + claim provenance;
-- [x] `user_input / provider_fact / model_inference / unknown`;
-- [x] `AIProvider.planTrip()` переведён с `Promise<unknown>` на typed contract;
-- [x] server `PlanOrchestrator`;
+- [x] minimized `TransportSearchRequest`;
+- [x] explicit destination + exact-date V1 boundary;
+- [x] typed normalized modes/segments/routes;
+- [x] typed `TransportProvider` with request context + `AbortSignal`;
+- [x] provider/request identity validation;
+- [x] normalized amount in minor units + 3-letter currency;
+- [x] explicit availability;
+- [x] retrieval/validity freshness boundary;
+- [x] route chronology validation;
+- [x] server Transport orchestrator;
 - [x] account ownership fail closed;
-- [x] provider-not-connected state;
-- [x] timeout;
-- [x] caller cancellation;
-- [x] no silent/mock/provider fallback;
-- [x] deterministic proposal validation;
-- [x] legal provider fact требует official HTTPS source;
-- [x] model inference для price/availability/schedule/legal/weather не authoritative;
-- [x] expired provider evidence не authoritative;
-- [x] audit metadata без prompt/response body и secrets;
-- [x] minimal business/security smoke;
-- [x] project typecheck;
-- [x] server runtime build;
-- [x] existing Trip/browser/frontend regression gate;
-- [x] Draft PR #29 открыт;
-- [ ] final Draft PR regression gate на documentation head.
+- [x] timeout/cancellation/not-connected/error semantics;
+- [x] deterministic duration/transfer/price comparison;
+- [x] no opaque/fake route score;
+- [x] mixed currency comparison fail closed;
+- [x] stale/unbounded data not authoritative;
+- [x] Plan/Trip regressions;
+- [x] typecheck/server/browser/frontend gate;
+- [x] stacked Draft PR #30 final regression;
+- [x] PostgreSQL 18.4 lower-layer regression.
 
-Реальный AI vendor/model, RAG/vector DB и travel provider в этот slice не входят.
+Real transport provider, booking, FX provider и vendor keys не входят в contract slice.
 
-## Следующий roadmap layer — после зелёного Plan V1 checkpoint
+## Текущая продуктовая модель
 
-### Transport / normalized route comparison contract
+ARVELIS AI на текущем этапе — полностью бесплатный user-facing сервис.
 
-Следующий этап можно начинать без выбора конкретного провайдера:
+- billing не проектируется;
+- subscriptions не проектируются;
+- paywall не проектируется;
+- Travel Domain остаётся независимым от будущей monetization model;
+- внутренние provider quotas/cost controls допустимы только как backend/application policy.
 
-1. normalized transport search request из Trip/Plan constraints;
-2. typed route/segment result contract;
-3. provider provenance для schedule/price/availability;
-4. currency/price timestamp/validity boundary;
-5. route comparison metrics без fake score;
-6. deduplication/normalization rules;
-7. timeout/cancellation/error semantics для transport adapters;
-8. deterministic validation перед записью route result в Trip;
-9. provider-neutral interface/tests;
-10. никаких реальных booking/purchase действий.
+## Next agreed slice — Transport Provider Strategy & Adapter Foundation V1
 
-Подключение конкретного transport provider — отдельное решение после contract layer, особенно если нужны платный API, production secrets, юридическая проверка или vendor lock-in.
+Перед реализацией каждого real adapter обязательно проверяются актуальные официальные:
+
+1. API terms и разрешённый тип проекта;
+2. бесплатность/стоимость provider access;
+3. attribution/branding requirements;
+4. quotas/rate limits;
+5. caching/storage/processing restrictions;
+6. право показывать schedule/price/availability;
+7. deeplink/affiliate/booking policy;
+8. доступность из России/backend topology;
+9. credentials/secret handling;
+10. vendor lock-in и возможность замены без изменения Travel Domain.
+
+Foundation должен оставаться provider-neutral. Конкретный provider activation, API key и production traffic требуют отдельного подтверждения условий непосредственно перед подключением.
 
 ## Later Travel sequence
 
-1. Budget provider inputs and currency handling;
-2. Legal source ingestion/verification;
-3. Map provider implementation;
-4. Stay/Weather integrations where justified;
-5. Trip Book export/generation;
-6. Live Companion;
-7. Safe/emergency capabilities.
+1. real Transport adapter(s) после terms/credentials gate;
+2. Budget provider inputs / Currency contract;
+3. Legal source ingestion/verification;
+4. Map provider implementation;
+5. Stay/Weather integrations;
+6. Trip Book export/generation;
+7. Live Companion;
+8. Safe/emergency capabilities.
 
-## Still outside approved scope
+## Всё ещё вне scope без отдельного решения
 
-- real AI/RAG provider;
+- real AI/RAG vendor;
 - booking/ticket purchase;
-- production transport/stay/map/legal/weather providers;
-- payments/billing/subscriptions;
-- production deployment/public registration rollout;
-- destructive Trip deletion/retention API;
+- billing/subscriptions/paywall;
+- production deployment/public registration;
+- destructive Trip deletion/retention operations;
+- production secrets;
+- irreversible migrations;
 - AR/offline maps;
-- Live/Safe automation;
-- camera/realtime voice;
-- Travel Memory/full Group Travel.
-
-Каждый внешний provider — отдельное engineering/security/legal решение. Paid integration не подразумевается roadmap автоматически.
+- Live/Safe automation.

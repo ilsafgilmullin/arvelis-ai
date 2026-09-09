@@ -4,131 +4,98 @@
 
 Слоган: `INTELLIGENCE. PRECISION. RESULTS.`
 
-Текущий пользовательский Travel UI — light AI-first: white / soft blue-white surfaces, teal/blue/green palette, side drawer и Trip Workspace. Геометрия бренда не менялась: `A`, круговая орбита и точечная дуга сохранены.
+Текущий пользовательский Travel UI — light AI-first. Геометрия ARVELIS brand mark не менялась.
 
 ## Текущий engineering slice
 
-`Plan Real-Data Contract & AI Orchestration Policy V1` развивается в stacked-ветке `feat/travel-plan-orchestration-contract-v1` поверх завершённого `Server-side Trip Persistence & API V1` (`feat/travel-trip-persistence-v1`, Draft PR #28).
+`Transport Normalized Route Contract V1` развивается в stacked-ветке `feat/travel-transport-contract-v1` поверх закрытого `Plan Real-Data Contract & AI Orchestration Policy V1` (`feat/travel-plan-orchestration-contract-v1`, Draft PR #29).
 
-Draft PR текущего Plan slice: **#29**. Merge не выполняется.
+Цель — зафиксировать provider-neutral transport request/response, provenance/freshness и сравнение маршрутов **до выбора и подключения конкретного transport vendor**.
 
-Цель — определить строгий server-side contract между Trip, будущими verified provider facts и будущим AI reasoning **до подключения реальной модели, RAG или travel provider**.
+## Transport contract V1
 
-## Plan contract V1
+`src/travel/transportContracts.ts` задаёт:
 
-`src/travel/planContracts.ts` фиксирует:
+- `TransportSearchRequest` из минимизированных Trip constraints;
+- exact outbound/return legs;
+- normalized modes/segments/routes;
+- provider route ID и request/provider identity;
+- price в minor units + ISO currency;
+- availability;
+- `retrievedAt` / optional `validUntil`;
+- optional HTTPS source URL;
+- deterministic chronology/shape validation.
 
-- `PlanRequest` с минимизированным immutable Trip snapshot;
-- `PlanProposal` как структурированный результат;
-- `PlanSourceReference`;
-- `PlanClaim`;
-- provenance: `user_input | provider_fact | model_inference | unknown`;
-- confidence и source references;
-- destination / itinerary suggestions;
-- assumptions;
-- deterministic validation до использования результата.
+Flexible dates и неизвестный destination не подменяются предположением: V1 fail closed до отдельного discovery/flexible-search contract.
 
-В PlanRequest намеренно не передаются owner/session credentials, traveler labels, legal/map state, документы, secrets и полный Trip aggregate.
+## Transport orchestration policy
 
-## AI orchestration policy
+`TransportProvider.searchRoutes()` теперь typed и получает `AbortSignal`.
 
-`AIProvider.planTrip()` больше не возвращает `unknown`. Он принимает typed `PlanRequest`, typed provider context и `AbortSignal`, возвращая `PlanProposal`.
+`server/travel/transportOrchestrator.ts`:
 
-`server/travel/planOrchestrator.ts` задаёт server policy:
+- проверяет authenticated account scope и Trip ownership;
+- честно возвращает `not_connected`, если provider отсутствует;
+- задаёт timeout/cancellation;
+- считает provider response untrusted до validation;
+- отклоняет provider/request mismatch и malformed chronology;
+- вычисляет freshness/authority policy;
+- не пишет маршруты автоматически в Trip;
+- не выполняет booking/purchase;
+- не делает silent/mock fallback.
 
-- Trip owner должен совпадать с authenticated account scope;
-- real provider может отсутствовать — это честное `not_connected`;
-- timeout ограничивает provider call;
-- caller cancellation распространяется через `AbortSignal`;
-- provider output считается untrusted до `validatePlanProposal`;
-- invalid provider response fail closed;
-- silent fallback на fake/local answer отсутствует;
-- orchestration не пишет Plan автоматически в Trip;
-- audit содержит только request/provider/trip metadata, timestamps/status и validation codes, но не prompt/response body и не secrets.
+## Route comparison
 
-## Real-data / provenance rules
+V1 не использует непрозрачный «лучший маршрут» score.
 
-Критические внешние факты (`transport_schedule`, `price`, `availability`, `legal`, `weather`) не становятся authoritative только потому, что их сгенерировала модель.
+Доступны deterministic criteria:
 
-- `provider_fact` обязан ссылаться на declared source;
-- legal provider fact требует official HTTPS source;
-- model inference остаётся advisory/non-authoritative;
-- expired provider evidence не используется как authoritative;
-- user input может быть authoritative только как пользовательское утверждение, а не как подтверждение внешнего факта;
-- unknown provenance не повышается до verified автоматически.
+- duration;
+- transfers;
+- price.
 
-Это contract policy, а не факт подключения реальных источников.
+Price comparison выполняется только когда все сравниваемые цены current и в одной валюте. Mixed currency не конвертируется автоматически. Stale или unbounded route data не считается authoritative current schedule/price/availability.
 
-## Persistence / auth foundations
-
-Server-side Trip Persistence V1 закрыт в Draft PR #28:
-
-- authenticated account → same-origin `/api/trips`;
-- SQLite closed-test persistence;
-- PostgreSQL 18.4-compatible persistence;
-- server-authoritative ownership/timestamps;
-- preview остаётся explicit local-only mode.
-
-Passwordless Email OTP / HttpOnly session foundation не переписывалась.
-
-## AI truth boundary
+## Truth boundary
 
 На текущем этапе **не подключены**:
 
-- реальная AI model/API;
-- RAG/vector database;
-- Transport provider;
-- Map provider;
-- Legal provider;
-- Weather provider;
-- Stay provider;
-- Currency provider;
-- booking/payment flow.
+- реальный transport provider;
+- booking/ticket purchase;
+- currency conversion provider;
+- real AI/RAG;
+- Map/Legal/Weather/Stay providers.
 
-Fake AI replies, fake prices, fake availability, fake schedules и fake legal conclusions запрещены.
+Fake schedules, prices, availability и booking state запрещены.
 
-## Development
+## Нижние закрытые слои
 
-Frontend preview:
-
-```bash
-npm run dev
-```
-
-Closed-test auth runtime после настройки protected environment:
-
-```bash
-npm run dev:auth
-```
+- Server-side Trip Persistence & API V1 — Draft PR #28, green, not merged;
+- Plan Real-Data Contract & AI Orchestration Policy V1 — Draft PR #29, green, not merged.
 
 ## Verification
-
-Основной gate текущего Plan slice:
 
 ```bash
 npm ci
 npm audit --audit-level=high
 npm run typecheck
 npm run test:plan-policy
+npm run test:transport-policy
 npm run test:trip-server
 npm run build:auth-server
 npm run test:travel-browser
 npm run build
 ```
 
-`npm run test:plan-policy` проверяет минимизацию PlanRequest, provenance/source validation, legal official-source rule, expired evidence, ownership, not-connected, cancellation, timeout и invalid provider response.
+Draft PR также прогоняет PostgreSQL 18.4 persistence regression нижнего слоя.
 
-Stacked Draft PR дополнительно сохраняет PostgreSQL persistence regression gate существующего нижнего слоя.
+## Release / decision boundary
 
-## Release boundary
+- merge в `main` не выполняется без отдельного подтверждения;
+- production deploy и paid services не выполняются;
+- реальные provider keys не добавляются;
+- destructive migrations/deletion не выполняются.
 
-- merge в `main` — только после отдельного подтверждения;
-- production deploy не выполняется;
-- реальные AI/RAG/travel providers не подключаются этим slice;
-- paid services не подключаются;
-- destructive migrations/deletion не выполняются;
-- production DB/provider region и legal/privacy rollout остаются отдельными решениями.
+После зелёного Transport V1 contract следующий шаг внутри Transport roadmap — **выбор реального provider strategy**. Это требует отдельного продуктово-технического решения по coverage (авиа/жд/автобус), доступности в России, API terms/costs, source freshness, booking/deeplink policy, credentials и vendor lock-in.
 
-После зелёного Plan checkpoint следующий roadmap layer — provider-neutral **Transport / normalized route comparison contract**, до выбора конкретного внешнего transport provider.
-
-См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/44_TRAVEL_TRIP_PERSISTENCE_API_V1.md` и `docs/45_PLAN_REAL_DATA_ORCHESTRATION_POLICY_V1.md`.
+См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/45_PLAN_REAL_DATA_ORCHESTRATION_POLICY_V1.md` и `docs/46_TRANSPORT_NORMALIZED_CONTRACT_V1.md`.
