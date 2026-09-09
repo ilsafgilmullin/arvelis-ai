@@ -43,7 +43,7 @@ Implemented scope:
 - [x] implementation push #704 PASS;
 - [x] README documentation;
 - [x] Architecture/Roadmap/Security documentation;
-- [x] dedicated `docs/51_ARVELIS_AI_ENGINE_KNOWLEDGE_FOUNDATION_V1.md` planned as final documentation artifact.
+- [x] dedicated `docs/51_ARVELIS_AI_ENGINE_KNOWLEDGE_FOUNDATION_V1.md`.
 
 Closure criterion:
 
