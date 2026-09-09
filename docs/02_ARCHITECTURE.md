@@ -1,6 +1,6 @@
 # ARVELIS AI — архитектура
 
-**Актуальность:** Map Provider Foundation & Route Map V1, 2026-09-09.
+**Актуальность:** Legal Sources & Travel Legal Foundation V1, 2026-09-09.
 
 ## Core invariants
 
@@ -20,7 +20,8 @@
 - Plan Real-Data Contract & AI Orchestration Policy V1;
 - Transport Normalized Route Contract V1;
 - Transport Provider Strategy & Adapter Foundation V1;
-- Yandex Rasp Live Adapter V1 — implementation closed, production key not activated.
+- Yandex Rasp Live Adapter V1 — implementation closed, production key not activated;
+- Map Provider Foundation & Route Map V1 — Draft PR #33, green, no real map provider.
 
 ## Transport / Yandex boundary
 
@@ -28,86 +29,103 @@ Transport remains normalized through `TransportProvider` and `TransportOrchestra
 
 ## Map Provider Foundation V1
 
-### Provider-neutral contract
+`src/travel/mapContracts.ts` defines provider-neutral map requests/responses, normalized point resolution, route geometry, attribution and freshness. `MapOrchestrator` checks ownership before provider execution, applies timeout/cancellation, validates untrusted output and does not persist provider geometry automatically.
 
-`src/travel/mapContracts.ts` defines:
+User-provided coordinates cannot be silently replaced by a provider. Missing provider validity remains `unspecified` rather than authoritative-current. Active UI therefore stays truthful while no real map provider is connected.
 
-- `MapRouteRequest` — Trip ID/revision plus map-relevant origin/destination/waypoints;
-- `MapResolvedPoint` — normalized coordinate + resolution provenance;
-- `MapRouteGeometry` — bounded route geometry with optional distance/duration/source URL;
-- `MapRouteResponse` — provider/request identity, retrieval time, optional provider validity, points/routes/attributions;
-- `MapResponsePolicy` — current/expired/unspecified freshness.
+## Legal Sources & Travel Legal Foundation V1
 
-The request intentionally does not include account secrets, traveler identities, documents, payment data or map-vendor IDs.
+### Scope boundary
 
-### User coordinate integrity
+Legal V1 is intentionally `route_general` only.
 
-If a request point already has a user-provided coordinate, a provider response cannot silently replace it. It must return `resolution: provided` with the same coordinate. A different coordinate or an attempt to relabel it as `provider_resolved` fails validation.
+Current `Trip` does not contain citizenship, nationality, passport number/type, residence permit, visa history or traveler identity details. The Legal layer therefore cannot answer personalized questions such as whether a specific traveler needs a visa. It must not infer or invent those fields.
 
-Origin and destination must both be resolved before normalized route geometry is accepted. Route references must use normalized response point IDs and include the required route endpoints.
+`LegalCheckRequest` contains only:
 
-### Validation bounds
+- contract version;
+- Trip ID/revision;
+- origin;
+- destination;
+- optional start/end dates;
+- `scope: route_general`.
 
-Map provider responses are bounded and validated for:
+This is the data-minimization boundary between Travel Domain and future legal-source adapters.
 
-- provider/request identity;
-- unique IDs;
-- requested-point membership;
-- latitude/longitude ranges;
-- point/route/geometry count limits;
-- HTTPS source/attribution URLs;
-- non-negative safe-integer distance/duration;
-- user-coordinate integrity;
-- required origin/destination resolution.
+### Source contract
 
-### MapOrchestrator
+`LegalSourceReference` records:
 
-`server/travel/mapOrchestrator.ts` mirrors the established provider-neutral orchestration pattern:
+- stable source ID;
+- title/publisher;
+- HTTPS URL;
+- `official | secondary` source type;
+- retrieval time;
+- optional effective-from/effective-until dates.
+
+`LegalClaim` records category, summary, source references and `verified | needs_review` status.
+
+Every claim must reference at least one source. An uncited conclusion fails validation.
+
+A `verified` claim can reference only official sources. A secondary source may support a `needs_review` claim but cannot establish an authoritative legal fact.
+
+### Freshness / effective dates
+
+Retrieval time alone does not prove legal validity.
+
+For each claim the application derives:
+
+- `expired` — at least one cited source is past explicit `effectiveUntil`;
+- `current` — all cited sources have explicit non-expired `effectiveUntil`;
+- `unknown` — source validity window is incomplete.
+
+A claim is authoritative only when all of the following hold:
+
+1. status is `verified`;
+2. freshness is `current`;
+3. at least one cited source exists;
+4. all cited sources are `official`;
+5. every cited source URL is HTTPS.
+
+`expired` and `unknown` freshness are never authoritative.
+
+### LegalOrchestrator
+
+`server/travel/legalOrchestrator.ts` follows the established provider-neutral orchestration pattern:
 
 1. validates account scope;
-2. checks Trip ownership;
-3. creates minimized Map request;
-4. returns truthful `not_connected` when provider is absent;
-5. applies timeout/cancellation;
-6. validates untrusted provider response;
-7. evaluates freshness policy;
-8. does not mutate/persist Trip automatically.
+2. checks Trip ownership before any provider call;
+3. creates minimized route-general request;
+4. returns truthful `not_connected` when no provider is configured;
+5. applies caller cancellation and bounded timeout;
+6. validates provider/request identity and normalized legal output;
+7. evaluates per-claim freshness/authority;
+8. does not mutate or persist `Trip` automatically.
 
 Default provider timeout is 12 seconds and is bounded to 60 seconds.
 
-### Freshness
+Provider failures, malformed payloads, missing citations, verified secondary-source claims and request/provider identity mismatches fail closed.
 
-A local retrieval timestamp does not prove a route is current.
+## AI/Knowledge next boundary
 
-- future provider `validUntil` => `current`;
-- expired `validUntil` => `expired`;
-- no provider validity => `unspecified` and `routeAuthoritative: false`.
+After Legal V1 closes, `ARVELIS AI Engine & Knowledge Foundation V1` may introduce provider-neutral AI gateway/runtime ports, Knowledge evidence/retrieval contracts and a tool registry over Trip/Transport/Map/Legal.
 
-Application cache age, if introduced by a future vendor adapter, must remain separate from provider validity.
+The AI layer must not become a source of truth for prices, transport schedules, legal rules, weather or availability. Those facts must come from normalized tools/provider evidence. Model output remains inference unless source-backed through the applicable tool/evidence contract.
 
-## Route Map presentation
-
-No real map vendor is connected in this foundation slice. Active UI therefore remains a truthful empty state. The old decorative pseudo-route schematic is hidden so a generated-looking route is not shown before validated map data exists.
-
-Existing `Trip.mapPoints` remain the lower-level stored user/provider points from the foundation model. Normalized Map provider responses are not automatically persisted into `Trip`, SQLite or PostgreSQL.
+No model/runtime, embedding provider, vector database or production knowledge ingestion is selected by this architecture document.
 
 ## CI / testing
 
-Signal-bearing gates include:
+Signal-bearing gates for Legal V1:
 
 - dependency audit;
 - strict project typecheck;
-- Plan/Transport regressions;
-- Map provider business/security/freshness smoke;
-- Yandex regression;
+- existing Plan/Transport/Map/Yandex regressions;
+- one Legal business/security/freshness gate;
 - Trip ownership regression;
 - server runtime build;
-- one server-backed Chromium happy-path, now including the truthful Map empty-state path;
+- one existing server-backed Chromium happy-path;
 - frontend build;
 - PostgreSQL lower-layer regression in the stacked PR.
 
 CI keeps `contents: read`.
-
-## Next layer
-
-After the Map checkpoint closes, the next stacked slice is `Legal Sources & Travel Legal Foundation V1`. It will follow the same pattern: minimized request, source-backed claims, official-source provenance, freshness/effective-date policy, ownership-aware orchestration and no live provider activation.
