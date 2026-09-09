@@ -16,6 +16,7 @@ const allowed = new Map([
   ['yandex-rasp-live', 'tests/.dist-yandex-rasp-live'],
   ['map-provider-foundation', 'tests/.dist-map-provider-foundation'],
   ['legal-foundation', 'tests/.dist-legal-foundation'],
+  ['ai-knowledge-foundation', 'tests/.dist-ai-knowledge-foundation'],
 ]);
 
 const relative = allowed.get(target);
