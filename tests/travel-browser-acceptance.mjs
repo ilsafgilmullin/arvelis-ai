@@ -259,10 +259,10 @@ try {
   assert.deepEqual(client.runtimeErrors, [], `Browser runtime errors: ${client.runtimeErrors.join(', ')}`);
 
   const database = new DatabaseSync(databasePath, { readOnly: true });
-  const persisted = database.prepare('SELECT account_id, document_json FROM travel_trips WHERE account_id = ?').all(accountId) as Array<{ account_id: string; document_json: string }>;
+  const persisted = database.prepare('SELECT account_id, document_json FROM travel_trips WHERE account_id = ?').all(accountId);
   database.close();
   assert.equal(persisted.length, 1, 'Browser-created Trip must exist in server SQLite');
-  const document = JSON.parse(persisted[0].document_json);
+  const document = JSON.parse(String(persisted[0].document_json));
   assert.equal(document.ownerScopeId, accountId);
   assert.equal(document.destination, 'Сочи');
   assert.equal(document.durationDays, 8);
