@@ -40,6 +40,8 @@
     "server/travel/transportOrchestrator.ts",
     "server/travel/transportProviderPolicy.ts",
     "server/travel/providers/yandexRaspAdapter.ts",
+    "server/travel/providers/yandexRaspHttpClient.ts",
+    "server/travel/providers/yandexRaspLiveProvider.ts",
     "server/persistence/postgres/rows.ts",
     "server/persistence/postgres/accountIdentityStore.ts",
     "server/persistence/postgres/emailOtpChallengeStore.ts",

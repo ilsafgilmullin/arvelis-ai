@@ -27,53 +27,85 @@ ARVELIS AI на текущем этапе — полностью бесплат�
 ## Transport Provider Strategy & Adapter Foundation V1 — DoD CLOSED
 
 Branch: `feat/travel-transport-provider-foundation-v1`  
-Base: Transport Contract V1 / `28ea5ab063f7e0c152ac92bffbe9c7d89a440e92`
+Final head: `c73deed052b0f94b5cbf791aa0385879fb073e43`  
+Draft PR #31 — green, open, not merged.
 
-- [x] provider-neutral activation policy;
-- [x] official-terms review boundary;
-- [x] free-product compatibility gate;
-- [x] attribution/branding metadata;
-- [x] quota/credentials gate;
-- [x] cache/storage restriction metadata;
-- [x] future monetization change handled outside Travel Domain;
-- [x] normalized `legId`;
-- [x] explicit price semantics (`from/quoted/cached_observation/unknown`);
-- [x] Yandex Rasp adapter foundation with injected client/resolver;
-- [x] `et_marker` not treated as availability;
-- [x] no fake provider `validUntil`;
-- [x] Aviasales Search blocked for current early-stage strategy;
-- [x] Aviasales Data retained only as future cached insight source;
-- [x] Product/Architecture/Roadmap/Security/README synchronized;
-- [x] `docs/47_TRANSPORT_PROVIDER_STRATEGY_ADAPTER_FOUNDATION_V1.md` added;
-- [x] PR #31 validate PASS;
-- [x] PR #31 PostgreSQL 18.4 lower-layer regression PASS.
+Закрыто:
 
-No real API key, live HTTP traffic, booking or production activation belongs to this foundation slice.
+- provider-neutral activation policy;
+- official-terms review boundary;
+- free-product compatibility gate;
+- attribution/branding metadata;
+- quota/credentials gate;
+- cache/storage restriction metadata;
+- normalized `legId` и explicit price semantics;
+- Yandex Rasp adapter foundation;
+- `et_marker` not treated as availability;
+- no fake provider `validUntil`;
+- Aviasales Search blocked for current strategy;
+- Aviasales Data retained only as future cached insight source;
+- Product/Architecture/Roadmap/Security/README synchronized;
+- PR-triggered validate + PostgreSQL 18.4 regression PASS.
 
-## Current slice — Yandex Rasp Live Adapter V1
+## Yandex Rasp Live Adapter V1 — implementation/docs complete, final PR gate required
 
-Scope без production activation:
+Branch: `feat/travel-yandex-rasp-live-adapter-v1`  
+Base: Provider Foundation / `c73deed052b0f94b5cbf791aa0385879fb073e43`  
+Implementation SHA: `df835cf92221cad3edb5d29b8e71a9f0a132ecf4`
 
-1. real server-side HTTP client;
-2. env-only `YANDEX_RASP_API_KEY`;
-3. location resolution;
-4. official Yandex request/response mapping;
-5. attribution output contract;
-6. temporary-cache-only policy;
-7. provenance/freshness without invented provider validity;
-8. truthful disabled/not_connected without key;
-9. one server-side HTTP happy-path through stub/fake endpoint;
-10. no booking/payment/persistent Yandex result storage.
+Реализовано:
 
-Перед фактической activation ключа повторно проверяются current official Yandex terms, attribution, quota и endpoint access.
+- [x] real server-side HTTP client на native Node `fetch`;
+- [x] approved Yandex Rasp API host validation;
+- [x] API key only in `Authorization` header;
+- [x] env-only credentials;
+- [x] fail-closed activation without key/fresh terms/quota confirmation;
+- [x] official `stations_list`-based location resolution;
+- [x] exact settlement/station matching;
+- [x] ambiguous/missing location fail closed;
+- [x] point-to-point request mapping;
+- [x] normalized route mapping без изменения Trip Domain;
+- [x] attribution output contract;
+- [x] `et_marker` remains non-availability;
+- [x] `from` price semantics;
+- [x] no invented provider `validUntil`;
+- [x] temporary in-memory search cache only;
+- [x] bounded temporary location directory cache;
+- [x] no persistent Yandex result storage;
+- [x] one real server-side HTTP happy-path through local stub/fake endpoint;
+- [x] existing TransportOrchestrator/Trip regressions preserved;
+- [x] implementation push CI PASS on `df835cf92221cad3edb5d29b8e71a9f0a132ecf4`;
+- [x] README/Architecture/Roadmap/Security closure;
+- [x] `docs/48_YANDEX_RASP_LIVE_ADAPTER_V1.md` added.
 
-## Provider candidates after Yandex
+Final DoD gate before declaring the slice CLOSED:
 
-- Aviasales Search API — **не подключать сейчас**;
-- Aviasales Data API — только future cached price insights;
-- другие providers — только после отдельного official terms/coverage/security review.
+- stacked Draft PR base `feat/travel-transport-provider-foundation-v1`;
+- PR-triggered validate PASS on documentation HEAD;
+- PR-triggered PostgreSQL 18.4 lower-layer regression PASS.
 
-## Later Travel sequence
+После этого slice считается **CLOSED**, но фактическая live API activation всё равно остаётся отдельным действием.
+
+## STOP boundary after Yandex V1
+
+После green final PR regression самостоятельно **не начинать новый slice**.
+
+Не выполнять без отдельного подтверждения:
+
+- production wiring;
+- установку/активацию реального `YANDEX_RASP_API_KEY`;
+- изменение production secrets;
+- live provider traffic rollout;
+- booking/ticket purchase/payment;
+- persistent storage Yandex data;
+- Aviasales Search API;
+- Aviasales Data live integration;
+- другие transport provider adapters;
+- merge в `main`.
+
+## Future Travel sequence — not started
+
+Следующие пункты остаются только roadmap, а не текущим scope:
 
 1. Budget provider inputs / Currency contract;
 2. Legal source ingestion/verification;
