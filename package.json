@@ -27,10 +27,11 @@
     "test:transport-policy": "node scripts/prepare-smoke-runtime.mjs transport-policy && tsc -p tsconfig.transport-policy-smoke.json && node tests/.dist-transport-policy/tests/transport-contract-policy-smoke.js",
     "test:transport-provider-foundation": "node scripts/prepare-smoke-runtime.mjs transport-provider-foundation && tsc -p tsconfig.transport-provider-foundation-smoke.json && node tests/.dist-transport-provider-foundation/tests/transport-provider-foundation-smoke.js",
     "test:yandex-rasp-live": "node scripts/prepare-smoke-runtime.mjs yandex-rasp-live && tsc -p tsconfig.yandex-rasp-live-smoke.json && node tests/.dist-yandex-rasp-live/tests/yandex-rasp-live-adapter-smoke.js",
+    "test:map-provider-foundation": "node scripts/prepare-smoke-runtime.mjs map-provider-foundation && tsc -p tsconfig.map-provider-foundation-smoke.json && node tests/.dist-map-provider-foundation/tests/map-provider-foundation-smoke.js",
     "test:travel-browser": "node tests/travel-browser-acceptance-runner.mjs",
     "db:migrate": "node scripts/migrate-auth-db.mjs",
     "test:server-db": "node scripts/prepare-smoke-runtime.mjs server-db && tsc -p tsconfig.server-db-smoke.json && node tests/.dist-server-db/tests/postgres-auth-persistence-smoke.js",
-    "check": "npm run typecheck && npm run test:plan-policy && npm run test:transport-policy && npm run test:transport-provider-foundation && npm run test:yandex-rasp-live && npm run test:trip-server && npm run build:auth-server && npm run test:travel-browser && npm run build",
+    "check": "npm run typecheck && npm run test:plan-policy && npm run test:transport-policy && npm run test:transport-provider-foundation && npm run test:yandex-rasp-live && npm run test:map-provider-foundation && npm run test:trip-server && npm run build:auth-server && npm run test:travel-browser && npm run build",
     "check:free-auth": "npm run auth:readiness && npm run check",
     "check:with-db": "npm run check && npm run db:migrate && npm run test:trip-postgres"
   },
