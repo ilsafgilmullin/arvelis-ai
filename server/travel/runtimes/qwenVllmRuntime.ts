@@ -296,7 +296,7 @@ export class QwenVllmRuntime implements AiModelRuntime {
   readonly id = QWEN_VLLM_RUNTIME_ID;
   private readonly baseUrl: URL;
   private readonly model: string;
-  private readonly apiKey?: string;
+  private readonly apiKey: string | undefined;
   private readonly timeoutMs: number;
   private readonly maxTokens: number;
   private readonly fetchImpl: typeof fetch;
