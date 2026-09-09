@@ -248,6 +248,18 @@ try {
   assert.equal(openedTrip, true);
   await waitFor(client, "document.body.textContent.includes('ПЛАНИРОВАНИЕ ПОЕЗДКИ') && document.body.textContent.includes('Сочи')", 'reopened server Trip');
 
+  await clickExact(client, 'Карта');
+  await waitFor(client, "document.body.textContent.includes('Карта маршрута') && document.body.textContent.includes('После подключения картографического сервиса')", 'truthful map empty state');
+  const mapTruth = await client.evaluate(`(() => {
+    const schematic = document.querySelector('.travel-map-schematic');
+    return {
+      fakeSchematicVisible: schematic ? getComputedStyle(schematic).display !== 'none' : false,
+      hasCanvas: Boolean(document.querySelector('canvas, .mapboxgl-map, .leaflet-container')),
+    };
+  })()`);
+  assert.equal(mapTruth.fakeSchematicVisible, false, 'Decorative fake map schematic must not be visible');
+  assert.equal(mapTruth.hasCanvas, false, 'No real map provider is connected in Map Foundation V1');
+
   const layout = await client.evaluate(`(() => ({
     innerWidth,
     scrollWidth: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth),
@@ -269,7 +281,7 @@ try {
   assert.equal(document.durationDays, 8);
   assert.equal(document.budget.limitRub, 150000);
 
-  console.log('travel browser server-persistence happy-path: PASS (390x844)');
+  console.log('travel browser server-persistence + truthful-map happy-path: PASS (390x844)');
 } catch (error) {
   if (devLog) process.stderr.write(devLog.slice(-8_000));
   throw error;
