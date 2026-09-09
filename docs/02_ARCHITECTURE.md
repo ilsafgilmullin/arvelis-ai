@@ -1,207 +1,158 @@
 # ARVELIS AI — архитектура
 
-**Актуальность:** Plan Real-Data Contract & AI Orchestration Policy V1, 2026-09-09.
+**Актуальность:** Transport Normalized Route Contract V1, 2026-09-09.
 
 ## Принципы
 
-- mobile-first frontend;
-- `Trip` — основной продуктовый агрегат;
-- UI, domain, persistence, provider adapters, auth, orchestration, audit и analytics разделены;
-- server-authoritative ownership не доверяет client-supplied account identity;
-- provider output считается untrusted до contract validation;
-- внешние AI/travel providers заменяемы;
-- demo/mock и real provider data имеют явную границу;
-- секреты только в protected environment;
-- legacy Chat не определяет Travel domain.
+- `Trip` — основной product aggregate;
+- UI, domain, persistence, orchestration и provider adapters разделены;
+- account ownership определяется trusted server session;
+- provider output считается untrusted до deterministic validation;
+- provenance/freshness обязательны для внешних фактов;
+- external providers заменяемы;
+- secrets только server-side/protected environment;
+- fake AI/transport/legal data не подменяет реальный backend.
 
-## Фактический stack
+## Stack / нижние слои
 
-- React `19.2.8`;
-- React DOM `19.2.8`;
-- TypeScript `6.0.3`;
-- Vite `8.2.1`;
-- Node requirement `>=22.12.0 <27`; CI runtime Node `24.19.0`;
-- `pg 8.23.0`;
-- Nodemailer `9.1.1`;
-- npm lockfile через `npm ci`;
-- Vite dev: `0.0.0.0:3000`;
-- same-origin `/api` proxy → trusted server runtime `127.0.0.1:3001`;
-- development/closed-test persistence: SQLite;
-- PostgreSQL 18.4 compatibility — PR regression gate.
+- React `19.2.8`, TypeScript `6.0.3`, Vite `8.2.1`;
+- Node `>=22.12.0 <27`, CI Node `24.19.0`;
+- authenticated Trip persistence через same-origin `/api/trips`;
+- SQLite closed-test + PostgreSQL 18.4-compatible adapter;
+- Plan V1 typed contract/orchestration policy завершён отдельным stacked Draft PR #29.
 
-## Travel frontend / persistence boundary
+## Plan boundary
 
-`src/travel/` содержит domain/UI/repository/contracts.
+`PlanRequest` передаёт минимизированный Trip snapshot будущему AI provider. `PlanProposal` имеет explicit sources/claims/provenance. Critical model inference не становится authoritative external fact без source-backed evidence.
 
-Persistence selection:
+Реальный AI/RAG не подключён.
 
-- preview → browser local repository;
-- authenticated real mode → `HttpTripRepository` через same-origin `/api/trips`;
-- server failure не переводит пользователя скрыто обратно на local persistence.
+## Transport normalized contract
 
-`TravelApp` не знает конкретный DB adapter.
+`src/travel/transportContracts.ts` добавляет provider-independent layer.
 
-## Server Trip boundary
+### Search request
 
-`server/travel/service.ts` сохраняет server-authoritative Trip ownership/timestamps. `accountId` приходит только из authenticated session; client `ownerScopeId` не является authorization credential.
+`TransportSearchRequest` содержит только transport-relevant constraints:
 
-API V1:
-
-- `GET /api/trips`;
-- `GET /api/trips/:id`;
-- `PUT /api/trips/:id`.
-
-SQLite/PostgreSQL реализуют общий `ServerTripStore` contract. Migration `002_travel_trip_persistence` additive.
-
-## Plan real-data contract
-
-Новый `src/travel/planContracts.ts` отделяет будущий AI reasoning от raw Trip aggregate.
-
-### `PlanRequest`
-
-Содержит только минимальный planning snapshot:
-
-- Trip ID + revision;
-- origin / optional destination;
-- dates / duration;
+- version;
+- Trip ID/revision;
 - traveler count;
 - budget limit;
-- travel preferences;
-- optional bounded user prompt.
+- transport preference hints;
+- exact outbound/return legs.
 
-Не передаются автоматически:
+Не передаются session/owner credentials, traveler identities, documents или full Trip aggregate.
 
-- `ownerScopeId` как provider credential;
-- session/cookie/auth data;
-- traveler labels/identities;
-- legal/map arrays;
-- documents;
-- provider secrets;
-- database metadata.
+V1 требует explicit destination и exact dates. Unknown destination/flexible dates fail closed, а не преобразуются в выдуманные параметры.
 
-### `PlanProposal`
+### Normalized response
 
-Структурированный provider result содержит:
+`TransportSearchResponse` содержит:
 
-- summary;
-- declared sources;
-- claims;
-- destination suggestions;
-- itinerary suggestions;
-- assumptions.
+- provider ID;
+- request ID;
+- retrieved timestamp;
+- normalized routes.
 
-Каждый claim имеет category, provenance, confidence и source references.
+Route содержит provider route ID, segments, optional price, availability, optional validity deadline и optional HTTPS source URL.
 
-Provenance V1:
+Segment нормализует mode, origin/destination, departure/arrival и optional carrier/service metadata.
 
-- `user_input`;
-- `provider_fact`;
-- `model_inference`;
-- `unknown`.
+Price хранится как integer minor units + ISO 4217-like 3-letter currency code. Float price semantics в contract не используются.
 
-## Provider-neutral AI port
+## Validation
 
-`AIProvider.planTrip()` больше не использует `Promise<unknown>`.
-
-Contract:
-
-`PlanRequest + AIPlanProviderContext + AbortSignal → Promise<PlanProposal>`.
-
-`AIPlanProviderContext` содержит только account scope, Trip ID, locale и request ID. Конкретный vendor/model в contract не зашит.
-
-Transport/Map/Legal/Weather/Stay/Currency interfaces этим slice не переписываются.
-
-## Server orchestration policy
-
-`server/travel/planOrchestrator.ts` — trusted policy layer между owned Trip и будущим AI adapter.
-
-Последовательность:
-
-1. проверить account scope;
-2. проверить Trip ownership;
-3. создать минимизированный `PlanRequest`;
-4. fail closed как `not_connected`, если provider отсутствует;
-5. вызвать typed provider с bounded timeout + cancellation;
-6. считать provider response untrusted;
-7. выполнить `validatePlanProposal`;
-8. вычислить authoritative/non-authoritative claim disposition;
-9. вернуть structured proposal + policy evaluation + минимальный audit metadata;
-10. **не** записывать результат автоматически в Trip.
-
-Отсутствует silent fallback на mock/local answer или другой provider.
-
-## Provenance / authority policy
-
-`provider_fact` обязан ссылаться на declared source. Unknown source reference делает proposal invalid.
-
-Legal provider fact дополнительно требует official HTTPS source.
-
-Критические external categories:
-
-- transport schedule;
-- price;
-- availability;
-- legal;
-- weather.
-
-Model inference для этих категорий не считается authoritative независимо от confidence. Expired provider evidence также не считается authoritative.
-
-`user_input` — trusted только как факт того, что пользователь это сообщил; он не подтверждает внешний schedule/price/legal fact.
-
-## Audit boundary
-
-Plan orchestration audit содержит только:
+Provider response валидируется до использования:
 
 - contract version;
-- request ID;
-- Trip ID/revision;
-- provider ID;
-- timestamps/duration;
-- status;
-- validation error codes.
+- provider/request identity match;
+- bounded route/segment counts;
+- unique IDs;
+- timestamp/URL/value shape;
+- non-negative safe integer price;
+- chronological route segments;
+- no overlapping/backward segment chronology;
+- validity deadline cannot predate retrieval time.
 
-Audit V1 не хранит prompt, proposal body, документы, cookies, session secret, API key или raw provider payload.
+Malformed response fail closed.
 
-## Error model
+## Freshness / authority policy
 
-Orchestration различает:
+Route external facts считаются current только при explicit `validUntil`, который ещё не истёк.
 
-- invalid input;
-- access denied;
-- provider not connected;
-- caller abort;
-- timeout;
-- provider failure;
-- invalid provider response;
-- invalid configuration.
+`TransportRoutePolicy` отдельно отмечает:
 
-Provider failure не превращается в fake success.
+- schedule authoritative;
+- price authoritative;
+- availability authoritative.
 
-## CI / acceptance
+Route без freshness bound получает `unspecified` и не выдаётся за current authoritative schedule/price/availability.
 
-Plan push gate:
+## Comparison policy
+
+`compareTransportRoutes()` использует только прозрачные deterministic criteria:
+
+- duration;
+- transfer count;
+- price.
+
+Нет composite/fake recommendation score.
+
+Price comparison разрешён только при:
+
+1. current price у каждого route;
+2. наличии price у каждого route;
+3. одной валюте.
+
+Mixed currencies возвращают `mixed_currency`; автоматический FX conversion не выполняется до отдельного Currency contract/provider решения.
+
+Stale/unbounded routes не сравниваются как current real-data results.
+
+## Transport provider port
+
+`TransportProvider.searchRoutes()` typed:
+
+`TransportSearchRequest + TransportProviderRequestContext + AbortSignal → TransportSearchResponse`.
+
+Конкретный vendor/API schema не зашит.
+
+## Server orchestration
+
+`server/travel/transportOrchestrator.ts`:
+
+1. validates account scope;
+2. enforces Trip ownership;
+3. builds minimized request;
+4. returns honest `not_connected` if no provider;
+5. applies timeout/cancellation;
+6. validates provider output;
+7. calculates per-route authority/freshness policy;
+8. returns response + policy + minimal audit metadata.
+
+No automatic Trip mutation, booking or fallback.
+
+## Audit
+
+Transport audit содержит request ID, Trip ID/revision, provider ID, timestamps/duration, status и validation codes. Route payload, user documents, cookies и provider keys в audit не пишутся.
+
+## CI
+
+Push gate:
 
 - dependency audit;
 - project typecheck;
-- `npm run test:plan-policy`;
+- Plan policy regression;
+- Transport contract/freshness smoke;
 - Trip ownership regression;
 - server runtime build;
-- server-backed Chromium regression;
+- one server-backed Chromium regression;
 - frontend build.
 
-Draft PR дополнительно сохраняет PostgreSQL 18.4 migration/persistence regression gate нижнего persistence слоя.
+Stacked PR дополнительно прогоняет PostgreSQL 18.4 persistence regression. CI permissions остаются `contents: read`.
 
-CI permissions остаются `contents: read`.
+## Product/engineering decision boundary
 
-## Не реализовано этим slice
+Следующий Transport step уже требует выбрать real provider strategy: aviation/rail/bus coverage, Russia access, vendor API terms/costs, rate limits, freshness semantics, booking/deeplink policy, credentials and lock-in.
 
-- real AI model/vendor;
-- RAG/vector DB;
-- prompt/tool execution framework;
-- real transport/map/legal/weather/stay/currency adapters;
-- automatic Plan → Trip mutation;
-- booking/purchase;
-- provider cost/rate routing across multiple vendors;
-- production deploy.
-
-Следующий roadmap layer после зелёного Plan checkpoint — provider-neutral Transport/normalized route comparison contract. Выбор реального transport provider остаётся отдельным product/engineering/legal решением.
+Этот выбор contract layer не делает автоматически.
