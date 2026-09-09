@@ -43,7 +43,7 @@ export type AiGatewayAudit = {
   completedAt: string;
   durationMs: number;
   status: 'success' | 'rejected' | 'not_connected' | 'aborted' | 'timeout' | 'runtime_failure' | 'retrieval_failure' | 'invalid_retrieval_response' | 'tool_failure' | 'invalid_model_output';
-  retrievalStatus: 'not_connected' | 'success';
+  retrievalStatus: 'not_connected' | 'not_run' | 'success' | 'failed';
   toolCallsExecuted: number;
   evidenceCount: number;
   validationErrorCodes: AiValidationError['code'][];
@@ -136,7 +136,7 @@ export class AiGateway {
       completedAt: completedAt.toISOString(),
       durationMs: Math.max(0, completedAt.getTime() - startedAt.getTime()),
       status,
-      retrievalStatus: details.retrievalStatus ?? (this.retriever ? 'success' : 'not_connected'),
+      retrievalStatus: details.retrievalStatus ?? (this.retriever ? 'not_run' : 'not_connected'),
       toolCallsExecuted: details.toolCallsExecuted ?? 0,
       evidenceCount: details.evidenceCount ?? 0,
       validationErrorCodes: (details.validationErrors ?? []).map((error) => error.code),
@@ -160,7 +160,7 @@ export class AiGateway {
     }
     if (this.runtime === null) {
       throw new AiGatewayError('not_connected', 'AI model runtime is not connected.', {
-        audit: this.audit(requestId, request, context, startedAt, 'not_connected', { retrievalStatus: this.retriever ? 'success' : 'not_connected' }),
+        audit: this.audit(requestId, request, context, startedAt, 'not_connected', { retrievalStatus: this.retriever ? 'not_run' : 'not_connected' }),
       });
     }
     if (!validId(this.runtime.id) || (this.retriever !== null && !validId(this.retriever.id))) {
@@ -198,7 +198,7 @@ export class AiGateway {
 
     const pipeline = async (): Promise<AiGatewayResult> => {
       const evidence: AiEvidence[] = [];
-      let retrievalStatus: AiGatewayAudit['retrievalStatus'] = this.retriever ? 'success' : 'not_connected';
+      let retrievalStatus: AiGatewayAudit['retrievalStatus'] = this.retriever ? 'not_run' : 'not_connected';
       let toolCallsExecuted = 0;
 
       if (this.retriever !== null) {
@@ -220,6 +220,7 @@ export class AiGateway {
           }, controller.signal);
         } catch (error) {
           if (controller.signal.aborted) throw error;
+          retrievalStatus = 'failed';
           throw new AiGatewayError('retrieval_failure', 'Knowledge retriever failed.', {
             audit: this.audit(requestId, request, context, startedAt, 'retrieval_failure', { retrievalStatus, toolCallsExecuted, evidenceCount: evidence.length }),
             cause: error,
@@ -227,11 +228,13 @@ export class AiGateway {
         }
         const retrievalErrors = validateKnowledgeRetrievalResult(retrieval, queryId);
         if (retrievalErrors.length > 0) {
+          retrievalStatus = 'failed';
           throw new AiGatewayError('invalid_retrieval_response', 'Knowledge retriever returned invalid normalized output.', {
             audit: this.audit(requestId, request, context, startedAt, 'invalid_retrieval_response', { retrievalStatus, toolCallsExecuted, evidenceCount: evidence.length, validationErrors: retrievalErrors }),
             validationErrors: retrievalErrors,
           });
         }
+        retrievalStatus = 'success';
         evidence.push(...knowledgeResultToEvidence(retrieval, this.now()));
       }
 
