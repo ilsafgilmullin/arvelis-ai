@@ -12,66 +12,65 @@ Travel Product Pivot остаётся текущим продуктовым на
 - [x] Plan Real-Data Contract & AI Orchestration Policy V1 — Draft PR #29, green, not merged;
 - [x] Transport Normalized Route Contract V1 — Draft PR #30, green, not merged;
 - [x] Transport Provider Strategy & Adapter Foundation V1 — Draft PR #31, green, not merged;
-- [x] Yandex Rasp Live Adapter V1 — Draft PR #32, green, not merged; production key not activated.
+- [x] Yandex Rasp Live Adapter V1 — Draft PR #32, green, not merged; production key not activated;
+- [x] Map Provider Foundation & Route Map V1 — Draft PR #33, green, not merged; no real map provider.
 
-## Current slice — Map Provider Foundation & Route Map V1
+## Current slice — Legal Sources & Travel Legal Foundation V1
 
-Branch: `feat/travel-map-provider-foundation-v1`  
-Base: Yandex Rasp V1 / `dc7da2ab920411bb39105c368e16ae90dcd0ef90`  
-Draft PR #33.
+Branch: `feat/travel-legal-sources-foundation-v1`  
+Base: Map V1 / `bd46fc12064faf2dd807782c35106ec062bb08dd`
 
 Scope / DoD:
 
-- [x] provider-neutral `MapRouteRequest/MapRouteResponse`;
-- [x] origin/destination/waypoint contract without vendor fields in `Trip`;
-- [x] bounded coordinates/geometry/attribution validation;
-- [x] user-provided coordinate integrity fail-closed;
-- [x] origin/destination resolution required;
-- [x] ownership-aware `MapOrchestrator`;
+- [x] typed provider-neutral `LegalCheckRequest`;
+- [x] route-general scope only;
+- [x] citizenship/passport/nationality not invented or added to `Trip`;
+- [x] typed legal source/claim contracts;
+- [x] every claim requires source reference;
+- [x] `verified` claims require official HTTPS sources;
+- [x] expired/unknown freshness never authoritative;
+- [x] ownership fail-closed before provider call;
 - [x] timeout/cancellation;
+- [x] malformed/untrusted provider output fail-closed;
 - [x] truthful `not_connected` without provider;
-- [x] freshness current/expired/unspecified without invented `validUntil`;
-- [x] no automatic persistence of provider map result;
-- [x] old decorative fake-route schematic hidden from active UI;
-- [x] one server-backed Chromium happy-path covers truthful Map empty state;
-- [x] implementation validate + PostgreSQL regression PASS;
-- [x] README + dedicated `docs/49_MAP_PROVIDER_FOUNDATION_ROUTE_MAP_V1.md`;
-- [ ] final validate/PostgreSQL PASS on documentation HEAD.
+- [x] one business/security/freshness gate;
+- [x] implementation push validate PASS;
+- [x] README/Architecture/Roadmap/Security documentation;
+- [x] `docs/50_LEGAL_SOURCES_TRAVEL_LEGAL_FOUNDATION_V1.md`;
+- [ ] stacked Draft PR;
+- [ ] final PR-triggered validate + PostgreSQL regression PASS.
 
-No real map vendor/SDK/key is connected in this slice.
+No real legal-source provider, credentials or production ingestion is connected.
 
-## Next agreed slice — Legal Sources & Travel Legal Foundation V1
-
-After Map DoD closes:
-
-1. provider-neutral legal request/source/claim contracts;
-2. official-source provenance model;
-3. freshness/effective-date policy without invented legal validity;
-4. ownership-aware Legal orchestrator;
-5. untrusted-output validation;
-6. truthful `not_connected`/needs-review states;
-7. no real legal-source provider credentials or live ingestion.
-
-## Then — ARVELIS AI Engine & Knowledge Foundation V1
+## Next agreed slice — ARVELIS AI Engine & Knowledge Foundation V1
 
 After Legal DoD closes:
 
-1. provider-neutral knowledge/evidence contracts;
-2. source trust/provenance policy;
-3. retrieval/model boundaries without choosing a live vendor;
-4. prompt/context minimization;
-5. no model-generated fact promoted to authoritative external fact without evidence;
-6. truthful `not_connected` without AI/model/retriever.
+1. provider-neutral AI Gateway;
+2. model/runtime adapter boundary without choosing a real vendor;
+3. Knowledge source/evidence contracts;
+4. retrieval/RAG boundary;
+5. tool registry for Trip/Transport/Map/Legal;
+6. structured output validation;
+7. provenance/trust policy;
+8. timeout/cancellation;
+9. evaluation policy;
+10. truthful `not_connected` when model/runtime/retriever is absent.
 
-## Real STOP boundary
+Hard rule: model output is **not** a source of authoritative facts for price, transport schedules, legal rules, weather or availability. Those facts must come through source-backed tools/provider contracts.
+
+## Real STOP boundary after AI/Knowledge Foundation
 
 Stop before the first step that requires one of:
 
-- real provider/model credentials;
+- selecting/activating a real model/runtime provider;
+- selecting an embedding provider;
+- selecting a vector database;
+- production knowledge ingestion/source-set decision;
+- real provider credentials;
 - paid service;
 - production deployment/wiring;
 - irreversible migration/deletion;
-- a product decision about model vendor, knowledge-source set/indexing strategy, or legal/map provider selection;
 - merge to `main`.
 
 ## Later roadmap — not started

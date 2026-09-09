@@ -12,30 +12,44 @@ ARVELIS AI на текущем этапе полностью бесплатен 
 
 ## Current engineering slice
 
-`Map Provider Foundation & Route Map V1` развивается в `feat/travel-map-provider-foundation-v1` поверх закрытого `Yandex Rasp Live Adapter V1` (Draft PR #32).
+`Legal Sources & Travel Legal Foundation V1` развивается в `feat/travel-legal-sources-foundation-v1` поверх закрытого `Map Provider Foundation & Route Map V1` (Draft PR #33).
 
-Ни один реальный map provider, SDK, API key или production map endpoint не подключён.
+Ни один real Legal provider, source ingestion service, credential или production legal endpoint не подключён.
 
-## Map architecture
+## Legal architecture
 
-`src/travel/mapContracts.ts` задаёт provider-neutral `MapRouteRequest/MapRouteResponse`:
+`src/travel/legalContracts.ts` задаёт provider-neutral contracts:
 
-- origin/destination и реальные сохранённые waypoints;
-- bounded coordinates and route geometry;
-- provider/request identity;
-- attribution;
-- retrievedAt + optional validUntil;
-- no invented freshness.
+- `LegalCheckRequest` — только Trip ID/revision, origin, destination и dates;
+- scope V1 — только `route_general`;
+- citizenship/passport/nationality в request не добавляются, потому что текущий `Trip` этих данных не содержит;
+- `LegalSourceReference` хранит source provenance и optional effective dates;
+- `LegalClaim` обязан ссылаться минимум на один source;
+- `LegalCheckResponse` содержит provider/request identity, retrieval time, sources и claims.
 
-`MapOrchestrator` проверяет authenticated ownership, timeout/cancellation и untrusted provider response до использования. User-provided coordinates не могут быть молча заменены provider-ом: response с `resolution: provided` обязан вернуть те же coordinates.
+`verified` claim допустим только при official HTTPS source. Secondary source может использоваться только как `needs_review`, но не как authoritative legal fact.
 
-Route without provider `validUntil` имеет freshness `unspecified` и не считается authoritative-current.
+## Freshness / authority
 
-## Route Map UI
+Legal retrieval time не равен юридической актуальности.
 
-В обычном runtime map provider всё ещё `not_connected`. Map tab показывает truthful empty state. Старая декоративная псевдолиния маршрута скрыта, чтобы не выглядеть как рассчитанный маршрут без фактических данных.
+- expired source => claim freshness `expired`, authoritative `false`;
+- source без explicit `effectiveUntil` => freshness `unknown`, authoritative `false`;
+- `current` + `verified` + official HTTPS sources => authoritative `true`.
 
-Сохранённые пользователем MapPoint остаются частью Trip foundation; новый normalized provider response автоматически в Trip не записывается.
+Uncited conclusion или verified claim на secondary source отклоняются contract validation.
+
+## Legal orchestration
+
+`server/travel/legalOrchestrator.ts`:
+
+- проверяет authenticated ownership до provider call;
+- строит minimized route-general request;
+- возвращает truthful `not_connected`, если provider отсутствует;
+- поддерживает timeout/cancellation;
+- валидирует untrusted provider output;
+- не придумывает citizenship/passport facts;
+- не мутирует `Trip` и не сохраняет provider result автоматически.
 
 ## Verification
 
@@ -43,6 +57,7 @@ Route without provider `validUntil` имеет freshness `unspecified` и не �
 npm ci
 npm audit --audit-level=high
 npm run typecheck
+npm run test:legal-foundation
 npm run test:transport-provider-foundation
 npm run test:yandex-rasp-live
 npm run test:trip-server
@@ -51,17 +66,17 @@ npm run test:travel-browser
 npm run build
 ```
 
-`test:transport-provider-foundation` в текущем slice дополнительно запускает Map provider foundation business/security smoke.
+`test:legal-foundation` — один signal-bearing business/security/freshness gate. Он проверяет ownership-before-provider, route-general minimization, official-source authority, uncited/secondary-source fail-closed, freshness и cancellation.
 
 ## Boundaries
 
-- no real Map credentials/provider activation;
-- no fake route geometry as user data;
-- no booking/payment;
+- no real Legal provider/credentials;
+- no citizenship/passport assumptions;
+- no uncited legal conclusions;
 - no production deploy;
 - no merge to `main`;
-- no persistent provider map result storage without a separate retention/terms decision.
+- no real AI/model/RAG provider yet.
 
-После green Map checkpoint следующий согласованный slice — `Legal Sources & Travel Legal Foundation V1`.
+После green Legal checkpoint следующий согласованный slice — `ARVELIS AI Engine & Knowledge Foundation V1`.
 
-См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/49_MAP_PROVIDER_FOUNDATION_ROUTE_MAP_V1.md`.
+См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/50_LEGAL_SOURCES_TRAVEL_LEGAL_FOUNDATION_V1.md`.

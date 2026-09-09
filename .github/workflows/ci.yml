@@ -13,6 +13,7 @@ on:
       - 'feat/travel-transport-provider-foundation-v1'
       - 'feat/travel-yandex-rasp-live-adapter-v1'
       - 'feat/travel-map-provider-foundation-v1'
+      - 'feat/travel-legal-sources-foundation-v1'
   workflow_dispatch:
 
 permissions:
@@ -53,7 +54,7 @@ jobs:
       - name: Transport contract business and freshness
         run: npm run test:transport-policy
 
-      - name: Transport provider strategy plus Map foundation
+      - name: Transport provider strategy plus Map and Legal foundations
         run: npm run test:transport-provider-foundation
 
       - name: Yandex Rasp live adapter HTTP and freshness

@@ -1,6 +1,6 @@
 # ARVELIS AI — безопасность
 
-**Актуальность:** Map Provider Foundation & Route Map V1 / бесплатная user-facing модель, 2026-09-09.
+**Актуальность:** Legal Sources & Travel Legal Foundation V1 / бесплатная user-facing модель, 2026-09-09.
 
 ## Global invariants
 
@@ -11,96 +11,108 @@
 - no provider response, auth secret, document or payment data is logged by default;
 - billing/subscriptions/paywall remain outside Travel Domain.
 
-## Existing transport/Yandex boundary
+## Existing provider boundaries
 
-Yandex Rasp V1 remains closed without production activation. No live key is present. Existing protections stay in force: approved HTTPS host, Authorization-header key, redirects blocked, response-size limits, exact location matching, temporary-memory-only cache, `et_marker != availability`, no invented provider validity and no persistent Yandex result storage.
+Yandex Rasp remains closed without production activation or live key. Map V1 remains provider-neutral with no real map vendor/credentials. Existing Transport/Map protections and temporary-cache/coordinate-integrity rules stay in force.
 
-## Map data minimization
+## Legal data minimization
 
-`MapRouteRequest` sends only map-relevant data:
+`LegalCheckRequest` contains only route-general fields:
 
 - Trip ID/revision;
-- origin/destination labels;
-- explicit saved waypoints;
-- coordinates only when already present in the Trip map point.
+- origin;
+- destination;
+- optional trip dates;
+- `scope: route_general`.
 
-It does not contain cookies, session secrets, traveler identities, documents, payment data, full Trip aggregate or future map-provider credentials.
+It must not contain cookies, session secrets, documents, payment data, traveler identities or future Legal provider credentials.
 
-## Map provider response validation
+Current `Trip` has no citizenship, nationality, passport or residence-permit fields. Legal V1 therefore must not infer, default or fabricate them. Personalized visa/entry eligibility cannot be asserted from the current model.
 
-A Map response is accepted only after deterministic validation.
+## Legal source/claim validation
 
-Bounds/invariants:
+External Legal responses are accepted only after deterministic validation.
 
-- max 64 resolved points;
-- max 16 routes;
-- max 4096 geometry coordinates per route;
-- max 8 attribution entries;
-- latitude in `[-90, 90]`;
-- longitude in `[-180, 180]`;
-- unique IDs;
+Required invariants:
+
 - provider/request identity match;
-- resolved points must correspond to requested points;
-- origin and destination must both resolve;
-- route point IDs must reference validated resolved points and include required endpoints;
-- source/attribution URLs must use HTTPS;
-- distance/duration must be non-negative safe integers.
+- bounded source/claim counts;
+- unique IDs;
+- source URLs use HTTPS;
+- source retrieval/effective dates have valid formats;
+- every claim references at least one existing source;
+- a `verified` claim may only cite `official` sources;
+- a secondary source cannot elevate a claim to verified/authoritative;
+- malformed or uncited output fails closed.
 
-Malformed or oversized output fails closed.
+No uncited legal conclusion is allowed through the normalized boundary.
 
-## User-provided coordinate integrity
+## Authority / freshness
 
-A coordinate supplied by the user/current Trip is treated as trusted application input relative to the external provider response.
+Legal retrieval time is not equivalent to legal validity.
 
-Provider rules:
+A claim can be authoritative only when:
 
-- provider must return it as `resolution: provided`;
-- latitude/longitude must exactly match the requested value;
-- provider may not silently replace it with a geocoded coordinate;
-- provider may not bypass the check by labeling the changed value `provider_resolved`.
+1. provider marked it `verified`;
+2. all cited sources are official HTTPS sources;
+3. source validity is explicitly bounded and non-expired;
+4. normalized validation succeeded.
 
-Any mismatch rejects the normalized response.
+Freshness semantics:
 
-## Map ownership/orchestration
+- explicit expired `effectiveUntil` => `expired`, non-authoritative;
+- no explicit validity end => `unknown`, non-authoritative;
+- all source validity windows explicit and non-expired => `current`.
 
-`MapOrchestrator` checks authenticated account scope and Trip ownership before provider execution. It supports caller cancellation and a bounded timeout. A missing provider returns truthful `not_connected`; there is no silent fallback to demo geometry.
+The application must not manufacture an effective date or convert `retrievedAt` into legal validity.
 
-Audit metadata may contain request ID, Trip ID/revision, provider ID, timing, status and validation codes. It must not contain raw response geometry payloads, secrets or user documents.
+## Legal ownership/orchestration
 
-## Freshness
+`LegalOrchestrator` checks authenticated account scope and Trip ownership **before** provider execution. Foreign ownership therefore cannot trigger a Legal provider call.
 
-Map retrieval time is not equivalent to route validity.
+It also provides:
 
-- no `validUntil` => freshness `unspecified`, route not authoritative-current;
-- future provider `validUntil` => `current`;
-- expired `validUntil` => `expired`.
+- bounded provider timeout;
+- caller cancellation;
+- truthful `not_connected` when no provider is configured;
+- validation of untrusted normalized output;
+- typed fail-closed errors;
+- audit metadata limited to request/trip/provider identity, timing, status and validation codes.
 
-Future map-adapter cache TTL must describe only local cache age and must not be presented as provider validity.
-
-## Route Map UI truthfulness
-
-No real Map provider/SDK is connected in this slice. The UI must not display fabricated route lines, tiles or coordinates as real data. The old decorative route schematic is hidden. The browser happy-path verifies the truthful empty state and absence of a real map canvas/provider container.
+Audit must not contain raw source documents, provider credentials, cookies or user documents.
 
 ## Persistence / retention
 
-Normalized Map provider results are not automatically persisted into Trip, SQLite or PostgreSQL. A future vendor adapter requires a separate review of terms, attribution, caching and retention before any persistence is introduced.
+Legal Foundation does not automatically write provider claims/sources into `Trip`, SQLite or PostgreSQL. Any future source ingestion or retention requires a separate terms/privacy/retention review.
+
+## AI boundary
+
+Future ARVELIS AI Engine must not use model inference as an authoritative source for:
+
+- legal rules;
+- price;
+- transport schedule;
+- availability;
+- weather.
+
+Legal facts must flow through validated Legal tools/evidence. The model may summarize or reason over evidence but must preserve provenance and authority status.
 
 ## CI security
 
-Important gates:
+Important Legal V1 gates:
 
 - `npm audit --audit-level=high`;
 - strict typecheck;
-- Map business/security/freshness smoke;
-- lower Plan/Transport/Yandex/Trip regressions;
+- Legal business/security/freshness smoke;
+- lower Plan/Transport/Map/Yandex/Trip regressions;
 - server runtime build;
-- one server-backed Chromium happy-path including Map empty-state truthfulness;
+- one existing server-backed Chromium happy-path;
 - frontend build;
-- PostgreSQL lower-layer regression;
+- stacked PR PostgreSQL lower-layer regression;
 - GitHub Actions `contents: read`.
 
-## Next security boundary
+## Production / STOP boundaries
 
-`Legal Sources & Travel Legal Foundation V1` must require source-backed claims, official HTTPS source provenance for verified requirements, effective-date/freshness handling without invented legal validity, ownership-aware orchestration, no uncited legal conclusions and no live provider credentials.
+No real Legal source provider/credential or production ingestion is connected in Legal Foundation V1.
 
-Production deployment, real map/legal credentials, paid services, destructive data operations and merge to `main` remain forbidden without separate confirmation.
+After AI/Knowledge Foundation, stop before selecting/activating a real model runtime, embedding provider, vector DB or production knowledge source set. Production deployment, paid services, destructive migrations and merge to `main` remain forbidden without separate confirmation.
