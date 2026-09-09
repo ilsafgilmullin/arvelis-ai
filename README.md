@@ -8,165 +8,176 @@
 
 ## Product access model
 
-ARVELIS AI на текущем этапе полностью бесплатен для пользователя. Billing/subscriptions/paywall не проектируются; provider quotas/cost controls остаются backend policy и не меняют `Trip`.
+ARVELIS AI на текущем этапе полностью бесплатен для пользователя. Billing/subscriptions/paywall не проектируются; provider/runtime quotas и cost controls остаются backend policy.
 
-## Current engineering slice
+## Closed lower checkpoint — Retrieval & Knowledge Ingestion V1
 
-`ARVELIS Retrieval & Knowledge Ingestion Foundation V1` развивается в `feat/travel-retrieval-knowledge-ingestion-v1` поверх закрытого `ARVELIS AI Engine & Knowledge Foundation V1` (Draft PR #35).
+`ARVELIS Retrieval & Knowledge Ingestion Foundation V1` закрыт в Draft PR #36 на final HEAD `aab7f49c1dfc0909536e1afba7da84bcdf98be3d`.
 
-Этот slice добавляет реальную persistence/retrieval foundation для будущего RAG, но **не активирует реальную модель, embedding runtime или production Knowledge ingestion**.
+Final PR-triggered run #721 подтвердил:
 
-Зафиксированный стек для дальнейшего AI/RAG направления:
+- `validate` — PASS;
+- PostgreSQL 18 + pgvector `postgres-compat` — PASS;
+- migration chain `001 → 002 → 003` — PASS;
+- Trip PostgreSQL regression — PASS;
+- Knowledge pgvector namespace/retrieval gate — PASS.
 
-- primary open-weight model candidate V1 — `Qwen3-8B`;
-- model runtime boundary — OpenAI-compatible `vLLM`;
-- local development runtime может использовать `llama.cpp` через отдельный adapter;
-- embedding V1 — `Qwen3-Embedding-0.6B`;
-- reranker — disabled;
-- retrieval storage — существующий PostgreSQL + `pgvector`;
-- отдельная vector DB не вводится;
-- `AiGateway` остаётся vendor-neutral и не содержит Qwen/vLLM-specific logic.
+Retrieval storage остаётся PostgreSQL + pgvector; Global/private account Knowledge разделены; автоматического external ingestion и private→global promotion нет.
 
-## Retrieval / Knowledge contracts
+## Current engineering slice — Qwen Runtime Adapter & AI Evaluation V1
 
-`src/travel/knowledgeIngestionContracts.ts` задаёт:
+Branch:
 
-- `global | account` namespace;
-- source registry;
-- document / document version / chunk contracts;
-- source type, rights, status, jurisdiction и language;
-- `fetchedAt`, `verifiedAt`, `effectiveFrom`, `effectiveUntil`;
-- embedding lifecycle/status;
-- bounded vector-search request и result contracts.
+`feat/travel-qwen-runtime-evaluation-v1`
 
-`server/travel/knowledgeEmbeddingPort.ts` оставляет embedding model заменяемым. Production embedding model не подключён; без embedding port новые chunks сохраняются с `embeddingStatus: pending`.
+Base:
 
-## Namespace isolation
+`feat/travel-retrieval-knowledge-ingestion-v1` / Draft PR #36.
 
-Global Knowledge и private account Knowledge разделены на application и database уровнях.
+Цель slice — реализовать первый concrete runtime adapter **через существующий `AiModelRuntime`**, не меняя vendor-neutral policy внутри `AiGateway`.
 
-- `global` namespace не содержит `accountId`;
-- `account` namespace обязан иметь конкретный authenticated account ID;
-- PostgreSQL primary/foreign keys включают `namespace_kind + namespace_key`;
-- cross-account source/document/version/chunk linkage отклоняется БД;
-- retrieval для запроса конкретного аккаунта допускает только `global + этот account`;
-- private Trip, документы и переписка не продвигаются автоматически в Global Knowledge и не используются для обучения.
+Зафиксированный runtime target:
 
-Global source не может быть `user`/`user_owned`; ingestion в Global Knowledge разрешён только для явно `public` или `licensed` rights.
+- model candidate: `Qwen3-8B`;
+- protocol/runtime boundary: OpenAI-compatible `vLLM`;
+- local development runtime может в будущем использовать `llama.cpp` через отдельный adapter;
+- production runtime/GPU/weights/credentials этим slice не подключаются.
 
-## Ingestion / deduplication
+## Qwen vLLM adapter
 
-`server/travel/knowledgeIngestionService.ts`:
+`server/travel/runtimes/qwenVllmRuntime.ts` реализует:
 
-- нормализует текст (`NFC`, LF, trim);
-- вычисляет SHA-256 content hash;
-- deduplicate выполняется внутри `(namespace, document, content_hash)`;
-- duplicate version в другом account namespace не считается тем же документом;
-- concurrent duplicate insert обрабатывается fail-safe через PostgreSQL uniqueness + повторный lookup;
-- malformed metadata, rights, namespace, timestamps и embedding batch отклоняются до trusted use.
+`AiModelRuntime.generate(AiRuntimeInput, AbortSignal) → AiModelTurn`.
 
-Автоматического crawler/import pipeline нет. Реальные внешние источники этим slice не скачиваются и не индексируются.
+Adapter отвечает только за runtime/protocol concerns:
 
-## PostgreSQL + pgvector
+- validation OpenAI-compatible `/v1` endpoint;
+- `POST /v1/chat/completions` mapping;
+- Qwen model selector;
+- structured-output JSON schema;
+- OpenAI-style native tool calls;
+- ARVELIS tool-ID ↔ function-name mapping;
+- bounded timeout/cancellation;
+- bounded response size;
+- untrusted runtime-response parsing/validation.
 
-Additive migration:
+`AiGateway` не содержит Qwen/vLLM-specific code и этим slice не изменялся.
 
-`server/db/migrations/003_knowledge_retrieval_foundation.sql`
+## Endpoint/security policy
 
-Она:
+- remote vLLM endpoint — HTTPS only;
+- HTTP разрешён только для loopback development (`localhost`, `127.0.0.1`, `::1`);
+- credentials/query/fragment в base URL запрещены;
+- optional API key может передаваться adapter configuration, но реальный key не добавлен;
+- `accountScopeId` не входит в `AiRuntimeInput` и не отправляется модели.
 
-- выполняет `CREATE EXTENSION IF NOT EXISTS vector`;
-- не изменяет `001_auth_foundation.sql` и `002_travel_trip_persistence.sql`;
-- создаёт `knowledge_sources`, `knowledge_documents`, `knowledge_document_versions`, `knowledge_chunks`;
-- хранит embedding как `vector(1024)`;
-- хранит source/version status, rights, jurisdiction/language и freshness timestamps;
-- сохраняет namespace isolation в composite PK/FK;
-- не создаёт approximate vector index до появления реальных объёмов и измерений производительности.
+## Structured output
 
-V1 repository использует bounded exact cosine search через pgvector. Максимальный пользовательский retrieval result — 20 элементов; текущий Gateway retriever запрашивает не более 12.
+Final answer запрашивается через OpenAI-compatible `response_format.type = json_schema`.
 
-## Retrieval policy
+Schema соответствует существующему ARVELIS `AiStructuredAnswer`:
 
-`server/travel/postgresKnowledgeRetriever.ts` адаптирует PostgreSQL repository к уже существующему `KnowledgeRetriever`.
+- contract version;
+- exact request ID;
+- user-facing message;
+- typed claims;
+- fact domain;
+- `fact | inference` mode;
+- evidence IDs.
 
-Default AI retrieval:
+После parsing adapter запускает существующую `validateAiModelTurn`. Полная evidence/protected-fact policy остаётся в `AiGateway`.
 
-- namespaces: `global + authenticated account`;
-- source status: `active`;
-- version status: `ready`;
-- locale `ru-RU`: `ru-RU | ru`;
-- freshness: `current_or_unknown`;
-- bounded result count;
-- repository output повторно нормализуется и проходит существующую `KnowledgeRetrievalResult` validation до попадания в `AiGateway`.
+## Tool calling
 
-Freshness semantics:
+Adapter-local function names:
 
-- `effectiveUntil >= asOf` => current;
-- отсутствующий `effectiveUntil` => unknown;
-- expired version исключается при `current`/`current_or_unknown` согласно filter policy;
-- retrieval/fetched time сам по себе не означает юридическую или provider freshness.
+- `trip.read` → `trip_read`;
+- `transport.search` → `transport_search`;
+- `map.route` → `map_route`;
+- `legal.check` → `legal_check`.
 
-RAG по-прежнему не обходится вокруг protected-fact policies: Legal/Transport/Map authoritative facts требуют соответствующий validated tool evidence.
+Runtime может вернуть только tool, который реально присутствует в текущем `AiRuntimeInput.tools`. Unknown function name, duplicate/invalid call ID, malformed JSON arguments или unavailable tool fail closed до исполнения.
 
-## Provider-neutral AI Gateway
+Фактическое выполнение и server-stamped provenance остаются в существующем `AiToolRegistry`.
 
-Existing `server/travel/aiGateway.ts` не получил Qwen/vLLM-specific logic.
+## Qwen request mode
 
-Gateway:
+Adapter использует non-thinking request mode:
 
-- хранит authenticated account scope server-side;
-- передаёт model runtime только normalized input;
-- валидирует retriever/model/tool output;
-- поддерживает timeout/cancellation;
-- ограничивает tool/evidence rounds;
-- возвращает truthful `not_connected`, если runtime отсутствует.
+- `chat_template_kwargs.enable_thinking = false`;
+- `temperature = 0.7`;
+- `top_p = 0.8`;
+- `top_k = 20`;
+- bounded `max_tokens`.
 
-## Verification
+Hidden reasoning не является частью ARVELIS runtime contract и не сохраняется/экспортируется этим adapter.
 
-Signal-bearing gates:
+## Golden semantic evaluation
 
-```bash
-npm ci
-npm audit --audit-level=high
-npm run typecheck
-npm run test:ai-knowledge-foundation
-npm run test:retrieval-knowledge-foundation
-npm run test:transport-provider-foundation
-npm run test:yandex-rasp-live
-npm run test:trip-server
-npm run build:auth-server
-npm run test:travel-browser
-npm run build
-```
+`server/travel/qwenGoldenEvaluation.ts` задаёт release-eval foundation для критических сценариев:
 
-PR-triggered PostgreSQL/pgvector gate дополнительно выполняет:
+- general advice остаётся inference;
+- unsupported price fails closed;
+- current tool-backed price может быть authoritative;
+- Knowledge-only Legal fact fails closed;
+- stale protected fact fails closed;
+- externally-checkable prose должно иметь structured-claim coverage.
+
+Ключевое правило: JSON/schema success **не равен semantic success**.
+
+Для кейсов с проверяемыми внешними утверждениями необходим отдельный explicit `semanticCoveragePassed: true`; отсутствие такого verdict закрывает evaluation fail-closed.
+
+В текущем slice harness проверяется deterministic fixtures. Реальный Qwen3-8B ещё не запускался, поэтому live-model golden suite не считается пройденным.
+
+## Signal-bearing verification
+
+Основная команда:
 
 ```bash
-npm run db:migrate
-npm run test:trip-postgres
-npm run test:knowledge-postgres-foundation
+npm run test:qwen-runtime-evaluation
 ```
 
-PostgreSQL CI image: `pgvector/pgvector:0.8.6-pg18`.
+Gate проверяет:
 
-## Scope boundaries
+- endpoint/config validation;
+- отсутствие account-scope leakage;
+- structured-output request mapping;
+- native tool-call mapping;
+- malformed/unknown responses fail-closed;
+- HTTP failure;
+- direct cancellation;
+- adapter timeout;
+- unsupported protected price rejection через unchanged Gateway;
+- two-round tool-backed price flow через Gateway + Tool Registry;
+- golden semantic coverage fail-closed policy.
 
-Retrieval/Knowledge Ingestion V1 **не включает**:
+Push run #723 на implementation HEAD `d202c5632ecd923a8e0ce2e9d0f38e8214023d53` полностью PASS, включая Qwen gate, lower-layer AI/Retrieval regressions, server build, browser happy-path и frontend build.
 
-- crawler или автоматическое скачивание внешних источников;
-- production source set;
+## Closure criterion
+
+Qwen Runtime Adapter & AI Evaluation V1 считается CLOSED только после:
+
+1. documentation synchronization;
+2. stacked Draft PR с base `feat/travel-retrieval-knowledge-ingestion-v1`;
+3. PR-triggered `validate` PASS на exact final documentation HEAD;
+4. PR-triggered PostgreSQL/pgvector lower-layer regression PASS на том же HEAD;
+5. отсутствия production runtime/model activation.
+
+## Explicit STOP boundary
+
+После green Qwen Runtime/Evaluation checkpoint работа останавливается перед real model deployment.
+
+Не входят и не разрешены этим slice:
+
+- production GPU/runtime provisioning;
+- запуск production vLLM;
+- скачивание production model weights;
+- real runtime/model credentials;
+- paid AI APIs;
 - production embedding activation;
-- Qwen/vLLM runtime activation;
-- production GPU/model weights;
-- credentials или paid API;
-- reranker;
-- отдельную vector DB;
-- automatic Trip/chat/document → Global Knowledge ingestion;
-- training/fine-tuning на пользовательских данных;
+- crawler/automatic external Knowledge ingestion;
 - production deployment;
-- merge в `main`;
-- destructive migrations.
+- destructive migrations;
+- merge в `main`.
 
-После полного green Retrieval checkpoint следующий утверждённый slice — `Qwen Runtime Adapter & AI Evaluation V1`. Реальный GPU/runtime deployment остаётся отдельным STOP boundary.
-
-См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/07_DECISIONS.md`, `docs/52_RETRIEVAL_KNOWLEDGE_INGESTION_FOUNDATION_V1.md`.
+См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/07_DECISIONS.md`, `docs/52_RETRIEVAL_KNOWLEDGE_INGESTION_FOUNDATION_V1.md`, `docs/53_QWEN_RUNTIME_ADAPTER_AI_EVALUATION_V1.md`.
