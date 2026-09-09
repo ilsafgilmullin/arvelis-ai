@@ -1,4 +1,5 @@
-import type { LegalCheck, Trip } from './domain';
+import type { Trip } from './domain';
+import type { LegalCheckRequest, LegalCheckResponse } from './legalContracts';
 import type { MapRouteRequest, MapRouteResponse } from './mapContracts';
 import type { PlanProposal, PlanRequest } from './planContracts';
 import type { TransportSearchRequest, TransportSearchResponse } from './transportContracts';
@@ -18,6 +19,10 @@ export type TransportProviderRequestContext = ProviderRequestContext & {
 };
 
 export type MapProviderRequestContext = ProviderRequestContext & {
+  requestId: string;
+};
+
+export type LegalProviderRequestContext = ProviderRequestContext & {
   requestId: string;
 };
 
@@ -46,7 +51,11 @@ export interface MapProvider {
 
 export interface LegalSourceProvider {
   readonly id: string;
-  checkTrip(trip: Trip, context: ProviderRequestContext): Promise<LegalCheck[]>;
+  checkRouteRequirements(
+    request: LegalCheckRequest,
+    context: LegalProviderRequestContext,
+    signal: AbortSignal,
+  ): Promise<LegalCheckResponse>;
 }
 
 export interface WeatherProvider {
