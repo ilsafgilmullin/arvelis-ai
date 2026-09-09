@@ -292,3 +292,24 @@
 - Временный self-mutating workflow для npm-generated lock удалён; финальный CI снова имеет `contents: read`.
 - Production DB provider/region, backups, retention/export/deletion, real AI/provider integrations и production deployment этим решением не утверждены.
 - После полного PostgreSQL PASS следующий согласованный slice — `Plan real-data contract / AI orchestration policy`; переход не означает автоматическое подключение конкретного AI vendor.
+
+## 2026-09-09 — Real AI / RAG stack V1
+
+Это решение **supersedes прежнее неопределённое состояние AI/database stack** в части AI runtime, embeddings и retrieval storage. Исторические записи выше сохраняются и не переписываются.
+
+- Primary open-weight model candidate V1: `Qwen3-8B`.
+- Model execution остаётся заменяемым через существующий `AiModelRuntime`; `AiGateway` остаётся vendor-neutral и не содержит Qwen/vLLM-specific logic.
+- Runtime boundary V1: OpenAI-compatible `vLLM`.
+- Для локальной разработки допустим отдельный adapter к `llama.cpp`; это не production foundation.
+- Embedding V1: `Qwen3-Embedding-0.6B`.
+- Reranker V1: disabled; отдельный reranking layer не активируется до отдельного решения.
+- Retrieval storage: существующий PostgreSQL + `pgvector`; отдельная vector database не вводится.
+- Следующий инженерный slice: `ARVELIS Retrieval & Knowledge Ingestion Foundation V1`.
+- Retrieval V1 включает source registry, document/version/chunk contracts, rights/status/jurisdiction/language/freshness metadata, content hashing/deduplication, ingestion lifecycle, embedding port без production model activation, PostgreSQL/pgvector repository boundary, strict `global`/`account` namespace isolation, bounded retrieval filters и evaluation fixtures.
+- Пользовательские Trip, документы и переписка не попадают автоматически в `global` Knowledge и не используются для обучения.
+- В Retrieval V1 запрещены автоматический crawler/download внешних источников, production GPU, production credentials, paid APIs и реальный Qwen runtime.
+- Только additive migrations; destructive migrations запрещены.
+- После зелёного Retrieval V1 следующий stacked slice — `Qwen Runtime Adapter & AI Evaluation V1`: `AiModelRuntime` adapter, OpenAI-compatible vLLM mapping, structured output/tool calling, cancellation/timeouts и golden semantic evaluation harness.
+- GigaChat/YandexGPT остаются возможными fallback adapters, но не являются foundation. GigaChat Freemium не используется как production backend публичного ARVELIS из-за ограничения на личное некоммерческое использование.
+- После зелёного Qwen Runtime/Evaluation checkpoint установлен STOP boundary перед реальным GPU/runtime deployment, production credentials и любой платной infrastructure activation.
+- Merge в `main`, production deploy и destructive migrations этим решением не разрешены.
