@@ -19,6 +19,7 @@ const allowed = new Map([
   ['ai-knowledge-foundation', 'tests/.dist-ai-knowledge-foundation'],
   ['retrieval-knowledge-foundation', 'tests/.dist-retrieval-knowledge-foundation'],
   ['knowledge-postgres-foundation', 'tests/.dist-knowledge-postgres-foundation'],
+  ['qwen-runtime-evaluation', 'tests/.dist-qwen-runtime-evaluation'],
 ]);
 
 const relative = allowed.get(target);
