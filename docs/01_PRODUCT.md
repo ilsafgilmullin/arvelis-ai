@@ -10,6 +10,17 @@
 
 `BUDGET + TRANSPORT + TIME + COMFORT + LEGAL + MAP + ITINERARY + TRIP BOOK → ARVELIS AI`
 
+## Текущая модель доступа — APPROVED
+
+На текущем этапе **ARVELIS AI полностью бесплатен для пользователя**.
+
+- billing не проектируется и не подключается;
+- subscriptions не проектируются и не подключаются;
+- paywall не проектируется и не подключается;
+- бесплатность пользователя не кодируется внутри `Trip` или других Travel Domain contracts;
+- внутренние provider quotas/cost controls разрешены только как backend/application policy;
+- будущая смена коммерческой модели, если когда-либо будет утверждена отдельно, должна происходить вне Travel Domain.
+
 ## Целевой пользователь — APPROVED
 
 Первичный пользователь — русскоязычный самостоятельный путешественник.
@@ -49,7 +60,7 @@ ARVELIS должен собирать эти ограничения в один 
 
 ## Основной объект — Trip
 
-`Trip` — агрегат пользовательского путешествия. Chat не является корнем продуктовой модели. В будущем conversational interaction может быть добавлен внутри конкретной поездки, но история сообщений не должна определять storage/domain architecture Travel-продукта.
+`Trip` — агрегат пользовательского путешествия. Chat не является корнем продуктовой модели. Provider-specific ограничения, тарификация и API credentials не должны проникать в `Trip`.
 
 Статусы Trip:
 
@@ -62,8 +73,6 @@ ARVELIS должен собирать эти ограничения в один 
 
 ## Границы Travel MVP
 
-Продуктовые модули, для которых закладываются границы:
-
 - **Plan / Discover** — параметры, направление, предпочтения, itinerary;
 - **Transport** — маршруты и сегменты разных видов транспорта;
 - **Budget** — лимит, категории расходов, резерв и остаток;
@@ -71,26 +80,9 @@ ARVELIS должен собирать эти ограничения в один 
 - **Map** — provider-neutral географические точки/маршрут;
 - **Trip Book** — единое представление материалов поездки.
 
-`Live Companion` и `Safe` зафиксированы как future направления, а не scope текущего Foundation slice.
-
-## Travel Pivot Foundation V1
-
-В текущем slice пользователь может:
-
-- открыть Travel-first Home;
-- открыть `Создать поездку`;
-- заполнить основные параметры;
-- честно сохранить пользовательский Trip draft локально;
-- увидеть поездку в `Мои поездки`;
-- снова открыть её;
-- перейти в Trip Workspace;
-- увидеть foundation разделов Overview, Itinerary, Map, Budget, Documents, Legal и Trip Book.
-
-В этом slice **нет** реального AI, поиска билетов/жилья, real map, legal conclusions, booking или payment.
+`Live Companion` и `Safe` зафиксированы как future направления.
 
 ## Truthfulness rule
-
-User-created Trip data и sample/demo content — разные классы данных.
 
 Запрещено выдавать за real data:
 
@@ -101,23 +93,12 @@ User-created Trip data и sample/demo content — разные классы да
 - AI-рекомендации;
 - фиктивные географические маршруты.
 
-Если provider отсутствует, UI показывает explicit empty/not-connected state.
+Если provider отсутствует или не прошёл activation gate, продукт обязан показывать truthful unavailable/not-connected state.
 
-## Excluded from Travel Pivot Foundation V1
+## Текущий Transport boundary
 
-- OpenAI/Gemini/Claude/другой real AI provider;
-- production transport/rail/bus/flight search;
-- booking/payment;
-- paid map API;
-- production Legal/Weather API;
-- billing/subscriptions;
-- production deploy/public registration rollout;
-- AR navigation/offline maps;
-- Live Companion/Safe automation;
-- camera/voice/realtime assistant;
-- Travel Memory;
-- полноценная Group Travel система.
+Transport Normalized Contract V1 и Transport Provider Strategy & Adapter Foundation V1 остаются provider-neutral.
 
-## Foundation success criteria
+Для каждого реального transport API до activation отдельно проверяются официальные terms, attribution, quotas, caching/storage, price/availability rights, deeplink/booking policy, credentials и совместимость с текущим бесплатным user-facing продуктом.
 
-Foundation считается полезным, когда пользователь может создать принадлежащий ему Trip draft, закрыть/вернуться в интерфейс и снова открыть сохранённую поездку, а архитектура позволяет подключать real-data providers без переписывания UI вокруг одного vendor.
+Реальный booking/payment, billing/subscriptions/paywall и production activation не входят в текущий этап.
