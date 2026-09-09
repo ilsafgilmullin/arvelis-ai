@@ -1,4 +1,5 @@
-import type { LegalCheck, MapPoint, Trip } from './domain';
+import type { LegalCheck, Trip } from './domain';
+import type { MapRouteRequest, MapRouteResponse } from './mapContracts';
 import type { PlanProposal, PlanRequest } from './planContracts';
 import type { TransportSearchRequest, TransportSearchResponse } from './transportContracts';
 
@@ -13,6 +14,10 @@ export type AIPlanProviderContext = ProviderRequestContext & {
 };
 
 export type TransportProviderRequestContext = ProviderRequestContext & {
+  requestId: string;
+};
+
+export type MapProviderRequestContext = ProviderRequestContext & {
   requestId: string;
 };
 
@@ -32,7 +37,11 @@ export interface TransportProvider {
 
 export interface MapProvider {
   readonly id: string;
-  resolvePoints(trip: Trip, context: ProviderRequestContext): Promise<MapPoint[]>;
+  resolveRouteMap(
+    request: MapRouteRequest,
+    context: MapProviderRequestContext,
+    signal: AbortSignal,
+  ): Promise<MapRouteResponse>;
 }
 
 export interface LegalSourceProvider {

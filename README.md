@@ -8,89 +8,36 @@
 
 ## Product access model
 
-ARVELIS AI на текущем этапе полностью бесплатен для пользователя.
+ARVELIS AI на текущем этапе полностью бесплатен для пользователя. Billing/subscriptions/paywall не проектируются; provider quotas/cost controls остаются backend policy и не меняют `Trip`.
 
-- billing/subscriptions/paywall не проектируются;
-- Travel Domain не содержит monetization fields;
-- provider quotas/cost controls остаются внутренней backend policy;
-- будущая смена коммерческой модели не должна требовать изменения `Trip`.
+## Current engineering slice
 
-## Current engineering state
+`Map Provider Foundation & Route Map V1` развивается в `feat/travel-map-provider-foundation-v1` поверх закрытого `Yandex Rasp Live Adapter V1` (Draft PR #32).
 
-`Yandex Rasp Live Adapter V1` реализован в stacked-ветке `feat/travel-yandex-rasp-live-adapter-v1` поверх закрытого `Transport Provider Strategy & Adapter Foundation V1` (Draft PR #31).
+Ни один реальный map provider, SDK, API key или production map endpoint не подключён.
 
-Implementation SHA до documentation closure: `df835cf92221cad3edb5d29b8e71a9f0a132ecf4`.
+## Map architecture
 
-Этот slice добавляет реальный server-side HTTP adapter, но **не активирует production traffic и не содержит real API key**.
+`src/travel/mapContracts.ts` задаёт provider-neutral `MapRouteRequest/MapRouteResponse`:
 
-## Yandex Rasp Live Adapter V1
+- origin/destination и реальные сохранённые waypoints;
+- bounded coordinates and route geometry;
+- provider/request identity;
+- attribution;
+- retrievedAt + optional validUntil;
+- no invented freshness.
 
-### HTTP client
+`MapOrchestrator` проверяет authenticated ownership, timeout/cancellation и untrusted provider response до использования. User-provided coordinates не могут быть молча заменены provider-ом: response с `resolution: provided` обязан вернуть те же coordinates.
 
-`server/travel/providers/yandexRaspHttpClient.ts`:
+Route without provider `validUntil` имеет freshness `unspecified` и не считается authoritative-current.
 
-- использует native Node `fetch`, без новой HTTP dependency;
-- default API base: `https://api.rasp.yandex-net.ru/v3.0/`;
-- передаёт API key только в `Authorization` header;
-- не добавляет key в query string;
-- запрещает redirects;
-- принимает insecure HTTP endpoint только в явно разрешённом test mode;
-- ограничивает размер search response до 4 MiB;
-- ограничивает `stations_list` response до 56 MiB;
-- валидирует HTTP/JSON/response shape и возвращает санитизированные ошибки.
+## Route Map UI
 
-### Location resolution
+В обычном runtime map provider всё ещё `not_connected`. Map tab показывает truthful empty state. Старая декоративная псевдолиния маршрута скрыта, чтобы не выглядеть как рассчитанный маршрут без фактических данных.
 
-`YandexRaspStationsLocationResolver` использует официальный `stations_list` только как temporary in-memory directory.
-
-- user labels остаются provider-neutral внутри `Trip`;
-- exact settlement match имеет приоритет;
-- если settlement не найден, допускается exact station match;
-- ambiguous/missing match возвращает `null` и поиск fail closed;
-- fuzzy guessing и запись Yandex codes в Travel Domain отсутствуют;
-- directory TTL по умолчанию — 15 минут.
-
-### Mapping / truthfulness
-
-`YandexRaspTransportAdapter` сохраняет normalized Transport boundary.
-
-- outbound/return привязаны к `legId`;
-- `et_marker` не трактуется как наличие мест;
-- Yandex ticket price нормализуется как `from`;
-- mixed-currency places не превращаются в одну цену;
-- provider `validUntil` не выдумывается;
-- availability остаётся `unknown`, если provider не дал отдельного авторитетного факта;
-- attribution contract: `Данные предоставлены сервисом Яндекс.Расписания`, placement `adjacent_to_data`.
-
-### Temporary cache only
-
-`TemporaryCachedTransportProvider` хранит результаты только в RAM.
-
-- search TTL по умолчанию — 60 секунд;
-- max search cache entries — 64;
-- location directory TTL — 15 минут;
-- cache TTL описывает возраст локального temporary cache и **не является provider validity**;
-- Yandex responses не записываются в Trip persistence, SQLite, PostgreSQL, localStorage или файлы.
-
-## Activation gate
-
-Runtime factory `createYandexRaspLiveProvider()` fail closed.
-
-Для состояния `ready` одновременно нужны server-side environment values:
-
-```text
-YANDEX_RASP_API_KEY
-YANDEX_RASP_TERMS_RECHECKED_AT
-YANDEX_RASP_QUOTA_CONFIRMED=true
-```
-
-`.env.example` содержит только пустые placeholders. Реальные значения не должны появляться в Git, PR, docs, screenshots, frontend bundle или logs.
-
-Без credentials/fresh terms review/confirmed quota provider остаётся `disabled` с `provider: null`; `TransportOrchestrator` сохраняет truthful `not_connected` behavior.
+Сохранённые пользователем MapPoint остаются частью Trip foundation; новый normalized provider response автоматически в Trip не записывается.
 
 ## Verification
-
-Signal-bearing commands:
 
 ```bash
 npm ci
@@ -104,23 +51,17 @@ npm run test:travel-browser
 npm run build
 ```
 
-`test:yandex-rasp-live` использует локальный HTTP stub и fake test key. Он не обращается к реальному Yandex endpoint и не требует real credentials.
+`test:transport-provider-foundation` в текущем slice дополнительно запускает Map provider foundation business/security smoke.
 
-Stacked Draft PR на `feat/travel-transport-provider-foundation-v1` дополнительно должен пройти PR-triggered PostgreSQL 18.4 lower-layer regression.
+## Boundaries
 
-## Explicit non-goals / STOP boundary
+- no real Map credentials/provider activation;
+- no fake route geometry as user data;
+- no booking/payment;
+- no production deploy;
+- no merge to `main`;
+- no persistent provider map result storage without a separate retention/terms decision.
 
-В этот slice **не входят**:
+После green Map checkpoint следующий согласованный slice — `Legal Sources & Travel Legal Foundation V1`.
 
-- фактическая activation live Yandex API key;
-- production provider wiring;
-- booking/ticket purchase/payment;
-- persistent storage Yandex results;
-- Aviasales Search API;
-- Aviasales Data live adapter;
-- другие transport providers;
-- изменение `Trip` под provider-specific ограничения.
-
-После green PR-triggered regression на documentation HEAD `Yandex Rasp Live Adapter V1` считается CLOSED. Следующий engineering slice самостоятельно не начинается.
-
-См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/47_TRANSPORT_PROVIDER_STRATEGY_ADAPTER_FOUNDATION_V1.md`, `docs/48_YANDEX_RASP_LIVE_ADAPTER_V1.md`.
+См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/49_MAP_PROVIDER_FOUNDATION_ROUTE_MAP_V1.md`.

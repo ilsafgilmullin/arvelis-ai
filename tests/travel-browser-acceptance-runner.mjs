@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 
-const PASS_MARKER = 'travel browser server-persistence happy-path: PASS';
+const PASS_MARKER = 'travel browser server-persistence + truthful-map happy-path: PASS';
 const TIMEOUT_MS = 90_000;
 
 const child = spawn(process.execPath, ['--experimental-sqlite', 'tests/travel-browser-acceptance.mjs'], {

@@ -2,127 +2,84 @@
 
 **Актуальность:** 2026-09-09.
 
-Travel Product Pivot остаётся текущим продуктовым направлением.
+Travel Product Pivot остаётся текущим продуктовым направлением. ARVELIS AI на текущем этапе — полностью бесплатный user-facing сервис; billing/subscriptions/paywall не проектируются.
 
-## Закрытые foundation layers
+## Закрытые stacked layers
 
 - [x] Travel Pivot Foundation V1;
 - [x] Travel UI Redesign V2;
 - [x] Server-side Trip Persistence & API V1 — Draft PR #28, green, not merged;
 - [x] Plan Real-Data Contract & AI Orchestration Policy V1 — Draft PR #29, green, not merged;
 - [x] Transport Normalized Route Contract V1 — Draft PR #30, green, not merged;
-- [x] Transport Provider Strategy & Adapter Foundation V1 — Draft PR #31, green, not merged.
+- [x] Transport Provider Strategy & Adapter Foundation V1 — Draft PR #31, green, not merged;
+- [x] Yandex Rasp Live Adapter V1 — Draft PR #32, green, not merged; production key not activated.
 
-## Текущая продуктовая модель
+## Current slice — Map Provider Foundation & Route Map V1
 
-ARVELIS AI на текущем этапе — полностью бесплатный user-facing сервис.
+Branch: `feat/travel-map-provider-foundation-v1`  
+Base: Yandex Rasp V1 / `dc7da2ab920411bb39105c368e16ae90dcd0ef90`  
+Draft PR #33.
 
-- billing не проектируется;
-- subscriptions не проектируются;
-- paywall не проектируется;
-- Travel Domain не содержит monetization fields;
-- provider quotas/cost controls остаются backend/application policy;
-- будущая смена commercial model не должна требовать переписывания `Trip`.
+Scope / DoD:
 
-## Transport Provider Strategy & Adapter Foundation V1 — DoD CLOSED
+- [x] provider-neutral `MapRouteRequest/MapRouteResponse`;
+- [x] origin/destination/waypoint contract without vendor fields in `Trip`;
+- [x] bounded coordinates/geometry/attribution validation;
+- [x] user-provided coordinate integrity fail-closed;
+- [x] origin/destination resolution required;
+- [x] ownership-aware `MapOrchestrator`;
+- [x] timeout/cancellation;
+- [x] truthful `not_connected` without provider;
+- [x] freshness current/expired/unspecified without invented `validUntil`;
+- [x] no automatic persistence of provider map result;
+- [x] old decorative fake-route schematic hidden from active UI;
+- [x] one server-backed Chromium happy-path covers truthful Map empty state;
+- [x] implementation validate + PostgreSQL regression PASS;
+- [x] README + dedicated `docs/49_MAP_PROVIDER_FOUNDATION_ROUTE_MAP_V1.md`;
+- [ ] final validate/PostgreSQL PASS on documentation HEAD.
 
-Branch: `feat/travel-transport-provider-foundation-v1`  
-Final head: `c73deed052b0f94b5cbf791aa0385879fb073e43`  
-Draft PR #31 — green, open, not merged.
+No real map vendor/SDK/key is connected in this slice.
 
-Закрыто:
+## Next agreed slice — Legal Sources & Travel Legal Foundation V1
 
-- provider-neutral activation policy;
-- official-terms review boundary;
-- free-product compatibility gate;
-- attribution/branding metadata;
-- quota/credentials gate;
-- cache/storage restriction metadata;
-- normalized `legId` и explicit price semantics;
-- Yandex Rasp adapter foundation;
-- `et_marker` not treated as availability;
-- no fake provider `validUntil`;
-- Aviasales Search blocked for current strategy;
-- Aviasales Data retained only as future cached insight source;
-- Product/Architecture/Roadmap/Security/README synchronized;
-- PR-triggered validate + PostgreSQL 18.4 regression PASS.
+After Map DoD closes:
 
-## Yandex Rasp Live Adapter V1 — implementation/docs complete, final PR gate required
+1. provider-neutral legal request/source/claim contracts;
+2. official-source provenance model;
+3. freshness/effective-date policy without invented legal validity;
+4. ownership-aware Legal orchestrator;
+5. untrusted-output validation;
+6. truthful `not_connected`/needs-review states;
+7. no real legal-source provider credentials or live ingestion.
 
-Branch: `feat/travel-yandex-rasp-live-adapter-v1`  
-Base: Provider Foundation / `c73deed052b0f94b5cbf791aa0385879fb073e43`  
-Implementation SHA: `df835cf92221cad3edb5d29b8e71a9f0a132ecf4`
+## Then — ARVELIS AI Engine & Knowledge Foundation V1
 
-Реализовано:
+After Legal DoD closes:
 
-- [x] real server-side HTTP client на native Node `fetch`;
-- [x] approved Yandex Rasp API host validation;
-- [x] API key only in `Authorization` header;
-- [x] env-only credentials;
-- [x] fail-closed activation without key/fresh terms/quota confirmation;
-- [x] official `stations_list`-based location resolution;
-- [x] exact settlement/station matching;
-- [x] ambiguous/missing location fail closed;
-- [x] point-to-point request mapping;
-- [x] normalized route mapping без изменения Trip Domain;
-- [x] attribution output contract;
-- [x] `et_marker` remains non-availability;
-- [x] `from` price semantics;
-- [x] no invented provider `validUntil`;
-- [x] temporary in-memory search cache only;
-- [x] bounded temporary location directory cache;
-- [x] no persistent Yandex result storage;
-- [x] one real server-side HTTP happy-path through local stub/fake endpoint;
-- [x] existing TransportOrchestrator/Trip regressions preserved;
-- [x] implementation push CI PASS on `df835cf92221cad3edb5d29b8e71a9f0a132ecf4`;
-- [x] README/Architecture/Roadmap/Security closure;
-- [x] `docs/48_YANDEX_RASP_LIVE_ADAPTER_V1.md` added.
+1. provider-neutral knowledge/evidence contracts;
+2. source trust/provenance policy;
+3. retrieval/model boundaries without choosing a live vendor;
+4. prompt/context minimization;
+5. no model-generated fact promoted to authoritative external fact without evidence;
+6. truthful `not_connected` without AI/model/retriever.
 
-Final DoD gate before declaring the slice CLOSED:
+## Real STOP boundary
 
-- stacked Draft PR base `feat/travel-transport-provider-foundation-v1`;
-- PR-triggered validate PASS on documentation HEAD;
-- PR-triggered PostgreSQL 18.4 lower-layer regression PASS.
+Stop before the first step that requires one of:
 
-После этого slice считается **CLOSED**, но фактическая live API activation всё равно остаётся отдельным действием.
+- real provider/model credentials;
+- paid service;
+- production deployment/wiring;
+- irreversible migration/deletion;
+- a product decision about model vendor, knowledge-source set/indexing strategy, or legal/map provider selection;
+- merge to `main`.
 
-## STOP boundary after Yandex V1
+## Later roadmap — not started
 
-После green final PR regression самостоятельно **не начинать новый slice**.
-
-Не выполнять без отдельного подтверждения:
-
-- production wiring;
-- установку/активацию реального `YANDEX_RASP_API_KEY`;
-- изменение production secrets;
-- live provider traffic rollout;
-- booking/ticket purchase/payment;
-- persistent storage Yandex data;
-- Aviasales Search API;
-- Aviasales Data live integration;
-- другие transport provider adapters;
-- merge в `main`.
-
-## Future Travel sequence — not started
-
-Следующие пункты остаются только roadmap, а не текущим scope:
-
-1. Budget provider inputs / Currency contract;
-2. Legal source ingestion/verification;
-3. Map provider implementation;
-4. Stay/Weather integrations;
-5. Trip Book export/generation;
-6. Live Companion;
-7. Safe/emergency capabilities.
-
-## Всё ещё вне scope без отдельного решения
-
-- real AI/RAG vendor;
-- booking/ticket purchase;
-- billing/subscriptions/paywall;
-- production deployment/public registration;
-- destructive Trip deletion/retention operations;
-- production secrets;
-- irreversible migrations;
-- AR/offline maps;
-- Live/Safe automation.
+- Budget provider inputs / Currency contract;
+- real Legal source adapters;
+- real Map adapter/provider activation;
+- Stay/Weather integrations;
+- Trip Book export/generation;
+- Live Companion;
+- Safe/emergency capabilities.
