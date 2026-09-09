@@ -6,6 +6,7 @@ import {
   evaluateTransportRoutePolicy,
   getTransportRouteMetrics,
   validateTransportSearchResponse,
+  type NormalizedTransportRoute,
   type TransportSearchRequest,
   type TransportSearchResponse,
 } from '../src/travel/transportContracts';
@@ -88,6 +89,12 @@ function makeResponse(requestId: string, providerId = 'transport-contract-test')
   };
 }
 
+function requireRoute(response: TransportSearchResponse, index: number): NormalizedTransportRoute {
+  const route = response.routes[index];
+  assert.ok(route, `Expected route at index ${index}`);
+  return route;
+}
+
 async function expectTransportError(promise: Promise<unknown>, code: TransportOrchestrationError['code']) {
   await assert.rejects(promise, (error: unknown) => error instanceof TransportOrchestrationError && error.code === code);
 }
@@ -107,8 +114,8 @@ async function main() {
 
   const response = makeResponse('transport-request-1');
   assert.deepEqual(validateTransportSearchResponse(response, 'transport-contract-test', 'transport-request-1'), []);
-  assert.deepEqual(getTransportRouteMetrics(response.routes[0]), { durationMinutes: 120, transferCount: 0 });
-  assert.deepEqual(getTransportRouteMetrics(response.routes[1]), { durationMinutes: 900, transferCount: 1 });
+  assert.deepEqual(getTransportRouteMetrics(requireRoute(response, 0)), { durationMinutes: 120, transferCount: 0 });
+  assert.deepEqual(getTransportRouteMetrics(requireRoute(response, 1)), { durationMinutes: 900, transferCount: 1 });
 
   const now = new Date('2026-09-09T07:00:00.000Z');
   assert.deepEqual(compareTransportRoutes(response, 'duration', now), {
@@ -139,7 +146,7 @@ async function main() {
     ...response,
     routes: response.routes.map((route) => ({ ...route, validUntil: '2026-09-09T06:59:59.000Z' })),
   };
-  assert.equal(evaluateTransportRoutePolicy(stale.routes[0], stale, now).priceAuthoritative, false);
+  assert.equal(evaluateTransportRoutePolicy(requireRoute(stale, 0), stale, now).priceAuthoritative, false);
   assert.equal(compareTransportRoutes(stale, 'duration', now).comparable, false);
 
   const invalidChronology: TransportSearchResponse = {
