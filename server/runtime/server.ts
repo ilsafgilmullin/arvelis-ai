@@ -7,7 +7,7 @@ import type { EmailOtpChallengeStore, EmailOtpFailure, EmailOtpRateLimitPort } f
 import { SmtpEmailOtpDelivery } from '../auth/emailOtp/smtpDelivery';
 import { EmailOtpService } from '../auth/emailOtp/service';
 import { WebCryptoEmailOtpSecurity } from '../auth/emailOtp/webCryptoSecurity';
-import type { SessionStore } from '../auth/session/contracts';
+import type { AuthenticatedSession, SessionStore } from '../auth/session/contracts';
 import { SessionService } from '../auth/session/service';
 import { WebCryptoSessionSecurity } from '../auth/session/webCryptoSecurity';
 import { PostgresAccountIdentityStore } from '../persistence/postgres/accountIdentityStore';
@@ -50,7 +50,7 @@ type RequestAuthentication =
   | {
       kind: 'authenticated';
       credential: { sessionId: string; secret: string };
-      authenticated: Awaited<ReturnType<SessionService['authenticate']>> extends { ok: true; session: infer T } ? T : never;
+      authenticated: AuthenticatedSession;
       publicSession: {
         id: string;
         account: {
