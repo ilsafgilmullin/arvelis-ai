@@ -9,9 +9,10 @@
 - [x] Travel Pivot Foundation V1;
 - [x] Travel UI Redesign V2;
 - [x] Server-side Trip Persistence & API V1 — Draft PR #28, green, not merged;
-- [x] Plan Real-Data Contract & AI Orchestration Policy V1 — Draft PR #29, green, not merged.
+- [x] Plan Real-Data Contract & AI Orchestration Policy V1 — Draft PR #29, green, not merged;
+- [x] Transport Normalized Route Contract V1 — Draft PR #30, green, not merged.
 
-## Transport Normalized Route Contract V1 — CURRENT RELEASE GATE
+## Transport Normalized Route Contract V1 — DoD CLOSED
 
 Branch: `feat/travel-transport-contract-v1`  
 Base: Plan V1 / `7e99c1f118f037fcf90b488a1c2b24e409bedcf6`
@@ -33,36 +34,42 @@ Base: Plan V1 / `7e99c1f118f037fcf90b488a1c2b24e409bedcf6`
 - [x] mixed currency comparison fail closed;
 - [x] stale/unbounded data not authoritative;
 - [x] Plan/Trip regressions;
-- [x] implementation push typecheck/build/browser/frontend PASS;
-- [ ] stacked Draft PR final regression gate;
-- [ ] final PR checkpoint recorded.
+- [x] typecheck/server/browser/frontend gate;
+- [x] stacked Draft PR #30 final regression;
+- [x] PostgreSQL 18.4 lower-layer regression.
 
 Real transport provider, booking, FX provider и vendor keys не входят в contract slice.
 
-## Следующая граница — PRODUCT/ENGINEERING DECISION REQUIRED
+## Текущая продуктовая модель
 
-После зелёного Transport V1 contract следующий шаг внутри Transport roadmap — выбрать provider strategy.
+ARVELIS AI на текущем этапе — полностью бесплатный user-facing сервис.
 
-До реализации adapter нужно отдельно решить:
+- billing не проектируется;
+- subscriptions не проектируются;
+- paywall не проектируется;
+- Travel Domain остаётся независимым от будущей monetization model;
+- внутренние provider quotas/cost controls допустимы только как backend/application policy.
 
-1. какие виды транспорта обязательны для первого real-data release: авиа, железная дорога, автобус или комбинация;
-2. какой источник/API доступен пользователям и backend из России без обязательного VPN;
-3. API terms, стоимость, quotas/rate limits;
-4. можно ли показывать цену/availability и на каких условиях freshness;
-5. source/deeplink/booking policy;
-6. разрешается ли только поиск или также redirect/affiliate/booking;
-7. какие production credentials/secret handling нужны;
-8. нужен один provider или fallback/routing между несколькими;
-9. vendor lock-in и возможность замены;
-10. legal/privacy/transborder implications.
+## Next agreed slice — Transport Provider Strategy & Adapter Foundation V1
 
-До этого решения реальный adapter не подключается.
+Перед реализацией каждого real adapter обязательно проверяются актуальные официальные:
 
-## Позже по roadmap
+1. API terms и разрешённый тип проекта;
+2. бесплатность/стоимость provider access;
+3. attribution/branding requirements;
+4. quotas/rate limits;
+5. caching/storage/processing restrictions;
+6. право показывать schedule/price/availability;
+7. deeplink/affiliate/booking policy;
+8. доступность из России/backend topology;
+9. credentials/secret handling;
+10. vendor lock-in и возможность замены без изменения Travel Domain.
 
-После утверждения Transport provider strategy:
+Foundation должен оставаться provider-neutral. Конкретный provider activation, API key и production traffic требуют отдельного подтверждения условий непосредственно перед подключением.
 
-1. real Transport adapter(s) + normalized route ingestion;
+## Later Travel sequence
+
+1. real Transport adapter(s) после terms/credentials gate;
 2. Budget provider inputs / Currency contract;
 3. Legal source ingestion/verification;
 4. Map provider implementation;
@@ -75,7 +82,7 @@ Real transport provider, booking, FX provider и vendor keys не входят �
 
 - real AI/RAG vendor;
 - booking/ticket purchase;
-- paid provider activation;
+- billing/subscriptions/paywall;
 - production deployment/public registration;
 - destructive Trip deletion/retention operations;
 - production secrets;
