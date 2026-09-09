@@ -1,118 +1,190 @@
 # ARVELIS AI — безопасность
 
-**Актуальность:** Legal Sources & Travel Legal Foundation V1 / бесплатная user-facing модель, 2026-09-09.
+**Актуальность:** ARVELIS AI Engine & Knowledge Foundation V1 / бесплатная user-facing модель, 2026-09-09.
 
 ## Global invariants
 
 - Account/Session and Trip ownership are server-authoritative;
 - client `ownerScopeId` is not an authorization credential;
-- OTP/session/provider secrets are server-side only;
-- external provider output is untrusted input;
-- no provider response, auth secret, document or payment data is logged by default;
-- billing/subscriptions/paywall remain outside Travel Domain.
+- OTP/session/provider/model secrets are server-side only;
+- external provider, retriever, tool and model output is untrusted input;
+- provider/model-specific credentials and IDs do not enter `Trip`;
+- no provider response, model prompt, raw evidence payload, auth secret, document or payment data is logged by default;
+- billing/subscriptions/paywall remain outside Travel Domain;
+- no fake/model-generated external fact is promoted to authoritative data.
 
 ## Existing provider boundaries
 
-Yandex Rasp remains closed without production activation or live key. Map V1 remains provider-neutral with no real map vendor/credentials. Existing Transport/Map protections and temporary-cache/coordinate-integrity rules stay in force.
+Yandex Rasp remains closed without production activation or live key. Map V1 remains provider-neutral with no real map vendor/credentials. Legal V1 remains route-general and source-backed with no real Legal provider. Existing Transport/Map/Legal ownership, provenance, freshness and fail-closed rules stay in force.
 
-## Legal data minimization
+## AI Gateway data minimization
 
-`LegalCheckRequest` contains only route-general fields:
+`AiGatewayRequest` contains only:
 
-- Trip ID/revision;
-- origin;
-- destination;
-- optional trip dates;
-- `scope: route_general`.
+- contract version;
+- prompt;
+- locale;
+- `general | trip` scope.
 
-It must not contain cookies, session secrets, documents, payment data, traveler identities or future Legal provider credentials.
+The authenticated account scope remains in `AiGatewayServerContext` and is never exposed to `AiModelRuntime` input.
 
-Current `Trip` has no citizenship, nationality, passport or residence-permit fields. Legal V1 therefore must not infer, default or fabricate them. Personalized visa/entry eligibility cannot be asserted from the current model.
+For trip-scoped execution the server must provide an already-authorized Trip ID. Missing/invalid trip authorization fails before model execution.
 
-## Legal source/claim validation
+The model runtime must not receive cookies, session secrets, provider keys, account identifiers, raw user documents or unrestricted Trip persistence objects through this foundation boundary.
 
-External Legal responses are accepted only after deterministic validation.
+## Runtime/retrieval/tool isolation
 
-Required invariants:
+The AI execution stack is split into independent server-side ports:
 
-- provider/request identity match;
-- bounded source/claim counts;
-- unique IDs;
-- source URLs use HTTPS;
-- source retrieval/effective dates have valid formats;
-- every claim references at least one existing source;
-- a `verified` claim may only cite `official` sources;
-- a secondary source cannot elevate a claim to verified/authoritative;
-- malformed or uncited output fails closed.
+- `AiModelRuntime`;
+- `KnowledgeRetriever`;
+- `AiToolRegistry` handlers.
 
-No uncited legal conclusion is allowed through the normalized boundary.
+A real vendor adapter is not present in V1.
 
-## Authority / freshness
+All external outputs are validated before use:
 
-Legal retrieval time is not equivalent to legal validity.
+- retriever output validates source/chunk shape, IDs, references, HTTPS URLs and bounds;
+- model turns validate request identity, tool calls and structured answers;
+- tool output validates evidence shape and allowed domains;
+- unknown/unregistered tools fail closed.
 
-A claim can be authoritative only when:
+## Tool allowlist and provenance
 
-1. provider marked it `verified`;
-2. all cited sources are official HTTPS sources;
-3. source validity is explicitly bounded and non-expired;
-4. normalized validation succeeded.
+Only the following V1 tool IDs exist:
 
-Freshness semantics:
+- `trip.read`;
+- `transport.search`;
+- `map.route`;
+- `legal.check`.
 
-- explicit expired `effectiveUntil` => `expired`, non-authoritative;
-- no explicit validity end => `unknown`, non-authoritative;
-- all source validity windows explicit and non-expired => `current`.
+The model sees only tools with registered server handlers.
 
-The application must not manufacture an effective date or convert `retrievedAt` into legal validity.
+Tool evidence is stamped by the server with the actual executed `toolId`. A model cannot grant itself authority by inventing tool provenance inside its answer.
 
-## Legal ownership/orchestration
+Server tool handlers receive the authenticated account/trip context; model-visible tool descriptors do not contain credentials or account scope.
 
-`LegalOrchestrator` checks authenticated account scope and Trip ownership **before** provider execution. Foreign ownership therefore cannot trigger a Legal provider call.
+## Protected factual domains
 
-It also provides:
+The following domains are protected:
 
-- bounded provider timeout;
+- transport schedule;
+- price;
+- availability;
+- map route;
+- legal;
+- weather.
+
+A model inference is never authoritative for these domains.
+
+Authority requirements:
+
+- schedule/price/availability => current evidence from `transport.search`;
+- map route => current evidence from `map.route`;
+- legal => current official HTTPS evidence from `legal.check`;
+- weather => authoritative status impossible in V1 because no Weather tool exists.
+
+Stale or unknown-freshness evidence is not sufficient.
+
+## Knowledge / RAG security boundary
+
+Knowledge/RAG retrieval is untrusted and independently validated.
+
+Knowledge sources may be `official`, `editorial` or `user`, but source type alone does not bypass protected-tool rules.
+
+In particular:
+
+- an official RAG chunk does not establish an authoritative Legal fact;
+- RAG does not replace Transport, Map or Legal provider boundaries;
+- missing `validUntil` produces freshness `unknown`;
+- expired source evidence is non-authoritative;
+- malformed/insecure source references fail closed.
+
+No production source set, crawler, embedding model, vector store or ingestion service is configured in Foundation V1.
+
+## Structured-output security
+
+Final AI output contains a user-visible `message` plus typed `claims`.
+
+Each claim declares:
+
+- domain;
+- `fact | inference` mode;
+- evidence references.
+
+Protected facts without the correct current tool evidence are rejected as invalid model output rather than silently downgraded to trusted content.
+
+Important limitation: deterministic schema validation can verify declared claims/evidence, but cannot semantically prove that free-form prose contains no undeclared factual assertion. Therefore a future real-model activation requires semantic evaluation that all externally-checkable assertions are represented in structured claims.
+
+## Bounded execution / denial-of-service controls
+
+Foundation limits include:
+
+- bounded prompt/output/evidence sizes;
+- bounded retrieval source/chunk counts;
+- allowlisted tool count;
+- maximum two tool-call rounds;
+- global Gateway timeout;
 - caller cancellation;
-- truthful `not_connected` when no provider is configured;
-- validation of untrusted normalized output;
-- typed fail-closed errors;
-- audit metadata limited to request/trip/provider identity, timing, status and validation codes.
+- bounded audit metadata.
 
-Audit must not contain raw source documents, provider credentials, cookies or user documents.
+A timeout/abort propagates through runtime/retriever/tool execution via `AbortSignal`.
+
+## Audit / observability
+
+AI Gateway audit may contain only operational metadata such as:
+
+- request ID;
+- runtime/retriever ID;
+- scope and authorized Trip ID;
+- timing/status;
+- retrieval status;
+- tool-call count;
+- evidence count;
+- validation error codes.
+
+Audit must not contain raw prompt text, raw evidence/source text, model credentials, provider secrets, cookies or user documents.
+
+## Evaluation / activation policy
+
+A future real AI runtime must not be activated solely because API connectivity works.
+
+Mandatory evaluation coverage includes:
+
+- account-scope isolation;
+- trip authorization boundary;
+- unknown tools;
+- unsupported/stale price, schedule, availability, map, legal and weather facts;
+- malformed retriever/tool/model output;
+- protected-fact enforcement;
+- server tool provenance stamping;
+- timeout/cancellation;
+- semantic structured-claim coverage for externally-checkable assertions.
+
+The foundation release gate fails when required critical evaluation cases are missing or failed.
 
 ## Persistence / retention
 
-Legal Foundation does not automatically write provider claims/sources into `Trip`, SQLite or PostgreSQL. Any future source ingestion or retention requires a separate terms/privacy/retention review.
+Foundation V1 does not introduce model conversation persistence, vector storage, embedding storage or production Knowledge ingestion.
 
-## AI boundary
-
-Future ARVELIS AI Engine must not use model inference as an authoritative source for:
-
-- legal rules;
-- price;
-- transport schedule;
-- availability;
-- weather.
-
-Legal facts must flow through validated Legal tools/evidence. The model may summarize or reason over evidence but must preserve provenance and authority status.
+Any future retention requires a separate privacy/security/source-rights decision covering source terms, personal data, refresh, deletion and audit requirements.
 
 ## CI security
 
-Important Legal V1 gates:
+Important AI/Knowledge V1 gates:
 
 - `npm audit --audit-level=high`;
-- strict typecheck;
-- Legal business/security/freshness smoke;
-- lower Plan/Transport/Map/Yandex/Trip regressions;
-- server runtime build;
-- one existing server-backed Chromium happy-path;
+- strict project typecheck;
+- lower Plan/Transport/Map/Legal/Yandex/Trip regressions;
+- one AI/Knowledge business/security/evidence gate;
+- server runtime build including Gateway/Knowledge files;
+- existing server-backed Chromium regression;
 - frontend build;
 - stacked PR PostgreSQL lower-layer regression;
 - GitHub Actions `contents: read`.
 
 ## Production / STOP boundaries
 
-No real Legal source provider/credential or production ingestion is connected in Legal Foundation V1.
+No real model/runtime provider, embedding provider, vector database, AI credential or production Knowledge ingestion is connected in this foundation.
 
-After AI/Knowledge Foundation, stop before selecting/activating a real model runtime, embedding provider, vector DB or production knowledge source set. Production deployment, paid services, destructive migrations and merge to `main` remain forbidden without separate confirmation.
+After the AI/Knowledge checkpoint, stop before selecting/activating those components. Production deployment, paid services, destructive migrations and merge to `main` remain forbidden without separate confirmation.
