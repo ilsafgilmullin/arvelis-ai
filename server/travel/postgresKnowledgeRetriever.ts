@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   AI_FACT_DOMAINS,
   validateKnowledgeRetrievalResult,
@@ -23,6 +24,10 @@ function clampRelevance(value: number): number {
 function asDomain(value: string): AiFactDomain {
   if (!SAFE_DOMAIN.has(value)) throw new Error('Knowledge repository returned an unsupported fact domain');
   return value as AiFactDomain;
+}
+
+function compactEvidenceId(prefix: 'source' | 'chunk', value: string): string {
+  return `${prefix}:${createHash('sha256').update(value).digest('hex').slice(0, 40)}`;
 }
 
 export class PostgresKnowledgeRetriever implements KnowledgeRetriever {
@@ -69,7 +74,7 @@ export class PostgresKnowledgeRetriever implements KnowledgeRetriever {
     const chunks: KnowledgeRetrievalResult['chunks'] = [];
     for (const hit of hits) {
       const sourceKey = `${hit.source.namespace.kind}:${hit.source.namespace.kind === 'account' ? hit.source.namespace.accountId : 'global'}:${hit.source.id}`;
-      const sourceId = `source:${sourceKey}`;
+      const sourceId = compactEvidenceId('source', sourceKey);
       if (!sources.has(sourceId)) {
         sources.set(sourceId, {
           id: sourceId,
@@ -82,7 +87,7 @@ export class PostgresKnowledgeRetriever implements KnowledgeRetriever {
         });
       }
       chunks.push({
-        id: `chunk:${sourceKey}:${hit.chunk.id}`,
+        id: compactEvidenceId('chunk', `${sourceKey}:${hit.chunk.id}`),
         sourceId,
         domain: asDomain(hit.chunk.domain),
         text: hit.chunk.text,
