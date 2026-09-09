@@ -2,7 +2,7 @@ name: ARVELIS CI
 
 on:
   pull_request:
-    branches: [main, feat/travel-foundation-v1, feat/travel-ui-redesign-v2, feat/travel-trip-persistence-v1, feat/travel-plan-orchestration-contract-v1]
+    branches: [main, feat/travel-foundation-v1, feat/travel-ui-redesign-v2, feat/travel-trip-persistence-v1, feat/travel-plan-orchestration-contract-v1, feat/travel-transport-contract-v1]
   push:
     branches:
       - 'codex/**'
@@ -10,6 +10,7 @@ on:
       - 'feat/travel-trip-persistence-v1'
       - 'feat/travel-plan-orchestration-contract-v1'
       - 'feat/travel-transport-contract-v1'
+      - 'feat/travel-transport-provider-foundation-v1'
   workflow_dispatch:
 
 permissions:
@@ -49,6 +50,9 @@ jobs:
 
       - name: Transport contract business and freshness
         run: npm run test:transport-policy
+
+      - name: Transport provider strategy and adapter foundation
+        run: npm run test:transport-provider-foundation
 
       - name: Trip server business and ownership
         run: npm run test:trip-server

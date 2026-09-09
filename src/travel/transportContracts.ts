@@ -14,6 +14,9 @@ export const TRANSPORT_MODES = [
 ] as const;
 export type NormalizedTransportMode = (typeof TRANSPORT_MODES)[number];
 
+export const TRANSPORT_PRICE_SEMANTICS = ['from', 'quoted', 'cached_observation', 'unknown'] as const;
+export type TransportPriceSemantics = (typeof TRANSPORT_PRICE_SEMANTICS)[number];
+
 export type TransportSearchLeg = {
   id: string;
   fromLabel: string;
@@ -39,6 +42,7 @@ export type TransportLocation = {
 export type TransportMoney = {
   amountMinor: number;
   currency: string;
+  semantics: TransportPriceSemantics;
 };
 
 export type TransportAvailability = 'available' | 'limited' | 'unavailable' | 'unknown';
@@ -56,6 +60,7 @@ export type NormalizedTransportSegment = {
 
 export type NormalizedTransportRoute = {
   id: string;
+  legId: string;
   providerRouteId: string;
   segments: NormalizedTransportSegment[];
   price?: TransportMoney;
@@ -95,6 +100,7 @@ export type TransportValidationError = {
     | 'duplicate_id'
     | 'provider_mismatch'
     | 'request_mismatch'
+    | 'leg_mismatch'
     | 'chronology_error';
 };
 
@@ -111,17 +117,19 @@ export type TransportRoutePolicy = {
 };
 
 export type TransportComparisonCriterion = 'duration' | 'transfers' | 'price';
-export type TransportComparisonReason = 'stale_or_unbounded' | 'missing_price' | 'mixed_currency';
+export type TransportComparisonReason = 'stale_or_unbounded' | 'missing_price' | 'mixed_currency' | 'no_routes';
 
 export type TransportComparisonResult =
   | {
       comparable: true;
       criterion: TransportComparisonCriterion;
+      legId: string;
       routeIds: string[];
     }
   | {
       comparable: false;
       criterion: TransportComparisonCriterion;
+      legId: string;
       routeIds: string[];
       reason: TransportComparisonReason;
     };
@@ -193,6 +201,7 @@ export function validateTransportSearchResponse(
   candidate: unknown,
   expectedProviderId: string,
   expectedRequestId: string,
+  expectedLegIds: readonly string[] = [],
 ): TransportValidationError[] {
   const errors: TransportValidationError[] = [];
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
@@ -212,9 +221,14 @@ export function validateTransportSearchResponse(
   const routes = response.routes as NormalizedTransportRoute[];
   if (!uniqueIds(routes)) errors.push({ path: 'routes', code: 'duplicate_id' });
   const retrievedAtMs = Date.parse(response.retrievedAt as string);
+  const allowedLegIds = new Set(expectedLegIds);
 
   routes.forEach((route, routeIndex) => {
     if (!validId(route.id)) errors.push({ path: `routes[${routeIndex}].id`, code: 'invalid_value' });
+    if (!validId(route.legId)) errors.push({ path: `routes[${routeIndex}].legId`, code: 'invalid_value' });
+    else if (allowedLegIds.size > 0 && !allowedLegIds.has(route.legId)) {
+      errors.push({ path: `routes[${routeIndex}].legId`, code: 'leg_mismatch' });
+    }
     if (!validText(route.providerRouteId, 256)) errors.push({ path: `routes[${routeIndex}].providerRouteId`, code: 'invalid_value' });
     if (!Array.isArray(route.segments) || route.segments.length < 1 || route.segments.length > 16) {
       errors.push({ path: `routes[${routeIndex}].segments`, code: 'invalid_shape' });
@@ -238,6 +252,9 @@ export function validateTransportSearchResponse(
       }
       if (!CURRENCY_PATTERN.test(route.price.currency)) {
         errors.push({ path: `routes[${routeIndex}].price.currency`, code: 'invalid_value' });
+      }
+      if (!(TRANSPORT_PRICE_SEMANTICS as readonly string[]).includes(route.price.semantics)) {
+        errors.push({ path: `routes[${routeIndex}].price.semantics`, code: 'invalid_value' });
       }
     }
 
@@ -268,7 +285,7 @@ export function validateTransportSearchResponse(
 
 export function getTransportRouteMetrics(route: NormalizedTransportRoute): TransportRouteMetrics {
   const first = route.segments[0];
-  const last = route.segments[route.segments.length - 1];
+  const last = route.segments.at(-1);
   if (first === undefined || last === undefined) return { durationMinutes: 0, transferCount: 0 };
   const durationMinutes = Math.max(0, Math.round((Date.parse(last.arrivalAt) - Date.parse(first.departureAt)) / 60_000));
   return { durationMinutes, transferCount: Math.max(0, route.segments.length - 1) };
@@ -276,7 +293,7 @@ export function getTransportRouteMetrics(route: NormalizedTransportRoute): Trans
 
 export function evaluateTransportRoutePolicy(
   route: NormalizedTransportRoute,
-  response: TransportSearchResponse,
+  _response: TransportSearchResponse,
   now = new Date(),
 ): TransportRoutePolicy {
   let freshness: TransportRoutePolicy['freshness'] = 'unspecified';
@@ -284,10 +301,11 @@ export function evaluateTransportRoutePolicy(
     freshness = Date.parse(route.validUntil) >= now.getTime() ? 'current' : 'expired';
   }
   const current = freshness === 'current';
+  const currentPriceSemantics = route.price?.semantics === 'from' || route.price?.semantics === 'quoted';
   return {
     freshness,
     scheduleAuthoritative: current,
-    priceAuthoritative: current && route.price !== undefined,
+    priceAuthoritative: current && route.price !== undefined && currentPriceSemantics,
     availabilityAuthoritative: current && route.availability !== 'unknown',
   };
 }
@@ -295,20 +313,24 @@ export function evaluateTransportRoutePolicy(
 export function compareTransportRoutes(
   response: TransportSearchResponse,
   criterion: TransportComparisonCriterion,
+  legId: string,
   now = new Date(),
 ): TransportComparisonResult {
-  const routes = [...response.routes];
+  const routes = response.routes.filter((route) => route.legId === legId);
+  if (routes.length === 0) {
+    return { comparable: false, criterion, legId, routeIds: [], reason: 'no_routes' };
+  }
   if (routes.some((route) => !evaluateTransportRoutePolicy(route, response, now).scheduleAuthoritative)) {
-    return { comparable: false, criterion, routeIds: routes.map((route) => route.id), reason: 'stale_or_unbounded' };
+    return { comparable: false, criterion, legId, routeIds: routes.map((route) => route.id), reason: 'stale_or_unbounded' };
   }
 
   if (criterion === 'price') {
     if (routes.some((route) => route.price === undefined || !evaluateTransportRoutePolicy(route, response, now).priceAuthoritative)) {
-      return { comparable: false, criterion, routeIds: routes.map((route) => route.id), reason: 'missing_price' };
+      return { comparable: false, criterion, legId, routeIds: routes.map((route) => route.id), reason: 'missing_price' };
     }
     const currencies = new Set(routes.map((route) => route.price?.currency));
     if (currencies.size !== 1) {
-      return { comparable: false, criterion, routeIds: routes.map((route) => route.id), reason: 'mixed_currency' };
+      return { comparable: false, criterion, legId, routeIds: routes.map((route) => route.id), reason: 'mixed_currency' };
     }
     routes.sort((left, right) => (left.price?.amountMinor ?? 0) - (right.price?.amountMinor ?? 0));
   } else if (criterion === 'duration') {
@@ -317,5 +339,5 @@ export function compareTransportRoutes(
     routes.sort((left, right) => getTransportRouteMetrics(left).transferCount - getTransportRouteMetrics(right).transferCount);
   }
 
-  return { comparable: true, criterion, routeIds: routes.map((route) => route.id) };
+  return { comparable: true, criterion, legId, routeIds: routes.map((route) => route.id) };
 }

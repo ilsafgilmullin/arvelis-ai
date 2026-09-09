@@ -2,7 +2,7 @@
 
 **Актуальность:** 2026-09-09.
 
-Исторические universal/chat-first этапы сохраняются, но Travel Product Pivot остаётся текущим продуктовым направлением.
+Travel Product Pivot остаётся текущим продуктовым направлением.
 
 ## Закрытые foundation layers
 
@@ -10,35 +10,8 @@
 - [x] Travel UI Redesign V2;
 - [x] Server-side Trip Persistence & API V1 — Draft PR #28, green, not merged;
 - [x] Plan Real-Data Contract & AI Orchestration Policy V1 — Draft PR #29, green, not merged;
-- [x] Transport Normalized Route Contract V1 — Draft PR #30, green, not merged.
-
-## Transport Normalized Route Contract V1 — DoD CLOSED
-
-Branch: `feat/travel-transport-contract-v1`  
-Base: Plan V1 / `7e99c1f118f037fcf90b488a1c2b24e409bedcf6`
-
-- [x] minimized `TransportSearchRequest`;
-- [x] explicit destination + exact-date V1 boundary;
-- [x] typed normalized modes/segments/routes;
-- [x] typed `TransportProvider` with request context + `AbortSignal`;
-- [x] provider/request identity validation;
-- [x] normalized amount in minor units + 3-letter currency;
-- [x] explicit availability;
-- [x] retrieval/validity freshness boundary;
-- [x] route chronology validation;
-- [x] server Transport orchestrator;
-- [x] account ownership fail closed;
-- [x] timeout/cancellation/not-connected/error semantics;
-- [x] deterministic duration/transfer/price comparison;
-- [x] no opaque/fake route score;
-- [x] mixed currency comparison fail closed;
-- [x] stale/unbounded data not authoritative;
-- [x] Plan/Trip regressions;
-- [x] typecheck/server/browser/frontend gate;
-- [x] stacked Draft PR #30 final regression;
-- [x] PostgreSQL 18.4 lower-layer regression.
-
-Real transport provider, booking, FX provider и vendor keys не входят в contract slice.
+- [x] Transport Normalized Route Contract V1 — Draft PR #30, green, not merged;
+- [x] Transport Provider Strategy & Adapter Foundation V1 — Draft PR #31, green, not merged.
 
 ## Текущая продуктовая модель
 
@@ -47,36 +20,68 @@ ARVELIS AI на текущем этапе — полностью бесплат�
 - billing не проектируется;
 - subscriptions не проектируются;
 - paywall не проектируется;
-- Travel Domain остаётся независимым от будущей monetization model;
-- внутренние provider quotas/cost controls допустимы только как backend/application policy.
+- Travel Domain не содержит monetization fields;
+- provider quotas/cost controls остаются backend/application policy;
+- будущая смена commercial model не должна требовать переписывания `Trip`.
 
-## Next agreed slice — Transport Provider Strategy & Adapter Foundation V1
+## Transport Provider Strategy & Adapter Foundation V1 — DoD CLOSED
 
-Перед реализацией каждого real adapter обязательно проверяются актуальные официальные:
+Branch: `feat/travel-transport-provider-foundation-v1`  
+Base: Transport Contract V1 / `28ea5ab063f7e0c152ac92bffbe9c7d89a440e92`
 
-1. API terms и разрешённый тип проекта;
-2. бесплатность/стоимость provider access;
-3. attribution/branding requirements;
-4. quotas/rate limits;
-5. caching/storage/processing restrictions;
-6. право показывать schedule/price/availability;
-7. deeplink/affiliate/booking policy;
-8. доступность из России/backend topology;
-9. credentials/secret handling;
-10. vendor lock-in и возможность замены без изменения Travel Domain.
+- [x] provider-neutral activation policy;
+- [x] official-terms review boundary;
+- [x] free-product compatibility gate;
+- [x] attribution/branding metadata;
+- [x] quota/credentials gate;
+- [x] cache/storage restriction metadata;
+- [x] future monetization change handled outside Travel Domain;
+- [x] normalized `legId`;
+- [x] explicit price semantics (`from/quoted/cached_observation/unknown`);
+- [x] Yandex Rasp adapter foundation with injected client/resolver;
+- [x] `et_marker` not treated as availability;
+- [x] no fake provider `validUntil`;
+- [x] Aviasales Search blocked for current early-stage strategy;
+- [x] Aviasales Data retained only as future cached insight source;
+- [x] Product/Architecture/Roadmap/Security/README synchronized;
+- [x] `docs/47_TRANSPORT_PROVIDER_STRATEGY_ADAPTER_FOUNDATION_V1.md` added;
+- [x] PR #31 validate PASS;
+- [x] PR #31 PostgreSQL 18.4 lower-layer regression PASS.
 
-Foundation должен оставаться provider-neutral. Конкретный provider activation, API key и production traffic требуют отдельного подтверждения условий непосредственно перед подключением.
+No real API key, live HTTP traffic, booking or production activation belongs to this foundation slice.
+
+## Current slice — Yandex Rasp Live Adapter V1
+
+Scope без production activation:
+
+1. real server-side HTTP client;
+2. env-only `YANDEX_RASP_API_KEY`;
+3. location resolution;
+4. official Yandex request/response mapping;
+5. attribution output contract;
+6. temporary-cache-only policy;
+7. provenance/freshness without invented provider validity;
+8. truthful disabled/not_connected without key;
+9. one server-side HTTP happy-path through stub/fake endpoint;
+10. no booking/payment/persistent Yandex result storage.
+
+Перед фактической activation ключа повторно проверяются current official Yandex terms, attribution, quota и endpoint access.
+
+## Provider candidates after Yandex
+
+- Aviasales Search API — **не подключать сейчас**;
+- Aviasales Data API — только future cached price insights;
+- другие providers — только после отдельного official terms/coverage/security review.
 
 ## Later Travel sequence
 
-1. real Transport adapter(s) после terms/credentials gate;
-2. Budget provider inputs / Currency contract;
-3. Legal source ingestion/verification;
-4. Map provider implementation;
-5. Stay/Weather integrations;
-6. Trip Book export/generation;
-7. Live Companion;
-8. Safe/emergency capabilities.
+1. Budget provider inputs / Currency contract;
+2. Legal source ingestion/verification;
+3. Map provider implementation;
+4. Stay/Weather integrations;
+5. Trip Book export/generation;
+6. Live Companion;
+7. Safe/emergency capabilities.
 
 ## Всё ещё вне scope без отдельного решения
 
