@@ -1,0 +1,29 @@
+.travel-map-empty {
+  min-height: auto;
+  grid-template-columns: minmax(0,1fr);
+  align-items: start;
+}
+
+.travel-map-schematic {
+  display: none;
+}
+
+.travel-map-empty::before {
+  content: '⌖';
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--travel-border);
+  border-radius: 16px;
+  color: var(--travel-accent-teal);
+  background: #f2f9f9;
+  font-size: 24px;
+}
+
+@media (max-width: 640px) {
+  .travel-map-empty {
+    gap: 16px;
+    padding: 20px;
+  }
+}
