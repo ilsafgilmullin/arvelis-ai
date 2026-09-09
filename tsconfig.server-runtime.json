@@ -17,6 +17,8 @@
   "include": [
     "src/travel/domain.ts",
     "src/travel/validation.ts",
+    "src/travel/planContracts.ts",
+    "src/travel/providers.ts",
     "server/auth/account/contracts.ts",
     "server/auth/account/displayName.ts",
     "server/auth/application/contracts.ts",
@@ -33,6 +35,7 @@
     "server/auth/session/webCryptoSecurity.ts",
     "server/travel/contracts.ts",
     "server/travel/service.ts",
+    "server/travel/planOrchestrator.ts",
     "server/persistence/postgres/rows.ts",
     "server/persistence/postgres/accountIdentityStore.ts",
     "server/persistence/postgres/emailOtpChallengeStore.ts",
