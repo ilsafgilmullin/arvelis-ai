@@ -1,6 +1,6 @@
 # ARVELIS AI — архитектура
 
-**Актуальность:** Transport Provider Strategy & Adapter Foundation V1, 2026-09-09.
+**Актуальность:** Yandex Rasp Live Adapter V1, 2026-09-09.
 
 ## Принципы
 
@@ -19,13 +19,14 @@
 - Travel UI V2;
 - Server-side Trip Persistence & API V1;
 - Plan Real-Data Contract & AI Orchestration Policy V1;
-- Transport Normalized Route Contract V1 — Draft PR #30, green, not merged.
+- Transport Normalized Route Contract V1 — Draft PR #30, green, not merged;
+- Transport Provider Strategy & Adapter Foundation V1 — Draft PR #31, green, not merged.
 
 ## Бесплатная user-facing модель
 
 Текущая monetization mode: `free_public`.
 
-Billing/subscriptions/paywall не являются частью `Trip`, Transport contracts или provider ports. Если коммерческая модель когда-либо изменится, совместимость provider-а должна проверяться application/activation policy без изменения Travel Domain.
+Billing/subscriptions/paywall не являются частью `Trip`, Transport contracts или provider ports. Если коммерческая модель когда-либо изменится, совместимость provider-а проверяется application activation policy без изменения Travel Domain.
 
 ## Transport normalized contract
 
@@ -33,7 +34,7 @@ Billing/subscriptions/paywall не являются частью `Trip`, Transpo
 
 `TransportSearchResponse` нормализует provider/request identity, `legId`, routes/segments, price, availability, retrieval/freshness и source URL.
 
-Цена хранится как integer minor units + currency и имеет explicit semantics:
+Price хранится как integer minor units + currency и имеет explicit semantics:
 
 - `from` — нижняя граница/минимальная заявленная цена;
 - `quoted` — конкретная котировка;
@@ -42,7 +43,7 @@ Billing/subscriptions/paywall не являются частью `Trip`, Transpo
 
 Provider-specific price semantics не кодируются в `Trip`.
 
-## Provider strategy / activation layer
+## Provider activation layer
 
 Transport provider проходит отдельный activation gate до runtime wiring.
 
@@ -54,47 +55,132 @@ Policy проверяет:
 4. подтверждённую quota/rate-limit policy;
 5. cache/storage restrictions;
 6. search/deeplink/booking restrictions;
-7. наличие server-side credentials, если они требуются;
+7. наличие server-side credentials;
 8. отсутствие domain coupling к vendor-specific данным.
 
 Если любой обязательный gate не подтверждён, provider остаётся disabled/not-connected.
 
-## Yandex Rasp adapter foundation
+## Yandex Rasp Live Adapter V1
 
-`YandexRaspTransportAdapter` существует только как чистый provider adapter поверх injected client/resolver.
+Live adapter построен как отдельный server-side слой поверх уже существующего `TransportProvider` port.
 
-Foundation:
+### Components
 
-- не содержит API key;
-- не выполняет production activation;
-- не делает booking/purchase;
-- не трактует `et_marker` как наличие мест;
-- нормализует Yandex price как `from`;
-- требует provider-specific location resolution вне `Trip`;
-- не создаёт фиктивный `validUntil`;
-- не записывает provider result автоматически в persistent Trip storage.
+- `server/travel/providers/yandexRaspHttpClient.ts` — real HTTP transport + defensive response parsing;
+- `server/travel/providers/yandexRaspLiveProvider.ts` — env activation, location resolver и temporary cache;
+- `server/travel/providers/yandexRaspAdapter.ts` — normalized Yandex → Transport mapping;
+- `server/travel/transportOrchestrator.ts` — остаётся provider-neutral и не знает Yandex schema.
 
-Следующий отдельный slice — Yandex Rasp Live Adapter V1 — может добавить HTTP transport и env credentials, но только с fail-closed runtime wiring и temporary cache.
+Trip Domain не менялся ради Yandex-specific codes/quotas/attribution.
 
-## Provider candidates
+## HTTP boundary
 
-### Yandex Rasp
+`YandexRaspHttpClient` использует native Node `fetch`.
 
-Primary schedule candidate. Official terms snapshot от 2026-09-09 совместим с бесплатным публичным продуктом при соблюдении attribution и storage restrictions. Перед фактической activation terms/quota должны проверяться повторно.
+Production default:
 
-### Aviasales Search API
+`https://api.rasp.yandex-net.ru/v3.0/`
 
-Не подключается сейчас. Current published access requirements делают его неподходящим для раннего ARVELIS; booking/deeplink flow имеет отдельные обязательные правила.
+Security/runtime rules:
 
-### Aviasales Data API
+- API key передаётся только в `Authorization` header;
+- key не добавляется в URL/query string;
+- production base URL обязан быть HTTPS и иметь approved hostname;
+- insecure HTTP endpoint допускается только explicit test option;
+- redirects запрещены;
+- search response ограничен 4 MiB;
+- `stations_list` response ограничен 56 MiB;
+- network/HTTP/JSON/shape failures превращаются в typed sanitized errors;
+- provider response body не логируется автоматически.
 
-Оставлен только как future cached flight-price insights candidate; не считается live availability/search source.
+## Location resolution
 
-## Freshness / provenance
+`YandexRaspStationsLocationResolver` получает official station directory через `stations_list`.
 
-Provider response проходит validation до использования. Route без доказуемого freshness bound не выдаётся за authoritative-current price/schedule/availability.
+Provider-specific codes живут только внутри adapter boundary.
 
-Yandex foundation не изобретает `validUntil`. В live slice temporary cache должен иметь собственный short application TTL, который обозначает возраст кэша, а не provider-guaranteed validity.
+Resolution algorithm:
+
+1. normalize user label;
+2. exact settlement title match;
+3. если settlement match отсутствует — exact station title match;
+4. duplicate codes deduplicated;
+5. неоднозначность или отсутствие единственного match → `null`;
+6. adapter fail closed, а не угадывает направление.
+
+Fuzzy/geocoding guesses в V1 отсутствуют.
+
+Directory и resolved points хранятся только в памяти. Default TTL — 15 минут; allowed TTL bounded максимум 30 минут.
+
+## Request/response mapping
+
+Point-to-point search отправляет:
+
+- `format=json`;
+- `lang=ru_RU`;
+- resolved `from/to` codes;
+- exact date;
+- `limit=100`;
+- `transfers=false`.
+
+Normalized mapping сохраняет:
+
+- original `legId`;
+- provider route/thread identity;
+- transport mode;
+- station labels/codes;
+- departure/arrival;
+- carrier/service number;
+- optional price.
+
+`et_marker` **не** является availability. V1 возвращает `availability: unknown`.
+
+Если tickets places дают валидную цену в одной валюте, минимум нормализуется как `price.semantics = from`. Mixed-currency price list не сливается в fake single price.
+
+## Attribution
+
+Live provider state содержит обязательный presentation contract:
+
+- text: `Данные предоставлены сервисом Яндекс.Расписания`;
+- URL: `https://rasp.yandex.ru/`;
+- placement: `adjacent_to_data`.
+
+Attribution metadata находится вне `Trip`. Production UI wiring в этот slice не выполняется.
+
+## Freshness / temporary cache
+
+Yandex adapter не изобретает provider `validUntil`.
+
+`retrievedAt` — время фактического provider fetch. Если provider validity отсутствует, normalized route freshness остаётся `unspecified` и не становится authoritative-current только из-за локального cache TTL.
+
+`TemporaryCachedTransportProvider`:
+
+- хранит responses только в process memory;
+- default search TTL — 60 секунд;
+- max entries — 64;
+- cache hit сохраняет исходный provider `retrievedAt`, меняя только request-scoped `requestId`;
+- не пишет response в Trip persistence/SQLite/PostgreSQL/localStorage/files.
+
+Application TTL означает только допустимый возраст temporary cache.
+
+## Runtime activation
+
+`createYandexRaspLiveProvider()` читает только server-side environment:
+
+- `YANDEX_RASP_API_KEY`;
+- `YANDEX_RASP_TERMS_RECHECKED_AT`;
+- `YANDEX_RASP_QUOTA_CONFIRMED`.
+
+Factory вызывает existing `evaluateTransportProviderActivation()` с product model `free_public`.
+
+Provider становится `ready` только когда terms review свежая, credentials присутствуют и quota explicitly confirmed. Иначе:
+
+- `status: disabled`;
+- `provider: null`;
+- blockers возвращаются вызывающему application layer;
+- `TransportOrchestrator` сохраняет truthful `not_connected` behavior.
+
+`.env.example` содержит только пустые placeholders/false. Production secret wiring не выполнялся.
 
 ## Server orchestration
 
@@ -111,20 +197,19 @@ Yandex foundation не изобретает `validUntil`. В live slice temporar
 
 ## Audit / secrets
 
-Audit не хранит provider response body, API keys, cookies, документы или payment data.
+Audit не хранит provider response body, API keys, auth headers, cookies, документы или payment data.
 
 Provider credentials никогда не передаются во frontend и не являются частью normalized request/context.
 
 ## CI
 
-Signal-bearing gates:
+Signal-bearing gates для Yandex V1:
 
 - dependency audit;
 - project typecheck;
-- Plan regression;
-- Transport contract/freshness;
-- Transport Provider Foundation policy/mapping;
-- Trip ownership regression;
+- Transport Provider Foundation regression;
+- `Yandex Rasp live adapter HTTP and freshness` — local real HTTP stub, fake key only;
+- Trip ownership / TransportOrchestrator regression;
 - server runtime build;
 - один server-backed Chromium happy-path;
 - frontend build;
@@ -132,6 +217,16 @@ Signal-bearing gates:
 
 CI permissions: `contents: read`.
 
-## Decision boundary
+## Decision / STOP boundary
 
-Live Yandex Rasp activation требует отдельного env credential и повторной официальной terms/quota проверки. Ни один real provider key не должен появляться в Git, PR, logs или docs.
+После green PR-triggered regression на documentation HEAD `Yandex Rasp Live Adapter V1` закрывается как implementation slice.
+
+Это **не** означает production activation. Отдельного подтверждения требуют:
+
+- фактический live API key;
+- production environment wiring;
+- fresh terms/quota confirmation непосредственно перед activation;
+- UI presentation of live Yandex data/attribution;
+- любые booking/payment flows.
+
+Другие provider adapters в этом slice не подключаются.
