@@ -20,6 +20,11 @@ export type KnowledgeVersionBundle = {
   chunks: KnowledgeChunkWithEmbedding[];
 };
 
+export type KnowledgeSaveVersionResult = {
+  status: 'created' | 'deduplicated';
+  documentVersion: KnowledgeDocumentVersion;
+};
+
 export interface KnowledgeRepository {
   registerSource(source: KnowledgeRegistrySource): Promise<void>;
   findVersionByContentHash(
@@ -27,6 +32,6 @@ export interface KnowledgeRepository {
     documentId: string,
     contentHash: string,
   ): Promise<KnowledgeDocumentVersion | null>;
-  saveVersion(bundle: KnowledgeVersionBundle): Promise<void>;
+  saveVersion(bundle: KnowledgeVersionBundle): Promise<KnowledgeSaveVersionResult>;
   search(request: KnowledgeSearchRequest): Promise<KnowledgeSearchHit[]>;
 }
