@@ -1,219 +1,106 @@
 # ARVELIS AI — безопасность
 
-**Актуальность:** Yandex Rasp Live Adapter V1 / бесплатная user-facing модель, 2026-09-09.
+**Актуальность:** Map Provider Foundation & Route Map V1 / бесплатная user-facing модель, 2026-09-09.
 
-## Auth / ownership invariants
+## Global invariants
 
-- OTP verification выполняется trusted server-side;
-- raw OTP не хранится и не логируется;
-- OTP/session peppers находятся только в protected environment;
-- session cookie HttpOnly;
-- Account/Session server-authoritative;
-- Trip owner определяется из authenticated session;
-- client `ownerScopeId` не является authorization credential;
-- foreign Trip access fail closed.
+- Account/Session and Trip ownership are server-authoritative;
+- client `ownerScopeId` is not an authorization credential;
+- OTP/session/provider secrets are server-side only;
+- external provider output is untrusted input;
+- no provider response, auth secret, document or payment data is logged by default;
+- billing/subscriptions/paywall remain outside Travel Domain.
 
-## Product monetization boundary
+## Existing transport/Yandex boundary
 
-ARVELIS AI сейчас полностью бесплатен для пользователя.
+Yandex Rasp V1 remains closed without production activation. No live key is present. Existing protections stay in force: approved HTTPS host, Authorization-header key, redirects blocked, response-size limits, exact location matching, temporary-memory-only cache, `et_marker != availability`, no invented provider validity and no persistent Yandex result storage.
 
-- billing/subscriptions/paywall не проектируются и не подключаются;
-- Travel Domain не содержит тарифных/платёжных полей;
-- provider usage/cost/quota controls допустимы только как внутренняя backend protection policy;
-- смена коммерческой модели в будущем не должна менять `Trip` или normalized Transport contracts.
+## Map data minimization
 
-## Transport data minimization
+`MapRouteRequest` sends only map-relevant data:
 
-`TransportSearchRequest` передаёт provider только transport-relevant constraints: Trip ID/revision, traveler count, budget constraint, preference hints и route legs.
+- Trip ID/revision;
+- origin/destination labels;
+- explicit saved waypoints;
+- coordinates only when already present in the Trip map point.
 
-Не передаются cookies, session secrets, OTP, traveler identities, документы, payment data, полный Trip aggregate или provider credentials.
+It does not contain cookies, session secrets, traveler identities, documents, payment data, full Trip aggregate or future map-provider credentials.
 
-## Provider activation security gate
+## Map provider response validation
 
-Real transport adapter может быть runtime-enabled только если одновременно подтверждены:
+A Map response is accepted only after deterministic validation.
 
-1. актуальная официальная terms review;
-2. совместимость условий с `free_public` продуктом;
-3. обязательная attribution/branding policy;
-4. quota/rate-limit status;
-5. cache/storage/processing restrictions;
-6. deeplink/booking requirements;
-7. server-side credentials availability;
-8. secret-safe logging/error behavior;
-9. provider output validation;
-10. возможность отключить/заменить provider без изменения Travel Domain.
+Bounds/invariants:
 
-Terms review имеет дату и официальный source URL. Устаревшая review не является основанием для activation.
+- max 64 resolved points;
+- max 16 routes;
+- max 4096 geometry coordinates per route;
+- max 8 attribution entries;
+- latitude in `[-90, 90]`;
+- longitude in `[-180, 180]`;
+- unique IDs;
+- provider/request identity match;
+- resolved points must correspond to requested points;
+- origin and destination must both resolve;
+- route point IDs must reference validated resolved points and include required endpoints;
+- source/attribution URLs must use HTTPS;
+- distance/duration must be non-negative safe integers.
 
-## Yandex Rasp Live Adapter V1 security boundary
+Malformed or oversized output fails closed.
 
-Yandex Rasp реализован как real HTTP adapter, но production activation **не выполнялась**.
+## User-provided coordinate integrity
 
-### Secrets
+A coordinate supplied by the user/current Trip is treated as trusted application input relative to the external provider response.
 
-Runtime читает только server-side environment:
+Provider rules:
 
-- `YANDEX_RASP_API_KEY`;
-- `YANDEX_RASP_TERMS_RECHECKED_AT`;
-- `YANDEX_RASP_QUOTA_CONFIRMED`.
+- provider must return it as `resolution: provided`;
+- latitude/longitude must exactly match the requested value;
+- provider may not silently replace it with a geocoded coordinate;
+- provider may not bypass the check by labeling the changed value `provider_resolved`.
 
-Правила:
+Any mismatch rejects the normalized response.
 
-- API key никогда не передаётся во frontend;
-- key не помещается в Git, PR body, docs, screenshots или logs;
-- `.env.example` содержит только пустой placeholder;
-- без key provider остаётся disabled;
-- без fresh terms timestamp provider остаётся disabled;
-- без explicit quota confirmation provider остаётся disabled;
-- actual production secret configuration требует отдельного подтверждения пользователя.
+## Map ownership/orchestration
 
-### HTTP request safety
+`MapOrchestrator` checks authenticated account scope and Trip ownership before provider execution. It supports caller cancellation and a bounded timeout. A missing provider returns truthful `not_connected`; there is no silent fallback to demo geometry.
 
-`YandexRaspHttpClient`:
+Audit metadata may contain request ID, Trip ID/revision, provider ID, timing, status and validation codes. It must not contain raw response geometry payloads, secrets or user documents.
 
-- production endpoint допускает только HTTPS approved host `api.rasp.yandex-net.ru`;
-- передаёт API key в `Authorization` header;
-- не добавляет key в URL/query parameters;
-- использует `redirect: error`;
-- insecure HTTP endpoint допускается только explicit test mode для local stub;
-- network/HTTP/JSON errors санитизированы и не включают secret;
-- raw provider response не логируется автоматически.
+## Freshness
 
-### Response bounding / parsing
+Map retrieval time is not equivalent to route validity.
 
-Provider response считается untrusted input.
+- no `validUntil` => freshness `unspecified`, route not authoritative-current;
+- future provider `validUntil` => `current`;
+- expired `validUntil` => `expired`.
 
-- point-to-point response ограничен 4 MiB;
-- station directory response ограничен 56 MiB;
-- JSON shape валидируется до mapping;
-- segment/ticket collections bounded;
-- malformed numeric/text fields fail closed;
-- normalized Transport validation выполняется после adapter mapping.
+Future map-adapter cache TTL must describe only local cache age and must not be presented as provider validity.
 
-## Location resolution security / correctness
+## Route Map UI truthfulness
 
-`stations_list` обрабатывается только server-side.
+No real Map provider/SDK is connected in this slice. The UI must not display fabricated route lines, tiles or coordinates as real data. The old decorative route schematic is hidden. The browser happy-path verifies the truthful empty state and absence of a real map canvas/provider container.
 
-- exact settlement title match preferred;
-- exact station title fallback allowed;
-- ambiguous multiple matches возвращают `null`;
-- fuzzy guessing отсутствует;
-- Yandex codes не записываются в `Trip`;
-- отсутствие resolution не заменяется выдуманным code;
-- location directory и point resolution cache существуют только в process memory.
+## Persistence / retention
 
-## Attribution / truthfulness
-
-Presentation boundary обязан сохранить attribution:
-
-`Данные предоставлены сервисом Яндекс.Расписания`
-
-с provider URL и placement `adjacent_to_data`.
-
-Attribution metadata не является Trip field.
-
-`et_marker` не означает наличие мест и не повышает availability status.
-
-Ticket place price нормализуется как `from`, а не guaranteed final price. Mixed-currency places не конвертируются автоматически.
-
-## Freshness / provenance
-
-Schedule, price и availability нельзя называть authoritative-current без достаточного provider freshness evidence.
-
-- adapter не изобретает `validUntil`;
-- missing provider validity остаётся `unspecified`;
-- cache TTL не является provider validity;
-- `retrievedAt` сохраняет время реального HTTP fetch;
-- cache hit не делает старые данные автоматически authoritative;
-- `from` price не выдаётся за final quote;
-- mixed-currency comparison fail closed;
-- AI/model inference не заменяет transport provider fact.
-
-## Temporary cache only
-
-Yandex data хранится только во временной памяти процесса.
-
-Default boundaries:
-
-- search cache TTL: 60 секунд;
-- max search entries: 64;
-- station directory TTL: 15 минут;
-- allowed location TTL bounded максимум 30 минут;
-- allowed search TTL bounded максимум 5 минут.
-
-Запрещено сохранять Yandex response/result как постоянную копию в:
-
-- `Trip`;
-- SQLite;
-- PostgreSQL;
-- localStorage;
-- filesystem/document archive.
-
-## Orchestration
-
-`TransportOrchestrator` остаётся provider-neutral и обязан:
-
-- проверять ownership до provider call;
-- возвращать truthful `not_connected`, если runtime factory вернул `provider: null`;
-- применять timeout/cancellation;
-- валидировать normalized output;
-- не делать silent/mock fallback;
-- не выполнять booking/purchase;
-- не мутировать Trip автоматически.
-
-## Test credential policy
-
-`test:yandex-rasp-live` использует только fake key внутри test process и local HTTP stub.
-
-Тест обязан доказать:
-
-- key присутствует только в `Authorization`;
-- URL не содержит `apikey`/real secret;
-- resolver/search работают через real server-side HTTP path;
-- `et_marker` остаётся non-availability;
-- price semantics = `from`;
-- provider validity не выдумывается;
-- temporary cache не вызывает лишний повторный provider request;
-- runtime without credentials остаётся disabled/not_connected.
-
-CI не выполняет network request к live Yandex API и не требует repository secret.
-
-## Aviasales / other providers boundary
-
-Aviasales Search API в текущий slice не подключается.
-
-Aviasales Data API остаётся только future cached price-insight candidate и не считается live availability source.
-
-Другие provider adapters не подключаются автоматически после Yandex V1.
+Normalized Map provider results are not automatically persisted into Trip, SQLite or PostgreSQL. A future vendor adapter requires a separate review of terms, attribution, caching and retention before any persistence is introduced.
 
 ## CI security
 
-Final Yandex V1 gate:
+Important gates:
 
 - `npm audit --audit-level=high`;
-- strict project typecheck;
-- Provider Foundation regression;
-- Yandex HTTP/mapping/freshness stub test;
-- existing TransportOrchestrator/Trip ownership regression;
+- strict typecheck;
+- Map business/security/freshness smoke;
+- lower Plan/Transport/Yandex/Trip regressions;
 - server runtime build;
-- один server-backed Chromium regression;
+- one server-backed Chromium happy-path including Map empty-state truthfulness;
 - frontend build;
-- stacked PR PostgreSQL 18.4 lower-layer regression;
-- GitHub Actions permissions `contents: read`.
+- PostgreSQL lower-layer regression;
+- GitHub Actions `contents: read`.
 
-## Production / STOP boundary
+## Next security boundary
 
-Green implementation/PR tests не означают production readiness или live provider activation.
+`Legal Sources & Travel Legal Foundation V1` must require source-backed claims, official HTTPS source provenance for verified requirements, effective-date/freshness handling without invented legal validity, ownership-aware orchestration, no uncited legal conclusions and no live provider credentials.
 
-До фактического activation отдельно нужны:
-
-- user-provided/authorized live API credential configuration;
-- fresh official terms review;
-- quota confirmation for the issued access;
-- production network/observability/privacy review;
-- UI attribution presentation verification;
-- Russia endpoint accessibility check в production topology.
-
-Без отдельного подтверждения не выполняются production wiring, key activation, booking/payment, другие provider adapters, merge в `main` или изменение production secrets.
-
-ARVELIS нельзя называть production-ready до фактического security/privacy/infrastructure/provider-terms audit.
+Production deployment, real map/legal credentials, paid services, destructive data operations and merge to `main` remain forbidden without separate confirmation.
