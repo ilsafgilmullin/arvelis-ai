@@ -12,6 +12,7 @@ const allowed = new Map([
   ['trip-postgres', 'tests/.dist-trip-postgres'],
   ['plan-policy', 'tests/.dist-plan-policy'],
   ['transport-policy', 'tests/.dist-transport-policy'],
+  ['transport-provider-foundation', 'tests/.dist-transport-provider-foundation'],
 ]);
 
 const relative = allowed.get(target);

@@ -43,10 +43,11 @@ function makeResponse(requestId: string, providerId = 'transport-contract-test')
     routes: [
       {
         id: 'route-fast',
+        legId: 'outbound',
         providerRouteId: 'provider-fast',
         availability: 'available',
         validUntil: '2026-09-09T08:00:00.000Z',
-        price: { amountMinor: 1_200_000, currency: 'RUB' },
+        price: { amountMinor: 1_200_000, currency: 'RUB', semantics: 'quoted' },
         segments: [
           {
             id: 'segment-fast',
@@ -62,10 +63,11 @@ function makeResponse(requestId: string, providerId = 'transport-contract-test')
       },
       {
         id: 'route-cheap',
+        legId: 'outbound',
         providerRouteId: 'provider-cheap',
         availability: 'limited',
         validUntil: '2026-09-09T08:00:00.000Z',
-        price: { amountMinor: 800_000, currency: 'RUB' },
+        price: { amountMinor: 800_000, currency: 'RUB', semantics: 'from' },
         segments: [
           {
             id: 'segment-cheap-1',
@@ -102,42 +104,53 @@ async function expectTransportError(promise: Promise<unknown>, code: TransportOr
 async function main() {
   const trip = makeTrip();
   const request = createTransportSearchRequest(trip);
+  const expectedLegIds = request.legs.map((leg) => leg.id);
   assert.equal(request.version, 1);
   assert.equal(request.tripId, trip.id);
   assert.equal(request.travelerCount, 2);
   assert.equal(request.legs.length, 2);
-  assert.deepEqual(request.legs.map((leg) => leg.id), ['outbound', 'return']);
+  assert.deepEqual(expectedLegIds, ['outbound', 'return']);
   assert.equal(request.legs[0]?.fromLabel, 'Казань');
   assert.equal(request.legs[0]?.toLabel, 'Сочи');
   assert.equal('ownerScopeId' in (request as unknown as Record<string, unknown>), false);
   assert.equal('travelers' in (request as unknown as Record<string, unknown>), false);
 
   const response = makeResponse('transport-request-1');
-  assert.deepEqual(validateTransportSearchResponse(response, 'transport-contract-test', 'transport-request-1'), []);
+  assert.deepEqual(validateTransportSearchResponse(response, 'transport-contract-test', 'transport-request-1', expectedLegIds), []);
   assert.deepEqual(getTransportRouteMetrics(requireRoute(response, 0)), { durationMinutes: 120, transferCount: 0 });
   assert.deepEqual(getTransportRouteMetrics(requireRoute(response, 1)), { durationMinutes: 900, transferCount: 1 });
 
   const now = new Date('2026-09-09T07:00:00.000Z');
-  assert.deepEqual(compareTransportRoutes(response, 'duration', now), {
+  assert.deepEqual(compareTransportRoutes(response, 'duration', 'outbound', now), {
     comparable: true,
     criterion: 'duration',
+    legId: 'outbound',
     routeIds: ['route-fast', 'route-cheap'],
   });
-  assert.deepEqual(compareTransportRoutes(response, 'price', now), {
+  assert.deepEqual(compareTransportRoutes(response, 'price', 'outbound', now), {
     comparable: true,
     criterion: 'price',
+    legId: 'outbound',
     routeIds: ['route-cheap', 'route-fast'],
+  });
+  assert.deepEqual(compareTransportRoutes(response, 'price', 'return', now), {
+    comparable: false,
+    criterion: 'price',
+    legId: 'return',
+    routeIds: [],
+    reason: 'no_routes',
   });
 
   const mixedCurrency: TransportSearchResponse = {
     ...response,
     routes: response.routes.map((route) => route.id === 'route-cheap'
-      ? { ...route, price: { amountMinor: 8_000, currency: 'EUR' } }
+      ? { ...route, price: { amountMinor: 8_000, currency: 'EUR', semantics: 'from' } }
       : route),
   };
-  assert.deepEqual(compareTransportRoutes(mixedCurrency, 'price', now), {
+  assert.deepEqual(compareTransportRoutes(mixedCurrency, 'price', 'outbound', now), {
     comparable: false,
     criterion: 'price',
+    legId: 'outbound',
     routeIds: ['route-fast', 'route-cheap'],
     reason: 'mixed_currency',
   });
@@ -147,7 +160,26 @@ async function main() {
     routes: response.routes.map((route) => ({ ...route, validUntil: '2026-09-09T06:59:59.000Z' })),
   };
   assert.equal(evaluateTransportRoutePolicy(requireRoute(stale, 0), stale, now).priceAuthoritative, false);
-  assert.equal(compareTransportRoutes(stale, 'duration', now).comparable, false);
+  assert.equal(compareTransportRoutes(stale, 'duration', 'outbound', now).comparable, false);
+
+  const cachedObservation: TransportSearchResponse = {
+    ...response,
+    routes: response.routes.map((route) => ({
+      ...route,
+      price: route.price ? { ...route.price, semantics: 'cached_observation' as const } : undefined,
+    })),
+  };
+  assert.equal(evaluateTransportRoutePolicy(requireRoute(cachedObservation, 0), cachedObservation, now).priceAuthoritative, false);
+
+  const invalidLeg: TransportSearchResponse = {
+    ...response,
+    routes: response.routes.map((route) => ({ ...route, legId: 'unexpected-leg' })),
+  };
+  assert.equal(
+    validateTransportSearchResponse(invalidLeg, 'transport-contract-test', 'transport-request-1', expectedLegIds)
+      .some((error) => error.code === 'leg_mismatch'),
+    true,
+  );
 
   const invalidChronology: TransportSearchResponse = {
     ...response,
@@ -162,7 +194,7 @@ async function main() {
       : route),
   };
   assert.equal(
-    validateTransportSearchResponse(invalidChronology, 'transport-contract-test', 'transport-request-1')
+    validateTransportSearchResponse(invalidChronology, 'transport-contract-test', 'transport-request-1', expectedLegIds)
       .some((error) => error.code === 'chronology_error'),
     true,
   );

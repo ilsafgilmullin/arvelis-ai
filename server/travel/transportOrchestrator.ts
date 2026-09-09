@@ -211,7 +211,12 @@ export class TransportOrchestrator {
 
     try {
       const response = await Promise.race(promises);
-      const validationErrors = validateTransportSearchResponse(response, this.provider.id, requestId);
+      const validationErrors = validateTransportSearchResponse(
+        response,
+        this.provider.id,
+        requestId,
+        request.legs.map((leg) => leg.id),
+      );
       if (validationErrors.length > 0) {
         throw new TransportOrchestrationError('invalid_provider_response', 'Transport provider returned a response that violates the normalized contract.', {
           audit: this.createAudit(requestId, trip, this.provider.id, startedAt, 'invalid_provider_response', validationErrors),
