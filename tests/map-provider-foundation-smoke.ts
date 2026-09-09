@@ -58,12 +58,15 @@ async function main() {
   await assert.rejects(() => orchestrator.run('acct-foreign', trip), (error: unknown) => error instanceof MapOrchestrationError && error.code === 'access_denied');
   await assert.rejects(() => new MapOrchestrator({ provider: null, now: () => now, requestId: () => 'map-request-2' }).run('acct-map', trip), (error: unknown) => error instanceof MapOrchestrationError && error.code === 'not_connected');
 
-  const invalid = structuredClone(result.response);
-  invalid.requestId = 'wrong';
-  invalid.points[2]!.coordinate.latitude = 1;
-  const errors = validateMapRouteResponse(invalid, provider.id, 'map-request-1', request);
-  assert.ok(errors.some((error) => error.code === 'request_mismatch'));
-  assert.ok(errors.some((error) => error.code === 'coordinate_mismatch'));
+  const wrongIdentity = structuredClone(result.response);
+  wrongIdentity.requestId = 'wrong';
+  const identityErrors = validateMapRouteResponse(wrongIdentity, provider.id, 'map-request-1', request);
+  assert.ok(identityErrors.some((error) => error.code === 'request_mismatch'));
+
+  const changedProvidedCoordinate = structuredClone(result.response);
+  changedProvidedCoordinate.points[2]!.coordinate.latitude = 1;
+  const coordinateErrors = validateMapRouteResponse(changedProvidedCoordinate, provider.id, 'map-request-1', request);
+  assert.ok(coordinateErrors.some((error) => error.code === 'coordinate_mismatch'));
 
   const current = structuredClone(result.response);
   current.validUntil = '2026-09-09T11:00:00.000Z';
