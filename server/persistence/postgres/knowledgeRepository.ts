@@ -411,6 +411,8 @@ export class PostgresKnowledgeRepository implements KnowledgeRepository {
       clauses.push(`(v.verified_at IS NULL OR v.verified_at <= $${asOfIndex}::timestamptz)`);
       clauses.push(`(v.effective_from IS NULL OR v.effective_from <= $${asOfIndex}::timestamptz)`);
       clauses.push(`(v.effective_until IS NULL OR v.effective_until >= $${asOfIndex}::timestamptz)`);
+    } else {
+      clauses.push(`$${asOfIndex}::timestamptz IS NOT NULL`);
     }
 
     params.push(request.limit);
