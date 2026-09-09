@@ -2,7 +2,7 @@ name: ARVELIS CI
 
 on:
   pull_request:
-    branches: [main, feat/travel-foundation-v1, feat/travel-ui-redesign-v2, feat/travel-trip-persistence-v1, feat/travel-plan-orchestration-contract-v1, feat/travel-transport-contract-v1, feat/travel-transport-provider-foundation-v1, feat/travel-yandex-rasp-live-adapter-v1]
+    branches: [main, feat/travel-foundation-v1, feat/travel-ui-redesign-v2, feat/travel-trip-persistence-v1, feat/travel-plan-orchestration-contract-v1, feat/travel-transport-contract-v1, feat/travel-transport-provider-foundation-v1, feat/travel-yandex-rasp-live-adapter-v1, feat/travel-map-provider-foundation-v1]
   push:
     branches:
       - 'codex/**'
