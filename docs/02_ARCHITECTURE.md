@@ -1,6 +1,6 @@
 # ARVELIS AI — архитектура
 
-**Актуальность:** Transport Normalized Route Contract V1, 2026-09-09.
+**Актуальность:** Transport Provider Strategy & Adapter Foundation V1, 2026-09-09.
 
 ## Принципы
 
@@ -10,149 +10,128 @@
 - provider output считается untrusted до deterministic validation;
 - provenance/freshness обязательны для внешних фактов;
 - external providers заменяемы;
+- provider terms/quotas/attribution/credentials находятся вне Travel Domain;
 - secrets только server-side/protected environment;
-- fake AI/transport/legal data не подменяет реальный backend.
+- fake AI/transport/legal data не подменяет real backend.
 
-## Stack / нижние слои
+## Нижние закрытые слои
 
-- React `19.2.8`, TypeScript `6.0.3`, Vite `8.2.1`;
-- Node `>=22.12.0 <27`, CI Node `24.19.0`;
-- authenticated Trip persistence через same-origin `/api/trips`;
-- SQLite closed-test + PostgreSQL 18.4-compatible adapter;
-- Plan V1 typed contract/orchestration policy завершён отдельным stacked Draft PR #29.
+- Travel UI V2;
+- Server-side Trip Persistence & API V1;
+- Plan Real-Data Contract & AI Orchestration Policy V1;
+- Transport Normalized Route Contract V1 — Draft PR #30, green, not merged.
 
-## Plan boundary
+## Бесплатная user-facing модель
 
-`PlanRequest` передаёт минимизированный Trip snapshot будущему AI provider. `PlanProposal` имеет explicit sources/claims/provenance. Critical model inference не становится authoritative external fact без source-backed evidence.
+Текущая monetization mode: `free_public`.
 
-Реальный AI/RAG не подключён.
+Billing/subscriptions/paywall не являются частью `Trip`, Transport contracts или provider ports. Если коммерческая модель когда-либо изменится, совместимость provider-а должна проверяться application/activation policy без изменения Travel Domain.
 
 ## Transport normalized contract
 
-`src/travel/transportContracts.ts` добавляет provider-independent layer.
+`TransportSearchRequest` содержит минимизированные transport constraints. V1 требует explicit destination и exact dates.
 
-### Search request
+`TransportSearchResponse` нормализует provider/request identity, `legId`, routes/segments, price, availability, retrieval/freshness и source URL.
 
-`TransportSearchRequest` содержит только transport-relevant constraints:
+Цена хранится как integer minor units + currency и имеет explicit semantics:
 
-- version;
-- Trip ID/revision;
-- traveler count;
-- budget limit;
-- transport preference hints;
-- exact outbound/return legs.
+- `from` — нижняя граница/минимальная заявленная цена;
+- `quoted` — конкретная котировка;
+- `cached_observation` — историческое/кэшированное наблюдение;
+- `unknown` — semantics недостаточно определены.
 
-Не передаются session/owner credentials, traveler identities, documents или full Trip aggregate.
+Provider-specific price semantics не кодируются в `Trip`.
 
-V1 требует explicit destination и exact dates. Unknown destination/flexible dates fail closed, а не преобразуются в выдуманные параметры.
+## Provider strategy / activation layer
 
-### Normalized response
+Transport provider проходит отдельный activation gate до runtime wiring.
 
-`TransportSearchResponse` содержит:
+Policy проверяет:
 
-- provider ID;
-- request ID;
-- retrieved timestamp;
-- normalized routes.
+1. актуальность official terms review;
+2. совместимость с текущим `free_public` продуктом;
+3. обязательную attribution/branding policy;
+4. подтверждённую quota/rate-limit policy;
+5. cache/storage restrictions;
+6. search/deeplink/booking restrictions;
+7. наличие server-side credentials, если они требуются;
+8. отсутствие domain coupling к vendor-specific данным.
 
-Route содержит provider route ID, segments, optional price, availability, optional validity deadline и optional HTTPS source URL.
+Если любой обязательный gate не подтверждён, provider остаётся disabled/not-connected.
 
-Segment нормализует mode, origin/destination, departure/arrival и optional carrier/service metadata.
+## Yandex Rasp adapter foundation
 
-Price хранится как integer minor units + ISO 4217-like 3-letter currency code. Float price semantics в contract не используются.
+`YandexRaspTransportAdapter` существует только как чистый provider adapter поверх injected client/resolver.
 
-## Validation
+Foundation:
 
-Provider response валидируется до использования:
+- не содержит API key;
+- не выполняет production activation;
+- не делает booking/purchase;
+- не трактует `et_marker` как наличие мест;
+- нормализует Yandex price как `from`;
+- требует provider-specific location resolution вне `Trip`;
+- не создаёт фиктивный `validUntil`;
+- не записывает provider result автоматически в persistent Trip storage.
 
-- contract version;
-- provider/request identity match;
-- bounded route/segment counts;
-- unique IDs;
-- timestamp/URL/value shape;
-- non-negative safe integer price;
-- chronological route segments;
-- no overlapping/backward segment chronology;
-- validity deadline cannot predate retrieval time.
+Следующий отдельный slice — Yandex Rasp Live Adapter V1 — может добавить HTTP transport и env credentials, но только с fail-closed runtime wiring и temporary cache.
 
-Malformed response fail closed.
+## Provider candidates
 
-## Freshness / authority policy
+### Yandex Rasp
 
-Route external facts считаются current только при explicit `validUntil`, который ещё не истёк.
+Primary schedule candidate. Official terms snapshot от 2026-09-09 совместим с бесплатным публичным продуктом при соблюдении attribution и storage restrictions. Перед фактической activation terms/quota должны проверяться повторно.
 
-`TransportRoutePolicy` отдельно отмечает:
+### Aviasales Search API
 
-- schedule authoritative;
-- price authoritative;
-- availability authoritative.
+Не подключается сейчас. Current published access requirements делают его неподходящим для раннего ARVELIS; booking/deeplink flow имеет отдельные обязательные правила.
 
-Route без freshness bound получает `unspecified` и не выдаётся за current authoritative schedule/price/availability.
+### Aviasales Data API
 
-## Comparison policy
+Оставлен только как future cached flight-price insights candidate; не считается live availability/search source.
 
-`compareTransportRoutes()` использует только прозрачные deterministic criteria:
+## Freshness / provenance
 
-- duration;
-- transfer count;
-- price.
+Provider response проходит validation до использования. Route без доказуемого freshness bound не выдаётся за authoritative-current price/schedule/availability.
 
-Нет composite/fake recommendation score.
-
-Price comparison разрешён только при:
-
-1. current price у каждого route;
-2. наличии price у каждого route;
-3. одной валюте.
-
-Mixed currencies возвращают `mixed_currency`; автоматический FX conversion не выполняется до отдельного Currency contract/provider решения.
-
-Stale/unbounded routes не сравниваются как current real-data results.
-
-## Transport provider port
-
-`TransportProvider.searchRoutes()` typed:
-
-`TransportSearchRequest + TransportProviderRequestContext + AbortSignal → TransportSearchResponse`.
-
-Конкретный vendor/API schema не зашит.
+Yandex foundation не изобретает `validUntil`. В live slice temporary cache должен иметь собственный short application TTL, который обозначает возраст кэша, а не provider-guaranteed validity.
 
 ## Server orchestration
 
-`server/travel/transportOrchestrator.ts`:
+`TransportOrchestrator` остаётся provider-neutral:
 
-1. validates account scope;
-2. enforces Trip ownership;
-3. builds minimized request;
-4. returns honest `not_connected` if no provider;
-5. applies timeout/cancellation;
-6. validates provider output;
-7. calculates per-route authority/freshness policy;
-8. returns response + policy + minimal audit metadata.
+1. проверяет account scope и Trip ownership;
+2. строит minimized request;
+3. возвращает `not_connected`, если provider не активирован;
+4. применяет timeout/cancellation;
+5. валидирует normalized output;
+6. вычисляет route policy;
+7. не мутирует Trip автоматически;
+8. не выполняет booking/purchase.
 
-No automatic Trip mutation, booking or fallback.
+## Audit / secrets
 
-## Audit
+Audit не хранит provider response body, API keys, cookies, документы или payment data.
 
-Transport audit содержит request ID, Trip ID/revision, provider ID, timestamps/duration, status и validation codes. Route payload, user documents, cookies и provider keys в audit не пишутся.
+Provider credentials никогда не передаются во frontend и не являются частью normalized request/context.
 
 ## CI
 
-Push gate:
+Signal-bearing gates:
 
 - dependency audit;
 - project typecheck;
-- Plan policy regression;
-- Transport contract/freshness smoke;
+- Plan regression;
+- Transport contract/freshness;
+- Transport Provider Foundation policy/mapping;
 - Trip ownership regression;
 - server runtime build;
-- one server-backed Chromium regression;
-- frontend build.
+- один server-backed Chromium happy-path;
+- frontend build;
+- stacked PR: PostgreSQL 18.4 lower-layer regression.
 
-Stacked PR дополнительно прогоняет PostgreSQL 18.4 persistence regression. CI permissions остаются `contents: read`.
+CI permissions: `contents: read`.
 
-## Product/engineering decision boundary
+## Decision boundary
 
-Следующий Transport step уже требует выбрать real provider strategy: aviation/rail/bus coverage, Russia access, vendor API terms/costs, rate limits, freshness semantics, booking/deeplink policy, credentials and lock-in.
-
-Этот выбор contract layer не делает автоматически.
+Live Yandex Rasp activation требует отдельного env credential и повторной официальной terms/quota проверки. Ни один real provider key не должен появляться в Git, PR, logs или docs.
