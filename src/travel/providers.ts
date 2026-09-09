@@ -1,4 +1,5 @@
 import type { LegalCheck, MapPoint, TransportRoute, Trip } from './domain';
+import type { PlanProposal, PlanRequest } from './planContracts';
 
 export type ProviderRequestContext = {
   accountScopeId: string;
@@ -6,9 +7,13 @@ export type ProviderRequestContext = {
   locale: 'ru-RU';
 };
 
+export type AIPlanProviderContext = ProviderRequestContext & {
+  requestId: string;
+};
+
 export interface AIProvider {
   readonly id: string;
-  planTrip(trip: Trip, context: ProviderRequestContext): Promise<unknown>;
+  planTrip(request: PlanRequest, context: AIPlanProviderContext, signal: AbortSignal): Promise<PlanProposal>;
 }
 
 export interface TransportProvider {

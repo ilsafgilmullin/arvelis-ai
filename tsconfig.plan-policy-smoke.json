@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"],
+    "outDir": "tests/.dist-plan-policy",
+    "rootDir": "."
+  },
+  "include": [
+    "src/travel/domain.ts",
+    "src/travel/planContracts.ts",
+    "src/travel/providers.ts",
+    "server/travel/planOrchestrator.ts",
+    "tests/plan-orchestration-policy-smoke.ts"
+  ]
+}

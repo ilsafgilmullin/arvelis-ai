@@ -1,13 +1,14 @@
 # ARVELIS AI — архитектура
 
-**Актуальность:** Server-side Trip Persistence & API V1, 2026-09-09.
+**Актуальность:** Plan Real-Data Contract & AI Orchestration Policy V1, 2026-09-09.
 
 ## Принципы
 
 - mobile-first frontend;
 - `Trip` — основной продуктовый агрегат;
-- UI, domain, persistence, provider adapters, auth, audit и analytics разделены;
+- UI, domain, persistence, provider adapters, auth, orchestration, audit и analytics разделены;
 - server-authoritative ownership не доверяет client-supplied account identity;
+- provider output считается untrusted до contract validation;
 - внешние AI/travel providers заменяемы;
 - demo/mock и real provider data имеют явную границу;
 - секреты только в protected environment;
@@ -21,138 +22,186 @@
 - Vite `8.2.1`;
 - Node requirement `>=22.12.0 <27`; CI runtime Node `24.19.0`;
 - `pg 8.23.0`;
-- Nodemailer `9.1.1` после security patch;
-- npm lockfile используется через `npm ci`;
+- Nodemailer `9.1.1`;
+- npm lockfile через `npm ci`;
 - Vite dev: `0.0.0.0:3000`;
 - same-origin `/api` proxy → trusted server runtime `127.0.0.1:3001`;
 - development/closed-test persistence: SQLite;
-- PostgreSQL 18.4 compatibility проверяется отдельным PR gate.
+- PostgreSQL 18.4 compatibility — PR regression gate.
 
-## Travel frontend boundary
+## Travel frontend / persistence boundary
 
-`src/travel/` содержит domain/UI/repository contracts. Persistence selection происходит за repository boundary:
+`src/travel/` содержит domain/UI/repository/contracts.
 
-- preview mode → browser local repository;
+Persistence selection:
+
+- preview → browser local repository;
 - authenticated real mode → `HttpTripRepository` через same-origin `/api/trips`;
-- server error не переводит real-auth пользователя скрыто обратно на local persistence.
+- server failure не переводит пользователя скрыто обратно на local persistence.
 
-`TravelApp` использует asynchronous repository operations и не знает конкретный DB adapter.
+`TravelApp` не знает конкретный DB adapter.
 
-## Trip domain
+## Server Trip boundary
 
-Существующий `Trip` contract сохранён. В него входят параметры поездки, travelers, preferences, destination options, transport routes, itinerary, budget, legal checks, map points и Trip Book.
+`server/travel/service.ts` сохраняет server-authoritative Trip ownership/timestamps. `accountId` приходит только из authenticated session; client `ownerScopeId` не является authorization credential.
 
-Server persistence V1 не нормализует каждый вложенный объект в отдельную таблицу. Причина: текущий aggregate ещё развивается, а преждевременная нормализация связала бы UI/domain evolution с DB schema.
-
-## Server Trip application boundary
-
-`server/travel/` содержит:
-
-- runtime validation входящего Trip document;
-- `TripApplicationService`;
-- account-scoped `ServerTripStore` contract;
-- application errors `invalid_input` / `access_denied`;
-- server-authoritative normalization ownership/timestamps.
-
-Правила:
-
-1. `accountId` приходит только из authenticated server session.
-2. `tripId` из path обязан совпадать с document ID.
-3. payload `ownerScopeId` обязан совпадать с authenticated account; foreign ownership отклоняется.
-4. `createdAt` при первой записи задаёт сервер; при update сохраняется исходный server value.
-5. `updatedAt` задаёт сервер при каждой записи.
-6. invalid/oversized payload fail closed.
-
-## HTTP API V1
-
-Same-origin endpoints:
+API V1:
 
 - `GET /api/trips`;
 - `GET /api/trips/:id`;
 - `PUT /api/trips/:id`.
 
-Mutations используют существующий `X-Arvelis-Request` + same-origin guard. Неаутентифицированный доступ получает `401`; foreign payload не становится способом сменить владельца.
+SQLite/PostgreSQL реализуют общий `ServerTripStore` contract. Migration `002_travel_trip_persistence` additive.
 
-`DELETE` намеренно отсутствует в V1: deletion/retention semantics требуют отдельного решения.
+## Plan real-data contract
 
-## SQLite persistence
+Новый `src/travel/planContracts.ts` отделяет будущий AI reasoning от raw Trip aggregate.
 
-`travel_trips` создаётся additive migration `002_travel_trip_persistence` поверх auth schema.
+### `PlanRequest`
 
-Логическая запись:
+Содержит только минимальный planning snapshot:
 
-- `account_id`;
-- `id`;
-- `document_json`;
-- `created_at`;
-- `updated_at`;
-- composite primary key `(account_id, id)`;
-- foreign key на `auth_accounts`.
+- Trip ID + revision;
+- origin / optional destination;
+- dates / duration;
+- traveler count;
+- budget limit;
+- travel preferences;
+- optional bounded user prompt.
 
-SQLite используется только для development/closed test, но проверяет реальную server persistence/ownership boundary.
+Не передаются автоматически:
 
-## PostgreSQL persistence
+- `ownerScopeId` как provider credential;
+- session/cookie/auth data;
+- traveler labels/identities;
+- legal/map arrays;
+- documents;
+- provider secrets;
+- database metadata.
 
-PostgreSQL adapter реализует тот же `ServerTripStore` contract. `travel_trips.document_json` хранится как `jsonb`; account/timestamps остаются отдельными authoritative columns.
+### `PlanProposal`
 
-`002_travel_trip_persistence.sql` применяется после неизменённой `001_auth_foundation.sql`. Migration runner хранит checksum каждого migration и выполняет их под advisory transaction lock. Migration additive и не содержит destructive DROP/irreversible transforms.
+Структурированный provider result содержит:
 
-## Auth — сохранённая архитектура
+- summary;
+- declared sources;
+- claims;
+- destination suggestions;
+- itinerary suggestions;
+- assumptions.
 
-Travel persistence расширяет существующий trusted server, но не переписывает Email OTP/Auth:
+Каждый claim имеет category, provenance, confidence и source references.
 
-- passwordless Email OTP;
-- raw OTP не хранится/не логируется;
-- independent OTP/session peppers;
-- HttpOnly session cookie;
-- server-authoritative Account/Session;
-- SQLite/PostgreSQL auth adapters;
-- environment-only SMTP/secret configuration.
+Provenance V1:
 
-## Provider-neutral interfaces
+- `user_input`;
+- `provider_fact`;
+- `model_inference`;
+- `unknown`.
 
-Следующие providers остаются contracts без vendor implementation:
+## Provider-neutral AI port
 
-- `AIProvider`;
-- `TransportProvider`;
-- `MapProvider`;
-- `LegalSourceProvider`;
-- `WeatherProvider`;
-- `StayProvider`;
-- `CurrencyProvider`.
+`AIProvider.planTrip()` больше не использует `Promise<unknown>`.
 
-Следующий согласованный slice — Plan real-data contract / AI orchestration policy. Он должен определить trusted data/orchestration boundary до подключения реальной модели или внешнего provider.
+Contract:
 
-## Map / Legal truth boundary
+`PlanRequest + AIPlanProviderContext + AbortSignal → Promise<PlanProposal>`.
 
-Map отображает только реальные provider points либо truthful unavailable state. Legal result без проверенного source не считается достоверным. AI не является authoritative legal source.
+`AIPlanProviderContext` содержит только account scope, Trip ID, locale и request ID. Конкретный vendor/model в contract не зашит.
+
+Transport/Map/Legal/Weather/Stay/Currency interfaces этим slice не переписываются.
+
+## Server orchestration policy
+
+`server/travel/planOrchestrator.ts` — trusted policy layer между owned Trip и будущим AI adapter.
+
+Последовательность:
+
+1. проверить account scope;
+2. проверить Trip ownership;
+3. создать минимизированный `PlanRequest`;
+4. fail closed как `not_connected`, если provider отсутствует;
+5. вызвать typed provider с bounded timeout + cancellation;
+6. считать provider response untrusted;
+7. выполнить `validatePlanProposal`;
+8. вычислить authoritative/non-authoritative claim disposition;
+9. вернуть structured proposal + policy evaluation + минимальный audit metadata;
+10. **не** записывать результат автоматически в Trip.
+
+Отсутствует silent fallback на mock/local answer или другой provider.
+
+## Provenance / authority policy
+
+`provider_fact` обязан ссылаться на declared source. Unknown source reference делает proposal invalid.
+
+Legal provider fact дополнительно требует official HTTPS source.
+
+Критические external categories:
+
+- transport schedule;
+- price;
+- availability;
+- legal;
+- weather.
+
+Model inference для этих категорий не считается authoritative независимо от confidence. Expired provider evidence также не считается authoritative.
+
+`user_input` — trusted только как факт того, что пользователь это сообщил; он не подтверждает внешний schedule/price/legal fact.
+
+## Audit boundary
+
+Plan orchestration audit содержит только:
+
+- contract version;
+- request ID;
+- Trip ID/revision;
+- provider ID;
+- timestamps/duration;
+- status;
+- validation error codes.
+
+Audit V1 не хранит prompt, proposal body, документы, cookies, session secret, API key или raw provider payload.
+
+## Error model
+
+Orchestration различает:
+
+- invalid input;
+- access denied;
+- provider not connected;
+- caller abort;
+- timeout;
+- provider failure;
+- invalid provider response;
+- invalid configuration.
+
+Provider failure не превращается в fake success.
 
 ## CI / acceptance
 
-Push gate для persistence branch:
+Plan push gate:
 
-- `npm ci`;
-- `npm audit --audit-level=high`;
-- `npm run typecheck`;
-- `npm run test:trip-server` — SQLite migration/business/ownership;
-- `npm run build:auth-server`;
-- `npm run test:travel-browser` — один реальный server-backed Chromium happy-path;
-- `npm run build`.
+- dependency audit;
+- project typecheck;
+- `npm run test:plan-policy`;
+- Trip ownership regression;
+- server runtime build;
+- server-backed Chromium regression;
+- frontend build.
 
-PR gate дополнительно запускает PostgreSQL 18.4:
+Draft PR дополнительно сохраняет PostgreSQL 18.4 migration/persistence regression gate нижнего persistence слоя.
 
-- `npm run db:migrate`;
-- `npm run test:trip-postgres`.
+CI permissions остаются `contents: read`.
 
-CI имеет только `contents: read`; self-mutating workflow step удалён.
+## Не реализовано этим slice
 
-## Production boundaries still open
+- real AI model/vendor;
+- RAG/vector DB;
+- prompt/tool execution framework;
+- real transport/map/legal/weather/stay/currency adapters;
+- automatic Plan → Trip mutation;
+- booking/purchase;
+- provider cost/rate routing across multiple vendors;
+- production deploy.
 
-- production DB provider/region;
-- backup/restore/retention/export/deletion policy;
-- provider implementations and routing/fallback policy;
-- provider-call observability/audit;
-- travel-document storage/retention;
-- legal/privacy package;
-- billing/quotas;
-- production deployment/public registration.
+Следующий roadmap layer после зелёного Plan checkpoint — provider-neutral Transport/normalized route comparison contract. Выбор реального transport provider остаётся отдельным product/engineering/legal решением.

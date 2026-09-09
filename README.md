@@ -8,66 +8,84 @@
 
 ## Текущий engineering slice
 
-`Server-side Trip Persistence & API V1` развивается в stacked-ветке `feat/travel-trip-persistence-v1` поверх `feat/travel-ui-redesign-v2`.
+`Plan Real-Data Contract & AI Orchestration Policy V1` развивается в stacked-ветке `feat/travel-plan-orchestration-contract-v1` поверх завершённого `Server-side Trip Persistence & API V1` (`feat/travel-trip-persistence-v1`, Draft PR #28).
 
-Цель slice — заменить local-only persistence для реально аутентифицированного аккаунта на server-authoritative account-scoped Trip persistence, сохранив существующий Trip domain и UI repository boundary.
+Draft PR текущего Plan slice: **#29**. Merge не выполняется.
 
-Реализовано:
+Цель — определить строгий server-side contract между Trip, будущими verified provider facts и будущим AI reasoning **до подключения реальной модели, RAG или travel provider**.
 
-- `GET /api/trips` — список Trip только текущего authenticated account;
-- `GET /api/trips/:id` — чтение Trip только в account scope;
-- `PUT /api/trips/:id` — создание/обновление Trip с server-side ownership;
-- SQLite adapter для development/closed test;
-- PostgreSQL-compatible adapter;
-- additive migration `002_travel_trip_persistence`;
-- server-authoritative `createdAt` / `updatedAt`;
-- real-auth frontend использует same-origin HTTP Trip repository;
-- preview mode остаётся отдельным local-only контуром;
-- server failure не маскируется fallback-записью в `localStorage`.
+## Plan contract V1
 
-Удаление Trip через API в V1 намеренно не добавлено.
+`src/travel/planContracts.ts` фиксирует:
 
-## Ownership / security boundary
+- `PlanRequest` с минимизированным immutable Trip snapshot;
+- `PlanProposal` как структурированный результат;
+- `PlanSourceReference`;
+- `PlanClaim`;
+- provenance: `user_input | provider_fact | model_inference | unknown`;
+- confidence и source references;
+- destination / itinerary suggestions;
+- assumptions;
+- deterministic validation до использования результата.
 
-`ownerScopeId` из клиентского payload не является доказательством владения. Account ID определяется только из проверенной HttpOnly session.
+В PlanRequest намеренно не передаются owner/session credentials, traveler labels, legal/map state, документы, secrets и полный Trip aggregate.
 
-- foreign-owned payload отклоняется;
-- одинаковый Trip ID может существовать у разных аккаунтов, потому что storage key account-scoped;
-- mutations проходят существующий same-origin request guard;
-- Trip JSON имеет bounded request size и проходит runtime validation;
-- `.env`, database credentials, SMTP password, OTP/session peppers и будущие provider keys не попадают в frontend/repository.
+## AI orchestration policy
 
-## Persistence model
+`AIProvider.planTrip()` больше не возвращает `unknown`. Он принимает typed `PlanRequest`, typed provider context и `AbortSignal`, возвращая `PlanProposal`.
 
-V1 сохраняет `Trip` как валидированный aggregate document, не раскладывая текущий domain на десятки таблиц раньше времени.
+`server/travel/planOrchestrator.ts` задаёт server policy:
 
-- SQLite: account-scoped row + JSON document;
-- PostgreSQL: account-scoped row + `jsonb` document;
-- account ID, timestamps и ownership metadata — server-authoritative;
-- migration additive, без destructive DROP/irreversible data changes.
+- Trip owner должен совпадать с authenticated account scope;
+- real provider может отсутствовать — это честное `not_connected`;
+- timeout ограничивает provider call;
+- caller cancellation распространяется через `AbortSignal`;
+- provider output считается untrusted до `validatePlanProposal`;
+- invalid provider response fail closed;
+- silent fallback на fake/local answer отсутствует;
+- orchestration не пишет Plan автоматически в Trip;
+- audit содержит только request/provider/trip metadata, timestamps/status и validation codes, но не prompt/response body и не secrets.
 
-Это позволяет позже нормализовать отдельные подсистемы Plan/Transport/Budget/Legal без UI-driven переписывания текущего Trip contract.
+## Real-data / provenance rules
+
+Критические внешние факты (`transport_schedule`, `price`, `availability`, `legal`, `weather`) не становятся authoritative только потому, что их сгенерировала модель.
+
+- `provider_fact` обязан ссылаться на declared source;
+- legal provider fact требует official HTTPS source;
+- model inference остаётся advisory/non-authoritative;
+- expired provider evidence не используется как authoritative;
+- user input может быть authoritative только как пользовательское утверждение, а не как подтверждение внешнего факта;
+- unknown provenance не повышается до verified автоматически.
+
+Это contract policy, а не факт подключения реальных источников.
+
+## Persistence / auth foundations
+
+Server-side Trip Persistence V1 закрыт в Draft PR #28:
+
+- authenticated account → same-origin `/api/trips`;
+- SQLite closed-test persistence;
+- PostgreSQL 18.4-compatible persistence;
+- server-authoritative ownership/timestamps;
+- preview остаётся explicit local-only mode.
+
+Passwordless Email OTP / HttpOnly session foundation не переписывалась.
 
 ## AI truth boundary
 
-Реальный AI provider в этом slice **не подключён**.
+На текущем этапе **не подключены**:
 
-General и trip-scoped ARVELIS AI остаются truthful UI contexts: пользовательский prompt может быть принят интерфейсом, но fake assistant answer не создаётся. Transport, Map, Legal, Weather, Stay, Currency и PDF providers также не подключены.
+- реальная AI model/API;
+- RAG/vector database;
+- Transport provider;
+- Map provider;
+- Legal provider;
+- Weather provider;
+- Stay provider;
+- Currency provider;
+- booking/payment flow.
 
-Следующий согласованный этап после полного DoD persistence slice — **Plan real-data contract / AI orchestration policy**. Это contract/policy этап, а не разрешение подключить конкретного AI vendor.
-
-## Auth foundation
-
-Существующая passwordless Email OTP foundation сохранена:
-
-- same-origin API;
-- HttpOnly server session;
-- server-authoritative Account/Session;
-- SQLite для development/closed test;
-- PostgreSQL-compatible persistence;
-- secrets только в protected environment.
-
-В рамках security maintenance Nodemailer обновлён до `9.1.1`; `npm audit --audit-level=high` должен оставаться зелёным.
+Fake AI replies, fake prices, fake availability, fake schedules и fake legal conclusions запрещены.
 
 ## Development
 
@@ -77,7 +95,7 @@ Frontend preview:
 npm run dev
 ```
 
-Closed-test real-auth runtime после настройки protected environment:
+Closed-test auth runtime после настройки protected environment:
 
 ```bash
 npm run dev:auth
@@ -85,32 +103,32 @@ npm run dev:auth
 
 ## Verification
 
-Основной persistence gate:
+Основной gate текущего Plan slice:
 
 ```bash
 npm ci
 npm audit --audit-level=high
 npm run typecheck
+npm run test:plan-policy
 npm run test:trip-server
 npm run build:auth-server
 npm run test:travel-browser
 npm run build
 ```
 
-Pull request дополнительно запускает PostgreSQL 18.4 gate:
+`npm run test:plan-policy` проверяет минимизацию PlanRequest, provenance/source validation, legal official-source rule, expired evidence, ownership, not-connected, cancellation, timeout и invalid provider response.
 
-```bash
-npm run db:migrate
-npm run test:trip-postgres
-```
-
-Browser happy-path использует реальный closed-test контур `HttpOnly session → same-origin /api/trips → SQLite → reload → reopen` на mobile viewport `390×844`, а не localStorage-only preview.
+Stacked Draft PR дополнительно сохраняет PostgreSQL persistence regression gate существующего нижнего слоя.
 
 ## Release boundary
 
-- merge в `main` не выполняется без отдельного подтверждения;
+- merge в `main` — только после отдельного подтверждения;
 - production deploy не выполняется;
-- production DB/provider region, backup/retention и public registration остаются отдельными решениями;
-- paid services и реальные AI/travel providers не подключаются этим slice.
+- реальные AI/RAG/travel providers не подключаются этим slice;
+- paid services не подключаются;
+- destructive migrations/deletion не выполняются;
+- production DB/provider region и legal/privacy rollout остаются отдельными решениями.
 
-См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/07_DECISIONS.md`, `docs/43_TRAVEL_UI_REDESIGN_V2.md` и `docs/44_TRAVEL_TRIP_PERSISTENCE_API_V1.md`.
+После зелёного Plan checkpoint следующий roadmap layer — provider-neutral **Transport / normalized route comparison contract**, до выбора конкретного внешнего transport provider.
+
+См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/44_TRAVEL_TRIP_PERSISTENCE_API_V1.md` и `docs/45_PLAN_REAL_DATA_ORCHESTRATION_POLICY_V1.md`.

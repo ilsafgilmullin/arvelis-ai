@@ -1,109 +1,168 @@
 # ARVELIS AI — безопасность
 
-**Актуальность:** Server-side Trip Persistence & API V1, 2026-09-09.
+**Актуальность:** Plan Real-Data Contract & AI Orchestration Policy V1, 2026-09-09.
 
-## Auth invariants — сохраняются
-
-Travel persistence не ослабляет существующую auth foundation:
+## Auth / ownership invariants
 
 - OTP verification выполняется trusted server-side;
 - raw OTP не хранится и не логируется;
-- OTP/session peppers независимы и находятся только в protected environment;
+- OTP/session peppers находятся только в protected environment;
 - session cookie HttpOnly;
-- same-origin API boundary;
 - Account/Session server-authoritative;
-- SQLite используется только для development/closed test;
-- PostgreSQL-compatible auth adapter сохраняется.
+- Trip `accountId` определяется из authenticated session;
+- client `ownerScopeId` не является authorization credential;
+- foreign Trip access fail closed.
 
-## Trip server ownership — реализовано
+## Trip persistence boundary
 
-Server-side Trip API не доверяет client-supplied account identity.
+Server-side Trip API V1 account-scoped. SQLite используется для development/closed test, PostgreSQL adapter проверяется regression gate. Production DB/region/backups/retention остаются отдельным решением.
 
-- `accountId` определяется из authenticated HttpOnly session.
-- `ownerScopeId` в Trip payload не выбирает owner и должен совпадать с session account.
-- foreign-owned payload отклоняется.
-- `GET /api/trips` возвращает только записи текущего account.
-- `GET /api/trips/:id` не раскрывает Trip другого account.
-- storage key — `(account_id, trip_id)`, поэтому одинаковый Trip ID разных аккаунтов не смешивает данные.
-- `createdAt` / `updatedAt` нормализуются server-side.
-- invalid/oversized Trip JSON fail closed.
+## Plan data minimization
 
-Mutating Trip requests проходят существующий same-origin guard (`X-Arvelis-Request` + Origin/host/fetch-site checks). Это CSRF boundary текущего same-origin BFF runtime.
+Будущий AI/provider не получает raw Trip aggregate автоматически.
 
-## Persistence / migrations
+`PlanRequest` V1 содержит только planning data:
 
-Migration `002_travel_trip_persistence` additive:
+- Trip ID/revision;
+- origin/destination;
+- dates/duration;
+- traveler count;
+- budget limit;
+- travel preferences;
+- bounded optional prompt.
 
-- создаёт новую account-scoped `travel_trips` table;
-- использует foreign key на account;
-- не удаляет и не преобразует существующие auth rows;
-- не содержит destructive `DROP`;
-- PostgreSQL migration checksum фиксируется в schema migration registry;
-- SQLite schema также проверяет checksum migration.
+Не передаются автоматически:
 
-Production DB choice/region/backups/restore/retention остаются `OPEN`; успешный SQLite/PostgreSQL compatibility test не означает production infrastructure approval.
+- auth cookie/session secret;
+- OTP/peppers;
+- `ownerScopeId` как credential;
+- traveler identity labels;
+- passport/document data;
+- bank/payment data;
+- legal/map arrays;
+- live location;
+- provider/API credentials;
+- database connection data.
 
-## Data minimization
+## Provider response is untrusted input
 
-Trip aggregate может содержать travel preferences и плановые данные, но текущий slice не добавляет хранение:
+Даже типизированный `AIProvider` не является trusted source.
 
-- сканов паспортов;
-- полных реквизитов документов;
-- банковских данных;
-- live location history;
-- provider credentials;
-- AI prompts/responses как отдельный persistent log.
+Перед использованием `PlanProposal` проходит deterministic validation:
 
-Travel-document storage требует отдельной retention/privacy модели.
+- contract version;
+- Trip identity;
+- bounded array/text sizes;
+- unique IDs;
+- source reference integrity;
+- provenance values;
+- claim category/confidence;
+- destination/itinerary claim references;
+- HTTPS URL validation.
 
-## Provider/security boundary
+Invalid provider response fail closed и не превращается в успешный Plan.
 
-- AI/API keys никогда не передаются frontend.
-- Реальные provider calls в будущем должны идти через trusted server adapters/gateway.
-- Provider contracts должны поддерживать timeout, cancellation, rate/cost controls и минимизацию данных.
-- Документы нельзя передавать AI/provider без утверждённой policy и явной цели обработки.
-- Prompt injection/tool permission protections обязательны для будущего AI orchestration.
-- AI-generated legal/price/availability statement без authoritative source не считается verified fact.
+## Provenance / authoritative facts
+
+Provenance V1:
+
+- `user_input`;
+- `provider_fact`;
+- `model_inference`;
+- `unknown`.
+
+Критические external facts:
+
+- transport schedule;
+- price;
+- availability;
+- legal;
+- weather.
+
+Для них model inference не является authoritative независимо от confidence.
+
+`provider_fact` обязан ссылаться на declared source. Legal provider fact требует official HTTPS source. Expired provider evidence не используется как authoritative.
+
+User input подтверждает только то, что пользователь это сообщил; он не заменяет внешний authoritative source.
+
+## Timeout / cancellation / failure policy
+
+Server orchestration задаёт bounded timeout и принимает caller cancellation через `AbortSignal`.
+
+Ошибки разделяются на:
+
+- invalid input;
+- access denied;
+- provider not connected;
+- cancellation;
+- timeout;
+- provider failure;
+- invalid provider response;
+- invalid configuration.
+
+Нет silent fallback на mock result, local fake answer или альтернативного provider без явно реализованной policy.
+
+## Audit minimization
+
+Audit V1 хранит только технические metadata:
+
+- request ID;
+- Trip ID/revision;
+- provider ID;
+- timestamps/duration;
+- orchestration status;
+- validation error codes.
+
+Audit V1 **не** хранит:
+
+- user prompt;
+- provider response body;
+- documents;
+- cookies/session secrets;
+- API keys;
+- raw model/tool traces.
+
+Это снижает риск утечки чувствительного travel context через logs/audit.
+
+## Prompt injection / tool boundary
+
+В Plan V1 нет tool execution, RAG, browser/search tools или document retrieval. Поэтому provider output не может самостоятельно инициировать privileged server action.
+
+До будущего tool/RAG layer обязательны отдельные решения по:
+
+- prompt injection isolation;
+- tool allowlists;
+- per-tool authorization;
+- data minimization;
+- source provenance;
+- output encoding;
+- rate/cost controls;
+- sensitive-document policy.
 
 ## Legal data
 
-Legal requirement нельзя считать достоверным только потому, что его сгенерировала модель. При отсутствии проверенного source provider UI должен fail closed: «проверка не выполнена».
+AI-generated legal conclusion не является authoritative source. При отсутствии official verified source юридический claim остаётся non-authoritative/unverified.
 
-## Map/location
+## Provider secrets
 
-- точная live-геолокация не хранится по умолчанию;
-- live tracking требует отдельного consent/retention решения;
-- `MapPoint` не означает разрешение на background tracking.
+Все будущие AI/travel provider credentials должны находиться только server-side в protected environment. Frontend не получает vendor keys.
 
-## Logging
+## CI security
 
-Разрешены минимальные технические metadata для диагностики. Без отдельной policy запрещено логировать:
+- `npm audit --audit-level=high` обязателен;
+- Nodemailer зафиксирован на `9.1.1` после security patch;
+- GitHub Actions permissions: `contents: read`;
+- self-mutating workflow отсутствует;
+- Plan policy smoke проверяет ownership, source requirements, cancellation, timeout и invalid response.
 
-- содержимое travel документов;
-- OTP;
-- session secrets;
-- SMTP/API credentials;
-- database credentials;
-- полный чувствительный пользовательский input.
+## Production / Russia review
 
-## Dependency security
+До public launch отдельно проверяются:
 
-В ходе persistence slice `npm audit --audit-level=high` выявил high-severity advisories в Nodemailer `9.0.5`. Dependency и npm lock обновлены до `9.1.1`; текущий CI audit показывает `0 vulnerabilities`.
-
-CI после одноразового lock refresh возвращён к `permissions: contents: read`; self-mutating commit/push step удалён.
-
-## Secrets
-
-`.env`, API keys, SMTP password, database credentials, peppers и production session secrets находятся только в protected environment. Они не попадают в repository, docs, screenshots или клиентский bundle.
-
-## Russia / production review
-
-До public launch отдельно по официальным источникам проверяются:
-
-- требования к персональным данным и выбранным регионам хранения;
-- трансграничная передача данных выбранным providers;
+- требования к персональным данным и региону хранения;
+- трансграничная передача данных будущим AI/travel providers;
 - retention/deletion/export;
-- legal notices/consents;
-- доступность production infrastructure в России без VPN, где это требуется продуктом.
+- consent/legal notices;
+- доступность выбранной инфраструктуры в России без VPN, где это продуктово требуется.
 
 ARVELIS нельзя называть production-ready до фактического security/privacy/infrastructure audit.
