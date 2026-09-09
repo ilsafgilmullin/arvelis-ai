@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"],
+    "outDir": "tests/.dist-yandex-rasp-live",
+    "rootDir": "."
+  },
+  "include": [
+    "src/travel/domain.ts",
+    "src/travel/transportContracts.ts",
+    "src/travel/providers.ts",
+    "server/travel/transportOrchestrator.ts",
+    "server/travel/transportProviderPolicy.ts",
+    "server/travel/providers/yandexRaspAdapter.ts",
+    "server/travel/providers/yandexRaspHttpClient.ts",
+    "server/travel/providers/yandexRaspLiveProvider.ts",
+    "tests/yandex-rasp-live-adapter-smoke.ts"
+  ]
+}
