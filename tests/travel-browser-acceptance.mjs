@@ -224,7 +224,8 @@ try {
   await clickExact(client, 'Продолжить');
   await waitFor(client, "document.body.textContent.includes('ШАГ 2 ИЗ 3')", 'create step 2');
   await setControlValue(client, '.travel-money-input input', '000150000');
-  assert.equal(await client.evaluate("document.querySelector('.travel-money-input input')?.value"), '150 000');
+  const formattedBudget = await client.evaluate("document.querySelector('.travel-money-input input')?.value ?? ''");
+  assert.equal(formattedBudget.replace(/\s+/g, ' '), '150 000');
   await clickExact(client, 'Продолжить');
   await waitFor(client, "document.body.textContent.includes('ШАГ 3 ИЗ 3')", 'create step 3');
   await clickExact(client, 'Город');
