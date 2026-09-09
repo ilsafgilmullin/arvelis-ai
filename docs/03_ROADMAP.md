@@ -76,7 +76,7 @@ Implementation SHA: `df835cf92221cad3edb5d29b8e71a9f0a132ecf4`
 - [x] existing TransportOrchestrator/Trip regressions preserved;
 - [x] implementation push CI PASS on `df835cf92221cad3edb5d29b8e71a9f0a132ecf4`;
 - [x] README/Architecture/Roadmap/Security closure;
-- [x] `docs/48_YANDEX_RASP_LIVE_ADAPTER_V1.md` planned in current documentation head.
+- [x] `docs/48_YANDEX_RASP_LIVE_ADAPTER_V1.md` added.
 
 Final DoD gate before declaring the slice CLOSED:
 
