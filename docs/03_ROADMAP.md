@@ -33,75 +33,84 @@
 - [x] responsive Trip Workspace;
 - [x] truthful provider unavailable/empty states;
 - [x] simplified Profile / dev-only diagnostics;
-- [x] iPhone UI polish for drawer scroll, screen scroll reset, labels and mobile form controls.
-
-Physical-device checks остаются acceptance QA и не меняют product scope.
+- [x] iPhone UI polish.
 
 ## Server-side Trip Persistence & API V1 — DoD CLOSED / Draft PR #28
 
-Реализация собрана в `feat/travel-trip-persistence-v1` поверх Travel UI V2 и оставлена Draft без merge.
-
-- [x] account-scoped server Trip repository contract;
-- [x] `GET /api/trips`;
-- [x] `GET /api/trips/:id`;
-- [x] `PUT /api/trips/:id`;
-- [x] server-authoritative owner from authenticated session;
-- [x] foreign `ownerScopeId` rejection;
-- [x] server-authoritative created/updated timestamps;
-- [x] SQLite additive migration + adapter;
-- [x] PostgreSQL additive migration + adapter;
-- [x] real-auth frontend switched behind repository boundary to same-origin API;
-- [x] preview remains explicit local-only mode;
+- [x] account-scoped server Trip repository/API;
+- [x] server-authoritative ownership/timestamps;
+- [x] SQLite + PostgreSQL adapters/migrations;
+- [x] authenticated frontend same-origin repository;
 - [x] no silent server→local fallback;
-- [x] dependency audit restored to zero vulnerabilities (`nodemailer 9.1.1`);
-- [x] CI restored to `contents: read`; self-mutating lock step removed;
-- [x] typecheck;
-- [x] SQLite migration/business/ownership test;
+- [x] typecheck/server build/browser/frontend build;
+- [x] PostgreSQL 18.4 migration/persistence/ownership;
+- [x] final read-only CI (`contents: read`).
+
+Merge в `main` не выполнялся.
+
+## Plan Real-Data Contract & AI Orchestration Policy V1 — CURRENT RELEASE GATE / Draft PR #29
+
+Base: `feat/travel-trip-persistence-v1` / `9d147e8955e158b8684a0a9ef399415ff64358c8`.
+
+Цель — зафиксировать trusted planning boundary до подключения реальной модели/RAG/provider.
+
+- [x] typed `PlanRequest` с минимизированным Trip snapshot;
+- [x] typed `PlanProposal`;
+- [x] declared sources + claim provenance;
+- [x] `user_input / provider_fact / model_inference / unknown`;
+- [x] `AIProvider.planTrip()` переведён с `Promise<unknown>` на typed contract;
+- [x] server `PlanOrchestrator`;
+- [x] account ownership fail closed;
+- [x] provider-not-connected state;
+- [x] timeout;
+- [x] caller cancellation;
+- [x] no silent/mock/provider fallback;
+- [x] deterministic proposal validation;
+- [x] legal provider fact требует official HTTPS source;
+- [x] model inference для price/availability/schedule/legal/weather не authoritative;
+- [x] expired provider evidence не authoritative;
+- [x] audit metadata без prompt/response body и secrets;
+- [x] minimal business/security smoke;
+- [x] project typecheck;
 - [x] server runtime build;
-- [x] one real server-backed Chromium happy-path at `390×844`;
-- [x] frontend build;
-- [x] PostgreSQL 18.4 migrations `001 + 002`;
-- [x] PostgreSQL migration/persistence/ownership gate;
-- [x] Draft PR #28 records the checkpoint.
+- [x] existing Trip/browser/frontend regression gate;
+- [x] Draft PR #29 открыт;
+- [ ] final Draft PR regression gate на documentation head.
 
-Merge в `main` не является частью DoD и не выполнялся.
+Реальный AI vendor/model, RAG/vector DB и travel provider в этот slice не входят.
 
-## Next agreed slice — CURRENT AFTER PERSISTENCE DoD
+## Следующий roadmap layer — после зелёного Plan V1 checkpoint
 
-### Plan real-data contract / AI orchestration policy
+### Transport / normalized route comparison contract
 
-Цель — определить, как ARVELIS формирует Plan из user constraints, verified source/provider inputs и будущего AI reasoning, не подключая vendor «любой ценой».
+Следующий этап можно начинать без выбора конкретного провайдера:
 
-Boundaries текущего следующего этапа:
+1. normalized transport search request из Trip/Plan constraints;
+2. typed route/segment result contract;
+3. provider provenance для schedule/price/availability;
+4. currency/price timestamp/validity boundary;
+5. route comparison metrics без fake score;
+6. deduplication/normalization rules;
+7. timeout/cancellation/error semantics для transport adapters;
+8. deterministic validation перед записью route result в Trip;
+9. provider-neutral interface/tests;
+10. никаких реальных booking/purchase действий.
 
-1. входной `PlanRequest` / immutable Trip snapshot;
-2. provenance каждой значимой части результата;
-3. разделение user facts, provider facts, model inference и unknown;
-4. provider-neutral AI orchestration port;
-5. timeout/cancellation/error/fallback policy;
-6. запрет model-generated legal/price/availability facts без authoritative source;
-7. structured Plan result, который можно безопасно применить к Trip;
-8. audit metadata без хранения secrets/лишнего sensitive content;
-9. deterministic validation до записи результата;
-10. никакого real vendor adapter в contract slice.
-
-Реальный AI/provider connection этим этапом не подразумевается автоматически.
+Подключение конкретного transport provider — отдельное решение после contract layer, особенно если нужны платный API, production secrets, юридическая проверка или vendor lock-in.
 
 ## Later Travel sequence
 
-1. Transport providers and normalized route comparison;
-2. Budget provider inputs and currency handling;
-3. Legal source ingestion/verification;
-4. Map provider implementation;
-5. Stay/Weather integrations where justified;
-6. Trip Book export/generation;
-7. Live Companion;
-8. Safe/emergency capabilities.
-
-Каждый внешний provider — отдельное engineering/security/legal решение. Paid integration не подразумевается roadmap автоматически.
+1. Budget provider inputs and currency handling;
+2. Legal source ingestion/verification;
+3. Map provider implementation;
+4. Stay/Weather integrations where justified;
+5. Trip Book export/generation;
+6. Live Companion;
+7. Safe/emergency capabilities.
 
 ## Still outside approved scope
 
+- real AI/RAG provider;
 - booking/ticket purchase;
 - production transport/stay/map/legal/weather providers;
 - payments/billing/subscriptions;
@@ -111,3 +120,5 @@ Boundaries текущего следующего этапа:
 - Live/Safe automation;
 - camera/realtime voice;
 - Travel Memory/full Group Travel.
+
+Каждый внешний provider — отдельное engineering/security/legal решение. Paid integration не подразумевается roadmap автоматически.
