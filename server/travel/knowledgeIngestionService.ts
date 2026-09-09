@@ -186,7 +186,7 @@ export class KnowledgeIngestionService {
       throw new KnowledgeIngestionError('invalid_input', 'Knowledge document version validation failed.', versionErrors.map((item) => `${item.path}:${item.code}`));
     }
 
-    let chunks: KnowledgeIngestionChunk[] = request.chunks.map((input, ordinal) => ({
+    const chunks: KnowledgeIngestionChunk[] = request.chunks.map((input, ordinal) => ({
       version: 1,
       id: input.id,
       sourceId: request.source.id,
@@ -240,11 +240,21 @@ export class KnowledgeIngestionService {
         ...(vectors !== null ? { embedding: vectors[index]! } : {}),
       })),
     };
-    await this.repository.saveVersion(bundle);
+    const saveResult = await this.repository.saveVersion(bundle);
+    if (saveResult.status === 'deduplicated') {
+      if (!knowledgeNamespacesEqual(saveResult.documentVersion.namespace, request.source.namespace)) {
+        throw new KnowledgeIngestionError('namespace_mismatch', 'Repository deduplication crossed a Knowledge namespace.');
+      }
+      return {
+        status: 'deduplicated',
+        documentVersion: saveResult.documentVersion,
+        embedded: false,
+      };
+    }
 
     return {
       status: vectors === null ? 'stored_pending_embeddings' : 'ready',
-      documentVersion,
+      documentVersion: saveResult.documentVersion,
       chunkCount: chunks.length,
       embedded: vectors !== null,
     };
