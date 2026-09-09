@@ -12,44 +12,80 @@ ARVELIS AI на текущем этапе полностью бесплатен 
 
 ## Current engineering slice
 
-`Legal Sources & Travel Legal Foundation V1` развивается в `feat/travel-legal-sources-foundation-v1` поверх закрытого `Map Provider Foundation & Route Map V1` (Draft PR #33).
+`ARVELIS AI Engine & Knowledge Foundation V1` развивается в `feat/travel-ai-knowledge-foundation-v1` поверх закрытого `Legal Sources & Travel Legal Foundation V1` (Draft PR #34).
 
-Ни один real Legal provider, source ingestion service, credential или production legal endpoint не подключён.
+**Реальная модель, embedding provider, vector database, RAG storage, production knowledge ingestion и AI credentials не подключены.** Активный пользовательский AI runtime остаётся truthful `not_connected`.
 
-## Legal architecture
+## Provider-neutral AI Gateway
 
-`src/travel/legalContracts.ts` задаёт provider-neutral contracts:
+`server/travel/aiGateway.ts` отделяет application policy от конкретного model/runtime vendor.
 
-- `LegalCheckRequest` — только Trip ID/revision, origin, destination и dates;
-- scope V1 — только `route_general`;
-- citizenship/passport/nationality в request не добавляются, потому что текущий `Trip` этих данных не содержит;
-- `LegalSourceReference` хранит source provenance и optional effective dates;
-- `LegalClaim` обязан ссылаться минимум на один source;
-- `LegalCheckResponse` содержит provider/request identity, retrieval time, sources и claims.
+Gateway:
 
-`verified` claim допустим только при official HTTPS source. Secondary source может использоваться только как `needs_review`, но не как authoritative legal fact.
+- принимает bounded structured request;
+- хранит authenticated account scope только server-side;
+- передаёт model runtime только prompt/locale/scope, уже-authorized Trip ID, evidence и список реально подключённых tools;
+- поддерживает global timeout/cancellation;
+- ограничивает tool-call rounds и evidence budget;
+- валидирует retrieval output, model turns, tool calls, tool evidence и final structured answer;
+- возвращает truthful `not_connected`, если runtime отсутствует;
+- не логирует prompt, raw evidence, provider response bodies или secrets в orchestration audit.
 
-## Freshness / authority
+Existing `PlanOrchestrator` не заменён: он остаётся отдельным high-level planning contract. Generic AI Gateway — новый нижний execution/evidence boundary для будущего runtime.
 
-Legal retrieval time не равен юридической актуальности.
+## Runtime / retrieval ports
 
-- expired source => claim freshness `expired`, authoritative `false`;
-- source без explicit `effectiveUntil` => freshness `unknown`, authoritative `false`;
-- `current` + `verified` + official HTTPS sources => authoritative `true`.
+`server/travel/aiEnginePorts.ts` задаёт injected interfaces:
 
-Uncited conclusion или verified claim на secondary source отклоняются contract validation.
+- `AiModelRuntime`;
+- `KnowledgeRetriever`;
+- AI tool handlers.
 
-## Legal orchestration
+Ни один concrete vendor adapter в V1 не выбран.
 
-`server/travel/legalOrchestrator.ts`:
+Knowledge/RAG boundary нормализует `KnowledgeSource`, `KnowledgeChunk` и retrieval result. Retriever output считается untrusted и проходит deterministic validation до попадания в model context.
 
-- проверяет authenticated ownership до provider call;
-- строит minimized route-general request;
-- возвращает truthful `not_connected`, если provider отсутствует;
-- поддерживает timeout/cancellation;
-- валидирует untrusted provider output;
-- не придумывает citizenship/passport facts;
-- не мутирует `Trip` и не сохраняет provider result автоматически.
+## Tool registry
+
+Allowlisted tool IDs:
+
+- `trip.read`;
+- `transport.search`;
+- `map.route`;
+- `legal.check`.
+
+Model видит только фактически зарегистрированные handlers. Произвольный tool ID отклоняется. Evidence после tool execution получает server-stamped `origin: tool` и реальный `toolId`; модель не может самостоятельно объявить provider/tool provenance.
+
+## Protected facts
+
+Модель **не является источником фактов** для:
+
+- цен;
+- расписаний транспорта;
+- availability;
+- route-map geometry/facts;
+- legal requirements;
+- weather.
+
+Price/schedule/availability требуют current evidence от `transport.search`. Map facts — от `map.route`. Legal facts — current official HTTPS evidence от `legal.check`. Weather в Foundation V1 не имеет authoritative tool, поэтому weather fact не может стать authoritative вообще.
+
+Knowledge/RAG evidence само по себе не может сделать protected fact authoritative, даже если retrieved source помечен official. Например Legal fact обязан пройти normalized Legal tool boundary.
+
+## Structured output / provenance
+
+Model answer содержит явные structured claims:
+
+- domain;
+- `fact | inference`;
+- evidence IDs.
+
+Inference всегда non-authoritative. Fact без evidence отклоняется. Protected fact без matching current tool evidence отклоняется целиком как invalid model output.
+
+Free-form `message` является presentation text, а не доказательством factual authority. Перед подключением real runtime обязательна semantic evaluation, что externally-checkable assertions из prose также представлены в structured claims; deterministic schema alone этого доказать не может.
+
+## Evaluation policy
+
+`server/travel/aiEvaluationPolicy.ts` задаёт mandatory release-eval checklist. Real runtime adapter нельзя активировать, пока critical cases не имеют явного PASS: not-connected behavior, account-scope isolation, unknown tools, unsupported protected facts, official Legal evidence, stale evidence, retrieval validation, cancellation/timeout и structured-claim coverage prose.
 
 ## Verification
 
@@ -57,7 +93,7 @@ Uncited conclusion или verified claim на secondary source отклоняю�
 npm ci
 npm audit --audit-level=high
 npm run typecheck
-npm run test:legal-foundation
+npm run test:ai-knowledge-foundation
 npm run test:transport-provider-foundation
 npm run test:yandex-rasp-live
 npm run test:trip-server
@@ -66,17 +102,19 @@ npm run test:travel-browser
 npm run build
 ```
 
-`test:legal-foundation` — один signal-bearing business/security/freshness gate. Он проверяет ownership-before-provider, route-general minimization, official-source authority, uncited/secondary-source fail-closed, freshness и cancellation.
+Новый AI test — один signal-bearing business/security/evidence gate; отдельный browser suite не добавлен, потому что этот foundation slice не выполняет active AI UI/runtime wiring.
 
-## Boundaries
+## STOP boundary
 
-- no real Legal provider/credentials;
-- no citizenship/passport assumptions;
-- no uncited legal conclusions;
-- no production deploy;
-- no merge to `main`;
-- no real AI/model/RAG provider yet.
+После green AI/Knowledge Foundation checkpoint **не выбирать и не активировать самостоятельно**:
 
-После green Legal checkpoint следующий согласованный slice — `ARVELIS AI Engine & Knowledge Foundation V1`.
+- model/runtime vendor;
+- embedding provider;
+- vector DB;
+- production knowledge source set/ingestion pipeline;
+- AI production credentials;
+- paid AI/RAG services.
 
-См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/50_LEGAL_SOURCES_TRAVEL_LEGAL_FOUNDATION_V1.md`.
+Также не выполнять production deployment или merge в `main` без отдельного подтверждения.
+
+См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/51_ARVELIS_AI_ENGINE_KNOWLEDGE_FOUNDATION_V1.md`.

@@ -2,7 +2,7 @@ name: ARVELIS CI
 
 on:
   pull_request:
-    branches: [main, feat/travel-foundation-v1, feat/travel-ui-redesign-v2, feat/travel-trip-persistence-v1, feat/travel-plan-orchestration-contract-v1, feat/travel-transport-contract-v1, feat/travel-transport-provider-foundation-v1, feat/travel-yandex-rasp-live-adapter-v1, feat/travel-map-provider-foundation-v1]
+    branches: [main, feat/travel-foundation-v1, feat/travel-ui-redesign-v2, feat/travel-trip-persistence-v1, feat/travel-plan-orchestration-contract-v1, feat/travel-transport-contract-v1, feat/travel-transport-provider-foundation-v1, feat/travel-yandex-rasp-live-adapter-v1, feat/travel-map-provider-foundation-v1, feat/travel-legal-sources-foundation-v1]
   push:
     branches:
       - 'codex/**'
@@ -14,6 +14,7 @@ on:
       - 'feat/travel-yandex-rasp-live-adapter-v1'
       - 'feat/travel-map-provider-foundation-v1'
       - 'feat/travel-legal-sources-foundation-v1'
+      - 'feat/travel-ai-knowledge-foundation-v1'
   workflow_dispatch:
 
 permissions:
@@ -56,6 +57,9 @@ jobs:
 
       - name: Transport provider strategy plus Map and Legal foundations
         run: npm run test:transport-provider-foundation
+
+      - name: ARVELIS AI Engine and Knowledge Foundation
+        run: npm run test:ai-knowledge-foundation
 
       - name: Yandex Rasp live adapter HTTP and freshness
         run: npm run test:yandex-rasp-live

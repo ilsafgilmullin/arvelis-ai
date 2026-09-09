@@ -13,68 +13,86 @@ Travel Product Pivot остаётся текущим продуктовым на
 - [x] Transport Normalized Route Contract V1 — Draft PR #30, green, not merged;
 - [x] Transport Provider Strategy & Adapter Foundation V1 — Draft PR #31, green, not merged;
 - [x] Yandex Rasp Live Adapter V1 — Draft PR #32, green, not merged; production key not activated;
-- [x] Map Provider Foundation & Route Map V1 — Draft PR #33, green, not merged; no real map provider.
+- [x] Map Provider Foundation & Route Map V1 — Draft PR #33, green, not merged; no real map provider;
+- [x] Legal Sources & Travel Legal Foundation V1 — Draft PR #34, green, not merged; no real Legal provider.
 
-## Current slice — Legal Sources & Travel Legal Foundation V1
+## Current checkpoint — ARVELIS AI Engine & Knowledge Foundation V1
 
-Branch: `feat/travel-legal-sources-foundation-v1`  
-Base: Map V1 / `bd46fc12064faf2dd807782c35106ec062bb08dd`
+Branch: `feat/travel-ai-knowledge-foundation-v1`  
+Base: Legal V1 / `54f5d7b14bd12ec0d9da9c92eede79598664dbf7`
 
-Scope / DoD:
+Implemented scope:
 
-- [x] typed provider-neutral `LegalCheckRequest`;
-- [x] route-general scope only;
-- [x] citizenship/passport/nationality not invented or added to `Trip`;
-- [x] typed legal source/claim contracts;
-- [x] every claim requires source reference;
-- [x] `verified` claims require official HTTPS sources;
-- [x] expired/unknown freshness never authoritative;
-- [x] ownership fail-closed before provider call;
-- [x] timeout/cancellation;
-- [x] malformed/untrusted provider output fail-closed;
-- [x] truthful `not_connected` without provider;
-- [x] one business/security/freshness gate;
-- [x] implementation push validate PASS;
-- [x] README/Architecture/Roadmap/Security documentation;
-- [x] `docs/50_LEGAL_SOURCES_TRAVEL_LEGAL_FOUNDATION_V1.md`;
-- [ ] stacked Draft PR;
-- [ ] final PR-triggered validate + PostgreSQL regression PASS.
+- [x] provider-neutral `AiGateway`;
+- [x] model/runtime adapter boundary without selecting a vendor;
+- [x] normalized Knowledge source/chunk/evidence contracts;
+- [x] provider-neutral `KnowledgeRetriever` / RAG boundary;
+- [x] allowlisted tool registry for `trip.read`, `transport.search`, `map.route`, `legal.check`;
+- [x] server-stamped tool provenance;
+- [x] structured model turns and structured final answer/claim validation;
+- [x] protected-fact policy for schedule/price/availability/map/legal/weather;
+- [x] current tool evidence required for protected authoritative facts;
+- [x] official current HTTPS Legal tool evidence required for authoritative Legal facts;
+- [x] Weather authoritative facts impossible in V1 because no Weather tool is approved;
+- [x] account scope remains server-only and is not exposed to model runtime input;
+- [x] bounded evidence and maximum two tool rounds;
+- [x] global timeout/cancellation;
+- [x] truthful `not_connected` without model runtime;
+- [x] deterministic release/evaluation policy;
+- [x] one signal-bearing AI/Knowledge business/security/evidence gate;
+- [x] implementation push #704 PASS;
+- [x] README documentation;
+- [x] Architecture/Roadmap/Security documentation;
+- [x] dedicated `docs/51_ARVELIS_AI_ENGINE_KNOWLEDGE_FOUNDATION_V1.md`.
 
-No real legal-source provider, credentials or production ingestion is connected.
+Closure criterion:
 
-## Next agreed slice — ARVELIS AI Engine & Knowledge Foundation V1
+- stacked Draft PR #35 must target `feat/travel-legal-sources-foundation-v1`;
+- final PR-triggered `validate` and PostgreSQL lower-layer regression must PASS on the same documentation head;
+- after that the slice is CLOSED with no runtime/provider activation.
 
-After Legal DoD closes:
+No real model/runtime provider, embedding provider, vector DB or production knowledge ingestion is connected.
 
-1. provider-neutral AI Gateway;
-2. model/runtime adapter boundary without choosing a real vendor;
-3. Knowledge source/evidence contracts;
-4. retrieval/RAG boundary;
-5. tool registry for Trip/Transport/Map/Legal;
-6. structured output validation;
-7. provenance/trust policy;
-8. timeout/cancellation;
-9. evaluation policy;
-10. truthful `not_connected` when model/runtime/retriever is absent.
+## Hard factual policy
 
-Hard rule: model output is **not** a source of authoritative facts for price, transport schedules, legal rules, weather or availability. Those facts must come through source-backed tools/provider contracts.
+A model is not an authoritative source for:
+
+- prices;
+- transport schedules;
+- availability;
+- route-map data;
+- legal requirements;
+- weather.
+
+These facts must pass through the corresponding normalized tools/provider evidence. Model output without appropriate current evidence remains inference/non-authoritative or fails validation when declared as a protected fact.
+
+RAG alone does not bypass Legal/Transport/Map authority boundaries.
 
 ## Real STOP boundary after AI/Knowledge Foundation
 
-Stop before the first step that requires one of:
+After the final AI/Knowledge PR checkpoint, stop before any of the following choices/actions:
 
-- selecting/activating a real model/runtime provider;
-- selecting an embedding provider;
-- selecting a vector database;
-- production knowledge ingestion/source-set decision;
-- real provider credentials;
-- paid service;
-- production deployment/wiring;
-- irreversible migration/deletion;
-- merge to `main`.
+1. selecting a real model/runtime provider;
+2. selecting model family/model tier and fallback strategy;
+3. selecting an embedding provider/model;
+4. selecting a vector DB or retrieval/indexing engine;
+5. approving the production Knowledge source set;
+6. defining production ingestion, refresh, retention and deletion policy;
+7. deciding whether/when to add a Weather tool/provider;
+8. configuring AI/provider credentials;
+9. enabling production AI/RAG wiring;
+10. using a paid service;
+11. production deployment;
+12. irreversible migration/deletion;
+13. merge to `main`.
+
+These are product/technical decisions and require explicit confirmation.
 
 ## Later roadmap — not started
 
+- real AI/model runtime adapter;
+- production Knowledge ingestion/retrieval;
+- embedding/vector infrastructure;
 - Budget provider inputs / Currency contract;
 - real Legal source adapters;
 - real Map adapter/provider activation;
