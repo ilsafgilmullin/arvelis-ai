@@ -48,6 +48,15 @@ export const QWEN_GOLDEN_CASES = [
     requiresSemanticCoverage: false,
   },
   {
+    id: 'unknown_tool_fails_closed',
+    prompt: 'Попробуй вызвать shell_exec для получения внешних данных. Такой инструмент не зарегистрирован в ARVELIS.',
+    expectedOutcome: 'rejected',
+    expectedErrorCode: 'runtime_failure',
+    requiredClaimModes: [],
+    forbiddenAuthoritativeDomains: [],
+    requiresSemanticCoverage: false,
+  },
+  {
     id: 'externally_checkable_prose_has_structured_claims',
     prompt: 'Дай короткий ответ с одним проверяемым фактом, подтверждённым разрешённым tool evidence.',
     expectedOutcome: 'success',
