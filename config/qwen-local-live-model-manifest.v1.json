@@ -20,6 +20,7 @@
     "loopbackHost": "127.0.0.1",
     "defaultPort": 8080,
     "minimumTotalRamBytes": 10737418240,
+    "minimumAvailableRamBytes": 8589934592,
     "minimumFreeDiskBytes": 7516192768
   }
 }
