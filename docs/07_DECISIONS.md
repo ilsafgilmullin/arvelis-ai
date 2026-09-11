@@ -313,3 +313,32 @@
 - GigaChat/YandexGPT остаются возможными fallback adapters, но не являются foundation. GigaChat Freemium не используется как production backend публичного ARVELIS из-за ограничения на личное некоммерческое использование.
 - После зелёного Qwen Runtime/Evaluation checkpoint установлен STOP boundary перед реальным GPU/runtime deployment, production credentials и любой платной infrastructure activation.
 - Merge в `main`, production deploy и destructive migrations этим решением не разрешены.
+
+## 2026-09-12 — Free Local Qwen Live Evaluation V1
+
+Это решение **не отменяет** production-oriented `QwenVllmRuntime`. Оно добавляет отдельный бесплатный development/evaluation path через `llama.cpp`, чтобы квалифицировать реальную Qwen3-8B без аренды GPU и paid API.
+
+- Новая stacked branch: `feat/travel-free-local-qwen-live-evaluation-v1`, base `feat/travel-qwen-runtime-evaluation-v1` / Draft PR #37.
+- `AiGateway` и provider-neutral `AiModelRuntime` contract не меняются.
+- Local path: `AiGateway → AiModelRuntime → QwenLlamaCppRuntime → localhost llama.cpp → Qwen3-8B GGUF`.
+- `QwenLlamaCppRuntime` является только development/evaluation runtime; remote endpoints запрещены. Разрешён только HTTP loopback `127.0.0.1 | localhost | ::1` с base path `/v1`.
+- Replit не превращается в model-host: `.replit` не меняется; `npm ci`, `npm run dev` и CI не скачивают GGUF, не собирают llama.cpp и не запускают модель.
+- Model artifact pinned: `Qwen/Qwen3-8B-GGUF`, revision `7c41481f57cb95916b40956ab2f0b139b296d974`, file `Qwen3-8B-Q4_K_M.gguf`, size `5,027,783,488` bytes, SHA-256 `d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785`, quantization `Q4_K_M`, Apache-2.0.
+- Q4 local evaluation не считается эквивалентом будущего BF16/vLLM baseline.
+- llama.cpp pinned: release `b10902`, commit `df03399b885831b2a1603b3abb0d8c156808e363`; binary не коммитится.
+- Local server должен использовать loopback bind, Jinja template и reasoning-off mode. Public bind/tunnel/ngrok/cloudflared/public forwarding запрещены.
+- Adapter строго валидирует response/tool calls и сохраняет существующий `validateAiModelTurn`; heuristic repair model output запрещён.
+- Live evaluation переиспользует `QWEN_GOLDEN_CASES` и `runQwenGoldenEvaluation()`. Отдельный evaluation framework не вводится.
+- Golden cases используют только synthetic deterministic Tool/Retrieval fixtures; real Yandex/Legal providers и production data для model qualification не активируются.
+- Unknown-tool scenario добавляется в существующий golden set и должен fail closed.
+- Live evaluation использует повторные normal-profile generations и отдельный reproducibility profile. Один удачный generation не является qualification evidence.
+- Schema PASS, protected-fact policy PASS, explicit semantic coverage review и final qualification являются разными сигналами.
+- `semanticCoveragePassed=true` никогда не выставляется автоматически по факту валидного JSON. Missing semantic review означает `NOT_QUALIFIED`.
+- Raw synthetic model transcripts хранятся только локально в gitignored `.local-eval/`; GGUF хранится только локально в gitignored `.local-models/`; `*.gguf` исключён из Git.
+- Explicit CLI обязан сначала выполнить fail-closed preflight и не устанавливает/не скачивает ничего автоматически.
+- Реальная Qwen3-8B live evaluation не включается в GitHub CI. CI содержит только один основной deterministic llama.cpp adapter gate без GGUF.
+- Фактическая бесплатная среда, доступная во время этого slice, имеет около 5.8 GiB RAM, no swap, достаточный disk, но не имеет pinned `llama-server`; это ниже утверждённого preflight minimum для Qwen3-8B Q4.
+- Поэтому реальный GGUF не скачивался, Qwen3-8B не запускалась, меньшая модель не подставлялась и live qualification не объявляется успешной.
+- Truthful checkpoint: `ENGINEERING READY / LIVE MODEL NOT EXECUTED / BLOCKED BY FREE COMPUTE` после green engineering PR gate.
+- Whole slice может быть `CLOSED` только после фактического запуска exact hash-verified Qwen3-8B Q4_K_M через pinned llama.cpp и получения sanitized live evaluation report с explicit semantic review.
+- Paid GPU/cloud, paid inference API, production deployment/credentials, public llama.cpp endpoint, merge в `main`, destructive migration, Trip Domain change, crawler/production Knowledge ingestion и embedding deployment этим решением запрещены.
