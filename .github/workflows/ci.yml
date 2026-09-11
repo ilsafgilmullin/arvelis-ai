@@ -88,6 +88,9 @@ jobs:
       - name: Frontend build
         run: npm run build
 
+      - name: Full npm check checkpoint
+        run: npm run check
+
   postgres-compat:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
