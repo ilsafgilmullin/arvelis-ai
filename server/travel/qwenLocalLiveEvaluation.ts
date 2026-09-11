@@ -1,6 +1,6 @@
-import { mkdir, readFile, writeFile, appendFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
+import { resolve } from 'node:path';
 import { AiGateway, AiGatewayError } from './aiGateway';
 import type { KnowledgeRetriever } from './aiEnginePorts';
 import { AiToolRegistry } from './aiToolRegistry';
@@ -14,6 +14,7 @@ import {
 } from './qwenGoldenEvaluation';
 import {
   QWEN_LLAMACPP_ADAPTER_VERSION,
+  QWEN_LLAMACPP_RUNTIME_ID,
   QwenLlamaCppRuntime,
   QwenLlamaCppRuntimeError,
   type QwenLlamaCppLocalExchange,
@@ -21,11 +22,11 @@ import {
 } from './runtimes/qwenLlamaCppRuntime';
 
 const PROTECTED_DOMAINS = new Set(['transport_schedule', 'price', 'availability', 'map_route', 'legal', 'weather']);
-const CURRENT_TOOL_CASES = new Set<QwenGoldenCaseId>([
+const CURRENT_TRANSPORT_CASES = new Set<QwenGoldenCaseId>([
   'tool_backed_price_can_be_authoritative',
   'externally_checkable_prose_has_structured_claims',
 ]);
-const STALE_TOOL_CASES = new Set<QwenGoldenCaseId>(['stale_protected_fact_fails_closed']);
+const STALE_TRANSPORT_CASES = new Set<QwenGoldenCaseId>(['stale_protected_fact_fails_closed']);
 
 export type QwenLocalSemanticReview = Partial<Record<QwenGoldenCaseId, boolean>>;
 
@@ -71,10 +72,7 @@ export type QwenLocalLiveEvaluationReport = {
     modelId: string;
     contextSize: number;
   };
-  samplingProfiles: Array<{
-    id: QwenLlamaCppSamplingProfile;
-    runsPerCase: number;
-  }>;
+  samplingProfiles: Array<{ id: QwenLlamaCppSamplingProfile; runsPerCase: number }>;
   casesAttempted: QwenGoldenCaseId[];
   attempts: number;
   structuredValidationRate: number;
@@ -91,16 +89,8 @@ export type QwenLocalLiveEvaluationReport = {
   }>;
   timeoutCount: number;
   errorCount: number;
-  latencyMs: {
-    min: number | null;
-    p50: number | null;
-    p95: number | null;
-    max: number | null;
-  };
-  predictedTokensPerSecond: {
-    samples: number;
-    p50: number | null;
-  };
+  latencyMs: { min: number | null; p50: number | null; p95: number | null; max: number | null };
+  predictedTokensPerSecond: { samples: number; p50: number | null };
   goldenRuns: Array<{
     samplingProfile: QwenLlamaCppSamplingProfile;
     run: number;
@@ -129,6 +119,12 @@ type LiveConfig = {
   semanticReview: QwenLocalSemanticReview;
 };
 
+type GoldenRun = {
+  profile: QwenLlamaCppSamplingProfile;
+  run: number;
+  report: QwenGoldenEvaluationReport;
+};
+
 function requiredEnv(name: string): string {
   const value = process.env[name];
   if (!value || value.trim() !== value) throw new Error(`Missing or invalid ${name}.`);
@@ -148,9 +144,10 @@ async function loadSemanticReview(): Promise<QwenLocalSemanticReview> {
   if (!path) return {};
   const parsed = JSON.parse(await readFile(resolve(path), 'utf8')) as unknown;
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Semantic review file must contain a JSON object.');
+  const record = parsed as Record<string, unknown>;
   const review: QwenLocalSemanticReview = {};
   for (const testCase of QWEN_GOLDEN_CASES) {
-    const value = (parsed as Record<string, unknown>)[testCase.id];
+    const value = record[testCase.id];
     if (value !== undefined && typeof value !== 'boolean') throw new Error(`Semantic review for ${testCase.id} must be boolean.`);
     if (typeof value === 'boolean') review[testCase.id] = value;
   }
@@ -177,8 +174,8 @@ async function loadConfig(): Promise<LiveConfig> {
   };
 }
 
-function syntheticRetrieverFor(testCase: QwenGoldenCase): KnowledgeRetriever | null {
-  if (testCase.id !== 'knowledge_only_legal_fails_closed') return null;
+function retrieverFor(testCase: QwenGoldenCase): KnowledgeRetriever | undefined {
+  if (testCase.id !== 'knowledge_only_legal_fails_closed') return undefined;
   return {
     id: 'synthetic-legal-retriever',
     async retrieve(query) {
@@ -206,8 +203,8 @@ function syntheticRetrieverFor(testCase: QwenGoldenCase): KnowledgeRetriever | n
 }
 
 function toolRegistryFor(testCase: QwenGoldenCase): AiToolRegistry {
-  if (!CURRENT_TOOL_CASES.has(testCase.id) && !STALE_TOOL_CASES.has(testCase.id)) return new AiToolRegistry();
-  const freshness = STALE_TOOL_CASES.has(testCase.id) ? 'expired' as const : 'current' as const;
+  if (!CURRENT_TRANSPORT_CASES.has(testCase.id) && !STALE_TRANSPORT_CASES.has(testCase.id)) return new AiToolRegistry();
+  const freshness = STALE_TRANSPORT_CASES.has(testCase.id) ? 'expired' as const : 'current' as const;
   return new AiToolRegistry([{
     id: 'transport.search',
     async handler() {
@@ -228,9 +225,13 @@ function toolRegistryFor(testCase: QwenGoldenCase): AiToolRegistry {
   }]);
 }
 
-function semanticVerdict(testCase: QwenGoldenCase, review: QwenLocalSemanticReview): QwenGoldenObservation['semanticCoveragePassed'] {
-  if (!testCase.requiresSemanticCoverage) return undefined;
-  return review[testCase.id];
+function semanticObservationFields(
+  testCase: QwenGoldenCase,
+  review: QwenLocalSemanticReview,
+): Pick<QwenGoldenObservation, 'semanticCoveragePassed'> | Record<string, never> {
+  if (!testCase.requiresSemanticCoverage) return {};
+  const value = review[testCase.id];
+  return value === undefined ? {} : { semanticCoveragePassed: value };
 }
 
 function semanticLabel(testCase: QwenGoldenCase, review: QwenLocalSemanticReview): QwenLocalLiveAttempt['semanticCoverageVerdict'] {
@@ -239,32 +240,19 @@ function semanticLabel(testCase: QwenGoldenCase, review: QwenLocalSemanticReview
   return value === true ? 'pass' : value === false ? 'fail' : 'not_reviewed';
 }
 
-function runtimeErrorCode(error: unknown): string | undefined {
-  if (!(error instanceof AiGatewayError)) return undefined;
+function gatewayRuntimeErrorCode(error: AiGatewayError): string | undefined {
   const cause = Object.getOwnPropertyDescriptor(error, 'cause')?.value as unknown;
   return cause instanceof QwenLlamaCppRuntimeError ? cause.code : undefined;
-}
-
-function observationFromGatewayError(testCase: QwenGoldenCase, error: AiGatewayError, review: QwenLocalSemanticReview): QwenGoldenObservation {
-  return {
-    id: testCase.id,
-    outcome: 'rejected',
-    errorCode: error.code,
-    claims: [],
-    ...(testCase.requiresSemanticCoverage && review[testCase.id] !== undefined
-      ? { semanticCoveragePassed: review[testCase.id] }
-      : {}),
-  };
 }
 
 function aggregateExchangeMetrics(exchanges: readonly QwenLlamaCppLocalExchange[]) {
   const promptTokens = exchanges.reduce((sum, item) => sum + (item.promptTokens ?? 0), 0);
   const completionTokens = exchanges.reduce((sum, item) => sum + (item.completionTokens ?? 0), 0);
-  const tps = exchanges.flatMap((item) => item.predictedTokensPerSecond === undefined ? [] : [item.predictedTokensPerSecond]);
+  const speeds = exchanges.flatMap((item) => item.predictedTokensPerSecond === undefined ? [] : [item.predictedTokensPerSecond]);
   return {
     ...(promptTokens > 0 ? { promptTokens } : {}),
     ...(completionTokens > 0 ? { completionTokens } : {}),
-    ...(tps.length > 0 ? { predictedTokensPerSecond: tps.reduce((a, b) => a + b, 0) / tps.length } : {}),
+    ...(speeds.length > 0 ? { predictedTokensPerSecond: speeds.reduce((sum, item) => sum + item, 0) / speeds.length } : {}),
   };
 }
 
@@ -284,14 +272,14 @@ async function persistRawExchanges(
   }
 }
 
-function percentile(values: readonly number[], p: number): number | null {
+function percentile(values: readonly number[], fraction: number): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1));
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * fraction) - 1));
   return sorted[index] ?? null;
 }
 
-function roundMetric(value: number): number {
+function rounded(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
@@ -302,15 +290,12 @@ async function executeCase(
   testCase: QwenGoldenCase,
   attempts: QwenLocalLiveAttempt[],
 ): Promise<QwenGoldenObservation> {
-  const runtime = new QwenLlamaCppRuntime({
-    baseUrl: config.baseUrl,
-    model: config.modelId,
-    samplingProfile: profile,
-  });
+  const runtime = new QwenLlamaCppRuntime({ baseUrl: config.baseUrl, model: config.modelId, samplingProfile: profile });
   const requestId = `live-${profile}-${run}-${testCase.id}`;
+  const retriever = retrieverFor(testCase);
   const gateway = new AiGateway({
     runtime,
-    retriever: syntheticRetrieverFor(testCase),
+    ...(retriever ? { retriever } : {}),
     tools: toolRegistryFor(testCase),
     timeoutMs: 120_000,
     requestId: () => requestId,
@@ -336,53 +321,53 @@ async function executeCase(
     toolCallsExecuted = result.audit.toolCallsExecuted;
     const claims = result.answer.claims.map((claim) => {
       const evaluation = result.evaluation.find((item) => item.claimId === claim.id);
-      if (claim.mode === 'fact' && PROTECTED_DOMAINS.has(claim.domain) && evaluation?.authoritative !== true) {
-        protectedFactViolationCount += 1;
-      }
-      return {
-        domain: claim.domain,
-        mode: claim.mode,
-        authoritative: evaluation?.authoritative === true,
-      };
+      if (claim.mode === 'fact' && PROTECTED_DOMAINS.has(claim.domain) && evaluation?.authoritative !== true) protectedFactViolationCount += 1;
+      return { domain: claim.domain, mode: claim.mode, authoritative: evaluation?.authoritative === true };
     });
     protectedFactPolicyPassed = protectedFactViolationCount === 0;
     observation = {
       id: testCase.id,
       outcome: 'success',
       claims,
-      ...(testCase.requiresSemanticCoverage && semanticVerdict(testCase, config.semanticReview) !== undefined
-        ? { semanticCoveragePassed: semanticVerdict(testCase, config.semanticReview) }
-        : {}),
+      ...semanticObservationFields(testCase, config.semanticReview),
     };
   } catch (error) {
     if (!(error instanceof AiGatewayError)) throw error;
     gatewayError = error;
     toolCallsExecuted = error.audit?.toolCallsExecuted ?? 0;
-    const localRuntimeError = runtimeErrorCode(error);
-    schemaPassed = !(error.code === 'runtime_failure' && localRuntimeError === 'invalid_response');
-    protectedFactPolicyPassed = error.code === 'invalid_model_output' || error.code === 'runtime_failure' || error.code === 'tool_failure';
-    observation = observationFromGatewayError(testCase, error, config.semanticReview);
+    const runtimeCode = gatewayRuntimeErrorCode(error);
+    schemaPassed = !(error.code === 'runtime_failure' && runtimeCode === 'invalid_response');
+    protectedFactPolicyPassed = ['invalid_model_output', 'runtime_failure', 'tool_failure'].includes(error.code);
+    observation = {
+      id: testCase.id,
+      outcome: 'rejected',
+      errorCode: error.code,
+      claims: [],
+      ...semanticObservationFields(testCase, config.semanticReview),
+    };
   }
 
-  const elapsedMs = Math.max(0, performance.now() - startedAt);
+  const latencyMs = rounded(Math.max(0, performance.now() - startedAt));
   const exchanges = runtime.drainLocalExchanges();
   await persistRawExchanges(config.outputDir, profile, run, testCase.id, exchanges);
-  attempts.push({
+  const runtimeCode = gatewayError ? gatewayRuntimeErrorCode(gatewayError) : undefined;
+  const attempt: QwenLocalLiveAttempt = {
     caseId: testCase.id,
     samplingProfile: profile,
     run,
     outcome: observation.outcome,
     ...(gatewayError ? { errorCode: gatewayError.code } : {}),
-    ...(gatewayError && runtimeErrorCode(gatewayError) ? { runtimeErrorCode: runtimeErrorCode(gatewayError) } : {}),
+    ...(runtimeCode !== undefined ? { runtimeErrorCode: runtimeCode } : {}),
     schemaPassed,
     protectedFactPolicyPassed,
     protectedFactViolationCount,
     toolCallsExecuted,
     semanticCoverageVerdict: semanticLabel(testCase, config.semanticReview),
-    latencyMs: roundMetric(elapsedMs),
+    latencyMs,
     modelExchanges: exchanges.length,
     ...aggregateExchangeMetrics(exchanges),
-  });
+  };
+  attempts.push(attempt);
   return observation;
 }
 
@@ -391,8 +376,8 @@ async function runProfile(
   profile: QwenLlamaCppSamplingProfile,
   runs: number,
   attempts: QwenLocalLiveAttempt[],
-): Promise<Array<{ profile: QwenLlamaCppSamplingProfile; run: number; report: QwenGoldenEvaluationReport }>> {
-  const reports: Array<{ profile: QwenLlamaCppSamplingProfile; run: number; report: QwenGoldenEvaluationReport }> = [];
+): Promise<GoldenRun[]> {
+  const reports: GoldenRun[] = [];
   for (let run = 1; run <= runs; run += 1) {
     const report = await runQwenGoldenEvaluation((testCase) => executeCase(config, profile, run, testCase, attempts));
     reports.push({ profile, run, report });
@@ -400,48 +385,37 @@ async function runProfile(
   return reports;
 }
 
-function buildReport(
-  config: LiveConfig,
-  attempts: readonly QwenLocalLiveAttempt[],
-  goldenReports: readonly { profile: QwenLlamaCppSamplingProfile; run: number; report: QwenGoldenEvaluationReport }[],
-): QwenLocalLiveEvaluationReport {
+function buildReport(config: LiveConfig, attempts: readonly QwenLocalLiveAttempt[], goldenRuns: readonly GoldenRun[]): QwenLocalLiveEvaluationReport {
   const semanticCoverage = QWEN_GOLDEN_CASES
     .filter((testCase) => testCase.requiresSemanticCoverage)
-    .map((testCase) => ({
-      caseId: testCase.id,
-      verdict: config.semanticReview[testCase.id] === true
-        ? 'pass' as const
-        : config.semanticReview[testCase.id] === false
-          ? 'fail' as const
-          : 'not_reviewed' as const,
-    }));
+    .map((testCase) => {
+      const review = config.semanticReview[testCase.id];
+      return {
+        caseId: testCase.id,
+        verdict: review === true ? 'pass' as const : review === false ? 'fail' as const : 'not_reviewed' as const,
+      };
+    });
+  const protectedFactViolations = attempts.reduce((sum, item) => sum + item.protectedFactViolationCount, 0);
+  const timeoutCount = attempts.filter((item) => item.errorCode === 'timeout' || item.runtimeErrorCode === 'timeout').length;
   const qualificationReasons: string[] = [];
-  if (goldenReports.some(({ report }) => !report.passed)) qualificationReasons.push('one_or_more_golden_runs_failed');
+  if (goldenRuns.some((item) => !item.report.passed)) qualificationReasons.push('one_or_more_golden_runs_failed');
   if (semanticCoverage.some((item) => item.verdict === 'not_reviewed')) qualificationReasons.push('semantic_review_incomplete');
   if (semanticCoverage.some((item) => item.verdict === 'fail')) qualificationReasons.push('semantic_coverage_failed');
-  const protectedFactViolations = attempts.reduce((sum, item) => sum + item.protectedFactViolationCount, 0);
   if (protectedFactViolations > 0) qualificationReasons.push('protected_fact_violation');
-  const latency = attempts.map((item) => item.latencyMs);
-  const tps = attempts.flatMap((item) => item.predictedTokensPerSecond === undefined ? [] : [item.predictedTokensPerSecond]);
-  const timeoutCount = attempts.filter((item) => item.errorCode === 'timeout' || item.runtimeErrorCode === 'timeout').length;
   if (timeoutCount > 0) qualificationReasons.push('timeout_observed');
-  const errorCount = attempts.filter((item) => item.outcome === 'rejected').length;
-  const toolCaseIds = new Set<QwenGoldenCaseId>([
+
+  const latencies = attempts.map((item) => item.latencyMs);
+  const speeds = attempts.flatMap((item) => item.predictedTokensPerSecond === undefined ? [] : [item.predictedTokensPerSecond]);
+  const p50Latency = percentile(latencies, 0.5);
+  const p95Latency = percentile(latencies, 0.95);
+  const p50Speed = percentile(speeds, 0.5);
+  const toolCases = new Set<QwenGoldenCaseId>([
     'tool_backed_price_can_be_authoritative',
     'stale_protected_fact_fails_closed',
     'externally_checkable_prose_has_structured_claims',
     'unknown_tool_fails_closed',
   ]);
-  const toolSelection = QWEN_GOLDEN_CASES
-    .filter((testCase) => toolCaseIds.has(testCase.id))
-    .map((testCase) => {
-      const items = attempts.filter((attempt) => attempt.caseId === testCase.id);
-      return {
-        caseId: testCase.id,
-        attempts: items.length,
-        attemptsWithExecutedTool: items.filter((item) => item.toolCallsExecuted > 0).length,
-      };
-    });
+
   return {
     version: 1,
     generatedAt: new Date().toISOString(),
@@ -459,7 +433,7 @@ function buildReport(
       observedVersion: config.llamaCppObservedVersion,
     },
     runtime: {
-      adapterId: 'qwen3-8b-llamacpp-local-v1',
+      adapterId: QWEN_LLAMACPP_RUNTIME_ID,
       adapterVersion: QWEN_LLAMACPP_ADAPTER_VERSION,
       baseUrl: config.baseUrl,
       modelId: config.modelId,
@@ -471,29 +445,36 @@ function buildReport(
     ],
     casesAttempted: QWEN_GOLDEN_CASES.map((testCase) => testCase.id),
     attempts: attempts.length,
-    structuredValidationRate: attempts.length === 0 ? 0 : roundMetric(attempts.filter((item) => item.schemaPassed).length / attempts.length),
-    protectedFactPolicyRate: attempts.length === 0 ? 0 : roundMetric(attempts.filter((item) => item.protectedFactPolicyPassed).length / attempts.length),
+    structuredValidationRate: attempts.length === 0 ? 0 : rounded(attempts.filter((item) => item.schemaPassed).length / attempts.length),
+    protectedFactPolicyRate: attempts.length === 0 ? 0 : rounded(attempts.filter((item) => item.protectedFactPolicyPassed).length / attempts.length),
     protectedFactViolations,
     semanticCoverage,
-    toolSelection,
+    toolSelection: QWEN_GOLDEN_CASES.filter((testCase) => toolCases.has(testCase.id)).map((testCase) => {
+      const relevant = attempts.filter((item) => item.caseId === testCase.id);
+      return {
+        caseId: testCase.id,
+        attempts: relevant.length,
+        attemptsWithExecutedTool: relevant.filter((item) => item.toolCallsExecuted > 0).length,
+      };
+    }),
     timeoutCount,
-    errorCount,
+    errorCount: attempts.filter((item) => item.outcome === 'rejected').length,
     latencyMs: {
-      min: latency.length === 0 ? null : roundMetric(Math.min(...latency)),
-      p50: percentile(latency, 0.5) === null ? null : roundMetric(percentile(latency, 0.5)!),
-      p95: percentile(latency, 0.95) === null ? null : roundMetric(percentile(latency, 0.95)!),
-      max: latency.length === 0 ? null : roundMetric(Math.max(...latency)),
+      min: latencies.length === 0 ? null : rounded(Math.min(...latencies)),
+      p50: p50Latency === null ? null : rounded(p50Latency),
+      p95: p95Latency === null ? null : rounded(p95Latency),
+      max: latencies.length === 0 ? null : rounded(Math.max(...latencies)),
     },
     predictedTokensPerSecond: {
-      samples: tps.length,
-      p50: percentile(tps, 0.5) === null ? null : roundMetric(percentile(tps, 0.5)!),
+      samples: speeds.length,
+      p50: p50Speed === null ? null : rounded(p50Speed),
     },
-    goldenRuns: goldenReports.map(({ profile, run, report }) => ({
-      samplingProfile: profile,
-      run,
-      passed: report.passed,
-      missing: [...report.missing],
-      failed: [...report.failed],
+    goldenRuns: goldenRuns.map((item) => ({
+      samplingProfile: item.profile,
+      run: item.run,
+      passed: item.report.passed,
+      missing: [...item.report.missing],
+      failed: [...item.report.failed],
     })),
     qualificationReasons,
   };
