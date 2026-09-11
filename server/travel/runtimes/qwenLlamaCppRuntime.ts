@@ -41,6 +41,17 @@ export type QwenLlamaCppRuntimeErrorCode =
   | 'response_too_large'
   | 'invalid_response';
 
+export type QwenLlamaCppLocalExchange = {
+  requestId: string;
+  status: number;
+  elapsedMs: number;
+  requestBody: string;
+  responseBody: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  predictedTokensPerSecond?: number;
+};
+
 export class QwenLlamaCppRuntimeError extends Error {
   constructor(
     readonly code: QwenLlamaCppRuntimeErrorCode,
@@ -87,6 +98,10 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
+}
+
+function finiteNonNegative(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
 function normalizeLoopbackBaseUrl(raw: string): URL {
@@ -301,6 +316,20 @@ function parseLlamaCppResponse(candidate: unknown, input: AiRuntimeInput): AiMod
   return parseAnswerContent(message.content, input);
 }
 
+function exchangeMetrics(body: unknown): Pick<QwenLlamaCppLocalExchange, 'promptTokens' | 'completionTokens' | 'predictedTokensPerSecond'> {
+  if (!isPlainRecord(body)) return {};
+  const usage = isPlainRecord(body.usage) ? body.usage : undefined;
+  const timings = isPlainRecord(body.timings) ? body.timings : undefined;
+  const promptTokens = finiteNonNegative(usage?.prompt_tokens);
+  const completionTokens = finiteNonNegative(usage?.completion_tokens);
+  const predictedTokensPerSecond = finiteNonNegative(timings?.predicted_per_second);
+  return {
+    ...(promptTokens !== undefined ? { promptTokens } : {}),
+    ...(completionTokens !== undefined ? { completionTokens } : {}),
+    ...(predictedTokensPerSecond !== undefined ? { predictedTokensPerSecond } : {}),
+  };
+}
+
 async function readBoundedText(response: Response): Promise<string> {
   const contentLength = Number(response.headers.get('content-length'));
   if (Number.isFinite(contentLength) && contentLength > QWEN_LLAMACPP_MAX_RESPONSE_BYTES) {
@@ -333,6 +362,7 @@ export class QwenLlamaCppRuntime implements AiModelRuntime {
   private readonly maxTokens: number;
   private readonly samplingProfile: QwenLlamaCppSamplingProfile;
   private readonly fetchImpl: typeof fetch;
+  private readonly localExchanges: QwenLlamaCppLocalExchange[] = [];
 
   constructor(options: QwenLlamaCppRuntimeOptions) {
     this.baseUrl = normalizeLoopbackBaseUrl(options.baseUrl);
@@ -353,6 +383,10 @@ export class QwenLlamaCppRuntime implements AiModelRuntime {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
+  drainLocalExchanges(): QwenLlamaCppLocalExchange[] {
+    return this.localExchanges.splice(0, this.localExchanges.length).map((exchange) => ({ ...exchange }));
+  }
+
   async generate(input: AiRuntimeInput, signal: AbortSignal): Promise<AiModelTurn> {
     if (signal.aborted) throw new QwenLlamaCppRuntimeError('aborted', 'Local llama.cpp request was cancelled before execution.');
     const controller = new AbortController();
@@ -367,6 +401,8 @@ export class QwenLlamaCppRuntime implements AiModelRuntime {
       timedOut = true;
       controller.abort(new Error('qwen-llamacpp-timeout'));
     }, this.timeoutMs);
+    const requestBody = JSON.stringify(requestPayload(input, this.model, this.maxTokens, this.samplingProfile));
+    const startedAt = performance.now();
 
     try {
       let response: Response;
@@ -375,7 +411,7 @@ export class QwenLlamaCppRuntime implements AiModelRuntime {
           method: 'POST',
           redirect: 'error',
           headers: { 'content-type': 'application/json', accept: 'application/json' },
-          body: JSON.stringify(requestPayload(input, this.model, this.maxTokens, this.samplingProfile)),
+          body: requestBody,
           signal: controller.signal,
         });
       } catch (error) {
@@ -385,14 +421,24 @@ export class QwenLlamaCppRuntime implements AiModelRuntime {
       }
 
       const text = await readBoundedText(response);
-      if (!response.ok) {
-        throw new QwenLlamaCppRuntimeError('http_error', `Local llama.cpp returned HTTP ${response.status}.`, { status: response.status });
-      }
+      const elapsedMs = Math.max(0, performance.now() - startedAt);
       let body: unknown;
       try {
         body = JSON.parse(text) as unknown;
       } catch (error) {
+        this.localExchanges.push({ requestId: input.requestId, status: response.status, elapsedMs, requestBody, responseBody: text });
         throw new QwenLlamaCppRuntimeError('invalid_response', 'Local llama.cpp response body is not valid JSON.', { cause: error });
+      }
+      this.localExchanges.push({
+        requestId: input.requestId,
+        status: response.status,
+        elapsedMs,
+        requestBody,
+        responseBody: text,
+        ...exchangeMetrics(body),
+      });
+      if (!response.ok) {
+        throw new QwenLlamaCppRuntimeError('http_error', `Local llama.cpp returned HTTP ${response.status}.`, { status: response.status });
       }
       return parseLlamaCppResponse(body, input);
     } finally {
