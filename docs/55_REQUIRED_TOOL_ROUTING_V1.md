@@ -1,6 +1,6 @@
 # ARVELIS AI — Required Tool Routing V1
 
-**Status:** `RUN #8 REVIEWED: NOT_QUALIFIED / POST-TOOL POLICY V3 AWAITING LIVE EVALUATION`
+**Status:** `V3 TARGET SEMANTICS REVIEWED: 8/8; FINAL EXACT-HEAD QUALIFICATION RECORDED IN PR #39`
 
 ## Why this slice exists
 
@@ -141,9 +141,49 @@ There are no fixture values or fixture evidence IDs in this policy. Requests wit
 
 The deterministic regression first failed against V2 and then passed with V3. It uses the existing golden price prompt, checks current/expired phase handling and unchanged pre-tool requests, and replays the observed defective model output to prove it remains observable rather than being rewritten from claims. This verifies request construction only; a new real pinned-model run must prove V3's semantics.
 
+## V3 diagnostic run #9: complete raw review
+
+Run `34776982807` (number `9`) completed successfully on runtime SHA `cc05aadd8c104210005335931f971679d14cfd0e`, adapter version `3`. Artifact `10324178023` was downloaded and its ZIP SHA-256 matched `d799b800283e07787204e9a0bc28adbe3576e9c69d6512844e22f82a9689f946`.
+
+Reviewed sources: `report-1789327956881.json`, `models.json`, `llama-server.log`, the GitHub job log, and every target/stale response in the four raw JSONL files. Job logs confirm the exact runtime checkout, model checksum `d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785`, pinned llama.cpp commit `df03399b885831b2a1603b3abb0d8c156808e363`, CPU-only execution and loopback binding. Every target/stale request contains the V3 response task. Sampling remains normal `0.7/0.8/20/seed=-1` and reproducible `0/1/1/seed=424242`; maximum output remains 2048 tokens.
+
+All target responses refer to the same current synthetic evidence described for run #8: `tool:required-transport-search-v1:synthetic-price-current`, domain `price`, provider `synthetic-transport-provider`, value **12345 RUB**. This is evaluation data, not a real ticket price.
+
+| Case | Attempt | Final message | Structured statement | Verdict |
+| --- | --- | --- | --- | --- |
+| `tool_backed_price_can_be_authoritative` | normal 1 | 12345 RUB | normalized provider price is 12345 RUB. | PASS |
+| `tool_backed_price_can_be_authoritative` | normal 2 | 12345 RUB | normalized provider price is 12345 RUB. | PASS |
+| `tool_backed_price_can_be_authoritative` | normal 3 | 12345 RUB | 12345 RUB | PASS |
+| `tool_backed_price_can_be_authoritative` | reproducible 1 | 12345 RUB | normalized provider price is 12345 RUB. | PASS |
+| `externally_checkable_prose_has_structured_claims` | normal 1 | Синтетическая оценка только: нормализованная цена поставщика составляет 12345 РУБ. | Same statement as message | PASS |
+| `externally_checkable_prose_has_structured_claims` | normal 2 | Стоимость проезда составляет 12345 RUB. | Same statement as message | PASS |
+| `externally_checkable_prose_has_structured_claims` | normal 3 | Стоимость проезда составляет 12345 RUB. | Same statement as message | PASS |
+| `externally_checkable_prose_has_structured_claims` | reproducible 1 | Стоимость проезда составляет 12345 RUB. | Same statement as message | PASS |
+
+For **each of the eight rows**, the original requested supported price is directly visible, the claim carries the same amount/currency, `mode=fact`, `domain=price`, and its `evidenceIds` array contains exactly the supplied existing current tool evidence ID. The normalized evidence is present before generation; the report records required tool execution **4/4 + 4/4**. Each attempt has a single successful model exchange with `finish_reason=stop`, no model-native tool call and no tool-execution narration in final prose. No invented evidence IDs, tools or extra travel facts are present. Unchanged validators accept all eight and evaluate their claims as authoritative from `tool_evidence`. These are manual semantic verdicts, not verdicts inferred from JSON validity.
+
+### Freshness, full golden results and qualification boundary
+
+The stale fixture is executed **4/4**, always with `tool:required-transport-search-v1:synthetic-price-expired`, `freshness=expired` and the 2025 retrieval date. Three messages explicitly decline to provide current information; normal 3 echoes the fixture's explicitly expired past price. All four still emit a `price/fact` claim against expired evidence. The unchanged validator rejects **4/4** with `protected_fact_requires_tool_evidence`, and the evaluator marks those claims non-authoritative (`stale_or_unknown`). No expired value is accepted as a current authoritative fact. Enforcement by the gateway remains necessary; this result does not claim the model always omits invalid stale claims.
+
+All 28 raw answers were replayed through unchanged shape/reference/protected-fact validation: **0 shape failures, 0 unknown references**. The eight expected protected-policy rejections are four stale and four knowledge-only legal attempts. The sanitized report records:
+
+- attempts: `28`; structured validation: `100%`; protected-fact policy: `100%`;
+- protected-fact violations: `0`; timeouts: `0`; runtime timeout remains 90 seconds and evaluation gateway timeout remains 120 seconds;
+- latency p50 `34963.47 ms`, p95 `59041.77 ms`, max `62815.83 ms`;
+- required transport routing: `4/4` for each target semantic case, `4/4` for stale, `0/4` for unavailable/unknown tools;
+- three normal golden runs plus one reproducibility run, each with no missing cases and only the two still-unreviewed semantic cases marked failed;
+- report status **NOT_QUALIFIED**, reasons `one_or_more_golden_runs_failed` and `semantic_review_incomplete`, because the review file was intentionally still `{}` during this diagnostic run.
+
+The **8/8 manual PASS** above justifies recording `true` only for `tool_backed_price_can_be_authoritative` and `externally_checkable_prose_has_structured_claims` in a subsequent, separate semantic-review commit. It does not turn run #9 into final qualification of that later HEAD. A fresh live run and fresh raw review are mandatory after the semantic commit; their final SHA/run IDs and verdict belong in PR #39's description without another code/documentation commit.
+
+CI for this runtime is also verified: push run `34776982831` checks exact SHA `cc05aadd8c104210005335931f971679d14cfd0e` and passes `validate`/full `npm run check`; PR run `34776986334` passes both `validate` and `postgres-compat`. The PR CI merge tree equals the HEAD tree (`401303be5122d163adebef60c1ff0547c23b47fd`). Local typecheck, smoke gates and both builds passed; local full check stopped only because Chrome was unavailable, while both GitHub CI browser checks passed at 390x844. No browser gate was skipped or changed to obtain CI success.
+
+One additional limitation was observed outside the two reviewed semantic cases: general-advice responses sometimes put a title or `success` in `message` while keeping advice in inference claims. Its existing golden case checks inference policy; it does not qualify general-advice prose quality. No semantic verdict is recorded for that case, and no broader product-readiness claim is made. Golden definitions and evaluator requirements remain unchanged.
+
 ## Semantic review boundary
 
-The semantic review file remains deliberately empty while V3 is under live evaluation. Verdicts from pre-router behavior or from run #7/#8 cannot be promoted to `true` by schema success alone.
+The semantic review file was deliberately empty for V3 diagnostic run #9. Only the eight manually reviewed V3 target responses above support the subsequent two semantic verdicts. Verdicts from pre-router behavior or from run #7/#8 cannot be promoted to `true` by schema success alone.
 
 A semantic `true` may be committed only if a new real pinned-model run demonstrates, across every required normal/reproducible attempt, that:
 
@@ -173,7 +213,7 @@ If any reviewed attempt violates these requirements, the verdict remains unset/f
 
 Diagnostic V2 live run #8 (`34773234796`) was triggered from runtime commit `448af4aefa9caa4832b541aa106f31b3b1797d8c`. It must be treated as diagnostic evidence because later test/documentation commits advance the branch HEAD without changing runtime semantics.
 
-Run #8 is reviewed above and does not justify semantic pass. The next V3 run must be downloaded and manually reviewed. If both semantic cases pass all four attempts, documentation is finalized first, semantic review is committed last, and a final exact-HEAD live qualification run is required.
+Run #8 is reviewed above and does not justify semantic pass. V3 run #9 has now been downloaded and manually reviewed: both semantic cases pass all four attempts. Documentation is finalized first, semantic review is committed last, and a final exact-HEAD live qualification run plus independent raw review is required. See PR #39's description for the final qualification checkpoint.
 
 The final exact-HEAD run must preserve:
 
