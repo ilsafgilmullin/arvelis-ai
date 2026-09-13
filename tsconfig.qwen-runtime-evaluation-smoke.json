@@ -21,6 +21,7 @@
     "server/travel/aiGateway.ts",
     "server/travel/runtimes/qwenVllmRuntime.ts",
     "server/travel/qwenGoldenEvaluation.ts",
-    "tests/qwen-runtime-evaluation-smoke.ts"
+    "tests/qwen-runtime-evaluation-smoke.ts",
+    "tests/required-tool-routing-smoke.ts"
   ]
 }

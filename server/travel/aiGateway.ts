@@ -10,6 +10,8 @@ import {
   type AiEvidence,
   type AiGatewayRequest,
   type AiStructuredAnswer,
+  type AiToolCall,
+  type AiToolDescriptor,
   type AiValidationError,
 } from '../../src/travel/aiKnowledgeContracts';
 import type { AiGatewayServerContext, AiModelRuntime, KnowledgeRetriever, KnowledgeQuery } from './aiEnginePorts';
@@ -19,6 +21,8 @@ export const DEFAULT_AI_GATEWAY_TIMEOUT_MS = 30_000;
 export const MAX_AI_GATEWAY_TIMEOUT_MS = 120_000;
 export const MAX_AI_TOOL_ROUNDS = 2;
 export const MAX_AI_EVIDENCE_ITEMS = 128;
+export const REQUIRED_TRANSPORT_TOOL_ROUTING_VERSION = 1 as const;
+export const REQUIRED_TRANSPORT_TOOL_CALL_ID = 'required-transport-search-v1';
 
 export type AiGatewayErrorCode =
   | 'invalid_input'
@@ -74,6 +78,8 @@ export class AiGatewayError extends Error {
 const SAFE_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const TIMEOUT_MARKER = Symbol('ai-gateway-timeout');
 const ABORT_MARKER = Symbol('ai-gateway-abort');
+const TRANSPORT_CONTEXT_PATTERN = /(?:билет|поезд|самол[её]т|автобус|электричк|рейс|транспорт)/iu;
+const LIVE_TRANSPORT_FACT_PATTERN = /(?:цен|стоимост|расписан|отправлен|прибыт|наличи|доступн|свободн(?:ое|ые)?\s+мест)/iu;
 
 function validScope(value: string): boolean {
   return value.length > 0 && value.length <= 128 && value.trim() === value;
@@ -81,6 +87,27 @@ function validScope(value: string): boolean {
 
 function validId(value: string): boolean {
   return SAFE_IDENTIFIER.test(value);
+}
+
+function requiredTransportSearchCall(
+  request: AiGatewayRequest,
+  connectedTools: readonly AiToolDescriptor[],
+  evidence: readonly AiEvidence[],
+): AiToolCall | null {
+  if (request.scope !== 'trip') return null;
+  if (!connectedTools.some((tool) => tool.id === 'transport.search')) return null;
+  if (evidence.some((item) => item.origin === 'tool' && item.toolId === 'transport.search')) return null;
+
+  const prompt = request.prompt.toLocaleLowerCase('ru-RU');
+  const explicitlyRequired = prompt.includes('transport.search') || prompt.includes('transport_search');
+  const liveTransportFactRequested = TRANSPORT_CONTEXT_PATTERN.test(prompt) && LIVE_TRANSPORT_FACT_PATTERN.test(prompt);
+  if (!explicitlyRequired && !liveTransportFactRequested) return null;
+
+  return {
+    id: REQUIRED_TRANSPORT_TOOL_CALL_ID,
+    toolId: 'transport.search',
+    input: { intent: 'required-live-transport' },
+  };
 }
 
 export class AiGateway {
@@ -239,6 +266,29 @@ export class AiGateway {
       }
 
       const connectedTools = this.tools.listConnectedTools();
+      const executeToolCall = async (call: AiToolCall): Promise<void> => {
+        try {
+          const toolEvidence = await this.tools.execute(call, {
+            accountScopeId: context.accountScopeId,
+            ...(context.authorizedTripId ? { authorizedTripId: context.authorizedTripId } : {}),
+            requestId,
+            locale: request.locale,
+          }, controller.signal);
+          evidence.push(...toolEvidence);
+          toolCallsExecuted += 1;
+          if (evidence.length > MAX_AI_EVIDENCE_ITEMS) throw new AiToolRegistryError('invalid_tool_output', 'AI evidence budget exceeded.');
+        } catch (error) {
+          if (controller.signal.aborted) throw error;
+          throw new AiGatewayError('tool_failure', 'AI tool execution failed.', {
+            audit: this.audit(requestId, request, context, startedAt, 'tool_failure', { retrievalStatus, toolCallsExecuted, evidenceCount: evidence.length }),
+            cause: error,
+          });
+        }
+      };
+
+      const requiredTransportCall = requiredTransportSearchCall(request, connectedTools, evidence);
+      if (requiredTransportCall !== null) await executeToolCall(requiredTransportCall);
+
       for (let round = 0; round <= MAX_AI_TOOL_ROUNDS; round += 1) {
         let turn;
         try {
@@ -274,25 +324,7 @@ export class AiGateway {
               audit: this.audit(requestId, request, context, startedAt, 'invalid_model_output', { retrievalStatus, toolCallsExecuted, evidenceCount: evidence.length }),
             });
           }
-          for (const call of turn.calls) {
-            try {
-              const toolEvidence = await this.tools.execute(call, {
-                accountScopeId: context.accountScopeId,
-                ...(context.authorizedTripId ? { authorizedTripId: context.authorizedTripId } : {}),
-                requestId,
-                locale: request.locale,
-              }, controller.signal);
-              evidence.push(...toolEvidence);
-              toolCallsExecuted += 1;
-              if (evidence.length > MAX_AI_EVIDENCE_ITEMS) throw new AiToolRegistryError('invalid_tool_output', 'AI evidence budget exceeded.');
-            } catch (error) {
-              if (controller.signal.aborted) throw error;
-              throw new AiGatewayError('tool_failure', 'AI tool execution failed.', {
-                audit: this.audit(requestId, request, context, startedAt, 'tool_failure', { retrievalStatus, toolCallsExecuted, evidenceCount: evidence.length }),
-                cause: error,
-              });
-            }
-          }
+          for (const call of turn.calls) await executeToolCall(call);
           continue;
         }
 

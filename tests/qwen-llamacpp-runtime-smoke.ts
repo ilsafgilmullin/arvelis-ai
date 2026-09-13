@@ -3,15 +3,17 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AddressInfo } from 'node:net';
 import type { AiRuntimeInput } from '../server/travel/aiEnginePorts';
 import {
+  QWEN_LLAMACPP_ADAPTER_VERSION,
   QWEN_LLAMACPP_MAX_RESPONSE_BYTES,
   QwenLlamaCppRuntime,
   QwenLlamaCppRuntimeError,
 } from '../server/travel/runtimes/qwenLlamaCppRuntime';
 import { AI_TOOL_CATALOG } from '../src/travel/aiKnowledgeContracts';
+import { QWEN_GOLDEN_CASES } from '../server/travel/qwenGoldenEvaluation';
 
 const transportDescriptor = AI_TOOL_CATALOG.find((tool) => tool.id === 'transport.search')!;
 
-function runtimeInput(requestId: string, withTransport = false): AiRuntimeInput {
+function runtimeInput(requestId: string, withTransport = false, withTransportEvidence = false): AiRuntimeInput {
   return {
     version: 1,
     requestId,
@@ -19,7 +21,17 @@ function runtimeInput(requestId: string, withTransport = false): AiRuntimeInput 
     locale: 'ru-RU',
     scope: 'trip',
     tripId: 'synthetic-trip',
-    evidence: [],
+    evidence: withTransportEvidence ? [{
+      id: 'tool:required-transport-search-v1:synthetic-price-current',
+      origin: 'tool',
+      domain: 'price',
+      text: 'SYNTHETIC EVALUATION ONLY: normalized provider price is 12345 RUB.',
+      freshness: 'current',
+      sourceType: 'provider',
+      toolId: 'transport.search',
+      providerId: 'synthetic-transport-provider',
+      retrievedAt: '2026-09-13T00:00:00.000Z',
+    }] : [],
     tools: withTransport ? [{ ...transportDescriptor, allowedDomains: [...transportDescriptor.allowedDomains] }] : [],
   };
 }
@@ -75,6 +87,7 @@ async function expectRuntimeError(promise: Promise<unknown>, code: QwenLlamaCppR
 }
 
 async function main() {
+  assert.equal(QWEN_LLAMACPP_ADAPTER_VERSION, 3);
   const captured = new Map<string, Record<string, unknown>>();
   const server = createServer(async (req, res) => {
     if (req.method !== 'POST' || req.url !== '/v1/chat/completions') {
@@ -166,11 +179,71 @@ async function main() {
     const tools = payload.tools as Array<{ function?: { name?: string } }>;
     assert.deepEqual(tools.map((item) => item.function?.name), ['transport_search']);
     assert.equal(JSON.stringify(payload).includes('accountScopeId'), false);
+    const baseMessages = payload.messages as Array<{ content?: string }>;
+    assert.equal(baseMessages[0]?.content?.includes('server-side tool call has already completed'), false);
     const exchanges = runtime.drainLocalExchanges();
     assert.equal(exchanges.length, 1);
     assert.equal(exchanges[0]?.promptTokens, 100);
     assert.equal(exchanges[0]?.completionTokens, 20);
     assert.equal(exchanges[0]?.predictedTokensPerSecond, 12.5);
+
+    const postToolRuntime = new QwenLlamaCppRuntime({ baseUrl });
+    await postToolRuntime.generate(runtimeInput('post-tool-policy-case', true, true), new AbortController().signal);
+    const postToolPayload = captured.get('post-tool-policy-case')!;
+    const postToolMessages = postToolPayload.messages as Array<{ content?: string }>;
+    const postToolPolicy = postToolMessages[0]?.content ?? '';
+    const postToolContext = postToolMessages[1]?.content ?? '';
+    assert.equal(postToolPolicy.includes('server-side tool call has already completed'), true);
+    assert.equal(postToolPolicy.includes('state that supported fact directly in message'), true);
+    assert.equal(postToolPolicy.includes('Do not narrate, simulate, or repeat a completed tool call'), true);
+    assert.equal(postToolContext.includes('tool:required-transport-search-v1:synthetic-price-current'), true);
+    assert.equal(postToolContext.includes('"freshness":"current"'), true);
+
+    // Run #8 reproduced a status-only message despite a correct numeric claim.
+    // Lock the post-tool task at the model input boundary, without repairing output.
+    const pricePrompt = QWEN_GOLDEN_CASES.find((item) => item.id === 'tool_backed_price_can_be_authoritative')!.prompt;
+    const regressionInput = { ...runtimeInput('post-tool-regression-case', true, true), prompt: pricePrompt };
+    await postToolRuntime.generate(regressionInput, new AbortController().signal);
+    const regressionPayload = captured.get('post-tool-regression-case')!;
+    const regressionMessages = regressionPayload.messages as Array<{ role: string; content: string }>;
+    const responseTask = regressionMessages.at(-1)!;
+    assert.equal(responseTask.role, 'user');
+    assert.equal(responseTask.content.includes(pricePrompt), true, 'preserve the original user request');
+    assert.equal(responseTask.content.includes('CURRENT TASK: answer the informational request using the supplied evidence'), true);
+    assert.equal(responseTask.content.includes('numeric amount AND currency'), true);
+    assert.equal(responseTask.content.includes('Do not describe tool execution in message'), true);
+    assert.equal(responseTask.content.includes('exact existing evidence ID'), true);
+    assert.equal(responseTask.content.includes('expired or unknown'), true);
+    assert.equal(responseTask.content.includes('12345'), false, 'no fixture value in the response policy');
+    assert.equal(responseTask.content.includes('synthetic-price-current'), false, 'no fixture evidence ID in the response policy');
+    assert.equal(baseMessages.at(-1)?.content, runtimeInput('mapping-case').prompt, 'pre-tool prompt stays unchanged');
+
+    const staleInput = runtimeInput('post-tool-expired-policy-case', true, true);
+    staleInput.evidence[0] = { ...staleInput.evidence[0]!, freshness: 'expired' };
+    await postToolRuntime.generate(staleInput, new AbortController().signal);
+    const staleMessages = captured.get('post-tool-expired-policy-case')!.messages as Array<{ content: string }>;
+    assert.equal(staleMessages[1]?.content.includes('"freshness":"expired"'), true);
+    assert.equal(staleMessages.at(-1)?.content.includes('do not report a current protected fact'), true);
+
+    const defectiveAnswer = {
+      version: 1 as const,
+      requestId: 'status-only-regression-case',
+      message: 'Цена была успешно получена через вызов transport.search.',
+      claims: [{
+        id: 'price-claim', domain: 'price' as const,
+        statement: 'Цена составляет 12345 РУБ.', mode: 'fact' as const,
+        evidenceIds: ['tool:required-transport-search-v1:synthetic-price-current'],
+      }],
+    };
+    const unmodifiedOutput = await new QwenLlamaCppRuntime({
+      baseUrl,
+      fetchImpl: async () => new Response(JSON.stringify({ choices: [{
+        message: { role: 'assistant', content: JSON.stringify(defectiveAnswer) },
+      }] }), { headers: { 'content-type': 'application/json' } }),
+    }).generate(runtimeInput(defectiveAnswer.requestId, true, true), new AbortController().signal);
+    assert.equal(unmodifiedOutput.kind, 'answer');
+    if (unmodifiedOutput.kind === 'answer') assert.deepEqual(unmodifiedOutput.answer, defectiveAnswer,
+      'semantic defects must remain observable; the adapter must not rewrite message from claims');
 
     const reproducible = new QwenLlamaCppRuntime({ baseUrl, samplingProfile: 'reproducible' });
     await reproducible.generate(runtimeInput('repro-case'), new AbortController().signal);
