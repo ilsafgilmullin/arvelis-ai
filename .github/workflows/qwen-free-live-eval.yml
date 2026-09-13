@@ -19,7 +19,7 @@ permissions:
 
 concurrency:
   group: qwen-free-live-eval-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   live-qwen3-8b-cpu:
