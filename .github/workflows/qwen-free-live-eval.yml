@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - 'feat/travel-free-local-qwen-live-evaluation-v1'
+      - 'feat/travel-required-tool-routing-v1'
     paths:
       - '.github/workflows/qwen-free-live-eval.yml'
       - 'config/qwen-local-live-semantic-review.v1.json'
       - 'config/qwen-local-live-model-manifest.v1.json'
+      - 'server/travel/aiGateway.ts'
       - 'server/travel/qwenLocalLiveEvaluation.ts'
       - 'server/travel/runtimes/qwenLlamaCppRuntime.ts'
       - 'server/travel/qwenGoldenEvaluation.ts'
