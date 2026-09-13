@@ -15,7 +15,7 @@ export const QWEN_LLAMACPP_DEFAULT_TIMEOUT_MS = 90_000;
 export const QWEN_LLAMACPP_MAX_TIMEOUT_MS = 120_000;
 export const QWEN_LLAMACPP_DEFAULT_MAX_TOKENS = 2_048;
 export const QWEN_LLAMACPP_MAX_RESPONSE_BYTES = 1_000_000;
-export const QWEN_LLAMACPP_ADAPTER_VERSION = 2 as const;
+export const QWEN_LLAMACPP_ADAPTER_VERSION = 3 as const;
 
 const SAFE_TOOL_CALL_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const SAFE_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/;
@@ -230,7 +230,18 @@ function requestPayload(
         role: 'system',
         content: `ARVELIS_RUNTIME_CONTEXT_JSON\n${runtimeContext(input)}\nEND_ARVELIS_RUNTIME_CONTEXT_JSON`,
       },
-      { role: 'user', content: input.prompt },
+      {
+        role: 'user',
+        content: hasToolEvidence ? [
+          'Original user request (tool steps represented by the runtime evidence have already completed):',
+          input.prompt,
+          'CURRENT TASK: answer the informational request using the supplied evidence. The original instruction to obtain that evidence is already satisfied.',
+          'message is the answer the traveler sees. Start with the requested supported fact itself; for a price include the numeric amount AND currency. Do not describe tool execution in message or merely say that a value was obtained or confirmed.',
+          'Put the same supported fact in a structured claim with mode=fact, the matching domain, and the exact existing evidence ID from the runtime context. Do not add facts absent from evidence. Preserve any synthetic/demo qualification.',
+          'If evidence is expired or unknown, do not report a current protected fact. Explain that a current value cannot be confirmed; do not promote stale evidence by relabeling its claim as inference.',
+          'Return the final answer JSON when the evidence suffices. Use a registered native tool call only if additional missing evidence is actually needed.',
+        ].join('\n\n') : input.prompt,
+      },
     ],
     ...(tools.length > 0
       ? { tools, tool_choice: 'auto', parallel_tool_calls: true }
