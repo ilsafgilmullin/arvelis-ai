@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AddressInfo } from 'node:net';
 import type { AiRuntimeInput } from '../server/travel/aiEnginePorts';
 import {
+  QWEN_LLAMACPP_ADAPTER_VERSION,
   QWEN_LLAMACPP_MAX_RESPONSE_BYTES,
   QwenLlamaCppRuntime,
   QwenLlamaCppRuntimeError,
@@ -11,7 +12,7 @@ import { AI_TOOL_CATALOG } from '../src/travel/aiKnowledgeContracts';
 
 const transportDescriptor = AI_TOOL_CATALOG.find((tool) => tool.id === 'transport.search')!;
 
-function runtimeInput(requestId: string, withTransport = false): AiRuntimeInput {
+function runtimeInput(requestId: string, withTransport = false, withTransportEvidence = false): AiRuntimeInput {
   return {
     version: 1,
     requestId,
@@ -19,7 +20,17 @@ function runtimeInput(requestId: string, withTransport = false): AiRuntimeInput 
     locale: 'ru-RU',
     scope: 'trip',
     tripId: 'synthetic-trip',
-    evidence: [],
+    evidence: withTransportEvidence ? [{
+      id: 'tool:required-transport-search-v1:synthetic-price-current',
+      origin: 'tool',
+      domain: 'price',
+      text: 'SYNTHETIC EVALUATION ONLY: normalized provider price is 12345 RUB.',
+      freshness: 'current',
+      sourceType: 'provider',
+      toolId: 'transport.search',
+      providerId: 'synthetic-transport-provider',
+      retrievedAt: '2026-09-13T00:00:00.000Z',
+    }] : [],
     tools: withTransport ? [{ ...transportDescriptor, allowedDomains: [...transportDescriptor.allowedDomains] }] : [],
   };
 }
@@ -75,6 +86,7 @@ async function expectRuntimeError(promise: Promise<unknown>, code: QwenLlamaCppR
 }
 
 async function main() {
+  assert.equal(QWEN_LLAMACPP_ADAPTER_VERSION, 2);
   const captured = new Map<string, Record<string, unknown>>();
   const server = createServer(async (req, res) => {
     if (req.method !== 'POST' || req.url !== '/v1/chat/completions') {
@@ -166,11 +178,25 @@ async function main() {
     const tools = payload.tools as Array<{ function?: { name?: string } }>;
     assert.deepEqual(tools.map((item) => item.function?.name), ['transport_search']);
     assert.equal(JSON.stringify(payload).includes('accountScopeId'), false);
+    const baseMessages = payload.messages as Array<{ content?: string }>;
+    assert.equal(baseMessages[0]?.content?.includes('server-side tool call has already completed'), false);
     const exchanges = runtime.drainLocalExchanges();
     assert.equal(exchanges.length, 1);
     assert.equal(exchanges[0]?.promptTokens, 100);
     assert.equal(exchanges[0]?.completionTokens, 20);
     assert.equal(exchanges[0]?.predictedTokensPerSecond, 12.5);
+
+    const postToolRuntime = new QwenLlamaCppRuntime({ baseUrl });
+    await postToolRuntime.generate(runtimeInput('post-tool-policy-case', true, true), new AbortController().signal);
+    const postToolPayload = captured.get('post-tool-policy-case')!;
+    const postToolMessages = postToolPayload.messages as Array<{ content?: string }>;
+    const postToolPolicy = postToolMessages[0]?.content ?? '';
+    const postToolContext = postToolMessages[1]?.content ?? '';
+    assert.equal(postToolPolicy.includes('server-side tool call has already completed'), true);
+    assert.equal(postToolPolicy.includes('state that supported fact directly in message'), true);
+    assert.equal(postToolPolicy.includes('Do not narrate, simulate, or repeat a completed tool call'), true);
+    assert.equal(postToolContext.includes('tool:required-transport-search-v1:synthetic-price-current'), true);
+    assert.equal(postToolContext.includes('"freshness":"current"'), true);
 
     const reproducible = new QwenLlamaCppRuntime({ baseUrl, samplingProfile: 'reproducible' });
     await reproducible.generate(runtimeInput('repro-case'), new AbortController().signal);
