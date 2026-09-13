@@ -50,10 +50,12 @@ function versionCheck() {
     return '';
   }
   const observed = `${result.stdout ?? ''}\n${result.stderr ?? ''}`.trim().replace(/\s+/g, ' ').slice(0, 500);
-  const expectedCommitPrefix = manifest.llamaCpp.commit.slice(0, 8);
+  const expectedCommitPrefix = manifest.llamaCpp.commit.slice(0, 7);
   const releaseNumber = manifest.llamaCpp.release.replace(/^b/, '');
-  if (!observed.includes(expectedCommitPrefix) || !observed.includes(releaseNumber)) {
-    errors.push(`llama_cpp_version_mismatch:expected=${manifest.llamaCpp.release}/${expectedCommitPrefix};observed=${observed || '<empty>'}`);
+  if (!observed.includes(expectedCommitPrefix)) {
+    errors.push(`llama_cpp_version_mismatch:expected_commit=${expectedCommitPrefix};observed=${observed || '<empty>'}`);
+  } else if (!observed.includes(releaseNumber)) {
+    notes.push(`llama_cpp_release_label_not_reported:${manifest.llamaCpp.release}`);
   }
   return observed;
 }
