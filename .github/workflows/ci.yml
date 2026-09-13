@@ -2,7 +2,7 @@ name: ARVELIS CI
 
 on:
   pull_request:
-    branches: [main, feat/travel-foundation-v1, feat/travel-ui-redesign-v2, feat/travel-trip-persistence-v1, feat/travel-plan-orchestration-contract-v1, feat/travel-transport-contract-v1, feat/travel-transport-provider-foundation-v1, feat/travel-yandex-rasp-live-adapter-v1, feat/travel-map-provider-foundation-v1, feat/travel-legal-sources-foundation-v1, feat/travel-ai-knowledge-foundation-v1, feat/travel-retrieval-knowledge-ingestion-v1]
+    branches: [main, feat/travel-foundation-v1, feat/travel-ui-redesign-v2, feat/travel-trip-persistence-v1, feat/travel-plan-orchestration-contract-v1, feat/travel-transport-contract-v1, feat/travel-transport-provider-foundation-v1, feat/travel-yandex-rasp-live-adapter-v1, feat/travel-map-provider-foundation-v1, feat/travel-legal-sources-foundation-v1, feat/travel-ai-knowledge-foundation-v1, feat/travel-retrieval-knowledge-ingestion-v1, feat/travel-qwen-runtime-evaluation-v1]
   push:
     branches:
       - 'codex/**'
@@ -17,6 +17,7 @@ on:
       - 'feat/travel-ai-knowledge-foundation-v1'
       - 'feat/travel-retrieval-knowledge-ingestion-v1'
       - 'feat/travel-qwen-runtime-evaluation-v1'
+      - 'feat/travel-free-local-qwen-live-evaluation-v1'
   workflow_dispatch:
 
 permissions:
@@ -69,6 +70,9 @@ jobs:
       - name: Qwen Runtime Adapter and AI Evaluation
         run: npm run test:qwen-runtime-evaluation
 
+      - name: Free Local Qwen llama.cpp Adapter
+        run: npm run test:qwen-llamacpp-runtime
+
       - name: Yandex Rasp live adapter HTTP and freshness
         run: npm run test:yandex-rasp-live
 
@@ -83,6 +87,9 @@ jobs:
 
       - name: Frontend build
         run: npm run build
+
+      - name: Full npm check checkpoint
+        run: npm run check
 
   postgres-compat:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'

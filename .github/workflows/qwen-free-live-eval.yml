@@ -1,0 +1,167 @@
+name: ARVELIS Free Qwen Live Evaluation
+
+on:
+  push:
+    branches:
+      - 'feat/travel-free-local-qwen-live-evaluation-v1'
+    paths:
+      - '.github/workflows/qwen-free-live-eval.yml'
+      - 'config/qwen-local-live-semantic-review.v1.json'
+      - 'config/qwen-local-live-model-manifest.v1.json'
+      - 'server/travel/qwenLocalLiveEvaluation.ts'
+      - 'server/travel/runtimes/qwenLlamaCppRuntime.ts'
+      - 'server/travel/qwenGoldenEvaluation.ts'
+      - 'scripts/qwen-local-live-eval.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qwen-free-live-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-qwen3-8b-cpu:
+    name: Live Qwen3-8B Q4 qualification on free public runner
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      QWEN_LOCAL_MODEL_DIR: .local-models/qwen3-8b
+      QWEN_LOCAL_MODEL_PATH: .local-models/qwen3-8b/Qwen3-8B-Q4_K_M.gguf
+      QWEN_LOCAL_EVAL_OUTPUT_DIR: .local-eval/qwen
+      QWEN_LOCAL_HOST: 127.0.0.1
+      QWEN_LOCAL_PORT: '8080'
+      LLAMA_CPP_SERVER: .local-tools/llama-server
+
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+
+      - name: Install project dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Record free-runner resources
+        run: |
+          set -euxo pipefail
+          uname -a
+          nproc
+          free -h
+          df -h .
+          git rev-parse HEAD
+
+      - name: Build pinned llama.cpp server
+        run: |
+          set -euxo pipefail
+          LLAMA_COMMIT='df03399b885831b2a1603b3abb0d8c156808e363'
+          SRC="$RUNNER_TEMP/llama.cpp"
+          git init "$SRC"
+          git -C "$SRC" remote add origin https://github.com/ggml-org/llama.cpp.git
+          git -C "$SRC" fetch --depth 1 origin "$LLAMA_COMMIT"
+          git -C "$SRC" checkout --detach FETCH_HEAD
+          test "$(git -C "$SRC" rev-parse HEAD)" = "$LLAMA_COMMIT"
+          cmake -S "$SRC" -B "$SRC/build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DGGML_NATIVE=ON \
+            -DLLAMA_CURL=OFF
+          cmake --build "$SRC/build" --target llama-server -j "$(nproc)"
+          mkdir -p .local-tools
+          cp "$SRC/build/bin/llama-server" .local-tools/llama-server
+          chmod +x .local-tools/llama-server
+          .local-tools/llama-server --version
+          rm -rf "$SRC"
+          df -h .
+
+      - name: ARVELIS preflight before model download
+        run: npm run eval:qwen-local-live -- --preflight
+
+      - name: Download exact immutable Qwen3-8B Q4_K_M artifact
+        run: |
+          set -euxo pipefail
+          mkdir -p "$QWEN_LOCAL_MODEL_DIR"
+          MODEL_URL='https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/7c41481f57cb95916b40956ab2f0b139b296d974/Qwen3-8B-Q4_K_M.gguf?download=true'
+          curl --fail --location --retry 4 --retry-delay 5 --connect-timeout 30 \
+            --output "$QWEN_LOCAL_MODEL_PATH" "$MODEL_URL"
+          test "$(stat -c '%s' "$QWEN_LOCAL_MODEL_PATH")" = '5027783488'
+          echo 'd98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785  .local-models/qwen3-8b/Qwen3-8B-Q4_K_M.gguf' | sha256sum --check --strict
+          df -h .
+
+      - name: Start pinned llama.cpp on loopback only
+        run: |
+          set -euxo pipefail
+          mkdir -p "$QWEN_LOCAL_EVAL_OUTPUT_DIR"
+          nohup "$LLAMA_CPP_SERVER" \
+            --model "$QWEN_LOCAL_MODEL_PATH" \
+            --alias arvelis-qwen3-8b-q4-k-m-v1 \
+            --host 127.0.0.1 \
+            --port 8080 \
+            --ctx-size 8192 \
+            --parallel 1 \
+            --threads "$(nproc)" \
+            --threads-batch "$(nproc)" \
+            --jinja \
+            --reasoning off \
+            --n-gpu-layers 0 \
+            > "$QWEN_LOCAL_EVAL_OUTPUT_DIR/llama-server.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/llama-server.pid"
+          for attempt in $(seq 1 120); do
+            if curl --fail --silent http://127.0.0.1:8080/health >/dev/null; then
+              curl --fail --silent http://127.0.0.1:8080/v1/models | tee "$QWEN_LOCAL_EVAL_OUTPUT_DIR/models.json"
+              exit 0
+            fi
+            if ! kill -0 "$(cat "$RUNNER_TEMP/llama-server.pid")" 2>/dev/null; then
+              echo 'llama-server exited before readiness' >&2
+              tail -n 200 "$QWEN_LOCAL_EVAL_OUTPUT_DIR/llama-server.log" >&2 || true
+              exit 1
+            fi
+            sleep 5
+          done
+          echo 'llama-server readiness timeout' >&2
+          tail -n 200 "$QWEN_LOCAL_EVAL_OUTPUT_DIR/llama-server.log" >&2 || true
+          exit 1
+
+      - name: Run real Qwen3-8B golden evaluation through AiGateway
+        env:
+          QWEN_LOCAL_NORMAL_RUNS: '3'
+          QWEN_LOCAL_REPRODUCIBLE_RUNS: '1'
+        run: |
+          set -euxo pipefail
+          if [ -f config/qwen-local-live-semantic-review.v1.json ]; then
+            export QWEN_LOCAL_SEMANTIC_REVIEW_FILE=config/qwen-local-live-semantic-review.v1.json
+          fi
+          npm run eval:qwen-local-live -- --run
+
+      - name: Print sanitized evaluation report
+        if: always()
+        run: |
+          set -euo pipefail
+          REPORT="$(ls -1t .local-eval/qwen/report-*.json 2>/dev/null | head -n 1 || true)"
+          if [ -n "$REPORT" ]; then
+            jq '{status, model, llamaCpp, runtime, attempts, structuredValidationRate, protectedFactPolicyRate, protectedFactViolations, semanticCoverage, toolSelection, timeoutCount, errorCount, latencyMs, predictedTokensPerSecond, goldenRuns, qualificationReasons}' "$REPORT"
+          else
+            echo 'No live report was produced.'
+          fi
+
+      - name: Stop llama.cpp
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/llama-server.pid" ]; then
+            kill "$(cat "$RUNNER_TEMP/llama-server.pid")" 2>/dev/null || true
+          fi
+
+      - name: Upload live evaluation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwen3-8b-free-live-evaluation-${{ github.run_id }}
+          path: |
+            .local-eval/qwen/
+          if-no-files-found: warn
+          retention-days: 7

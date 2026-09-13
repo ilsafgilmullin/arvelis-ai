@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"],
+    "outDir": "tests/.dist-qwen-llamacpp-runtime",
+    "rootDir": "."
+  },
+  "include": [
+    "src/travel/aiKnowledgeContracts.ts",
+    "server/travel/aiEnginePorts.ts",
+    "server/travel/runtimes/qwenLlamaCppRuntime.ts",
+    "tests/qwen-llamacpp-runtime-smoke.ts"
+  ]
+}

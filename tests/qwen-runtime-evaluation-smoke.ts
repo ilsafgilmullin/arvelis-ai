@@ -254,10 +254,9 @@ async function main() {
   assert.equal(gatewayResult.evaluation[0]?.authoritative, true);
   assert.equal(gatewayResult.evaluation[0]?.reason, 'tool_evidence');
 
-  const missingSemantic: QwenGoldenObservation[] = QWEN_GOLDEN_CASES.map((testCase) => ({
+  const missingSemantic: QwenGoldenObservation[] = QWEN_GOLDEN_CASES.map((testCase): QwenGoldenObservation => ({
     id: testCase.id,
     outcome: testCase.expectedOutcome,
-    ...('expectedErrorCode' in testCase ? { errorCode: testCase.expectedErrorCode } : {}),
     claims: testCase.id === 'tool_backed_price_can_be_authoritative'
       ? [{ domain: 'price', mode: 'fact', authoritative: true }]
       : testCase.id === 'externally_checkable_prose_has_structured_claims'

@@ -11,12 +11,17 @@ tests/.dist-auth/
 tests/.dist-server-auth/
 tests/.dist-server-db/
 tests/.dist-server-sqlite/
+tests/.dist-qwen-llamacpp-runtime/
+tests/.dist-qwen-local-live-eval/
 
 # Local runtime data
 .data/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+.local-models/
+.local-eval/
+*.gguf
 
 # Secrets
 .env

@@ -50,6 +50,7 @@
     "server/travel/aiEvaluationPolicy.ts",
     "server/travel/qwenGoldenEvaluation.ts",
     "server/travel/runtimes/qwenVllmRuntime.ts",
+    "server/travel/runtimes/qwenLlamaCppRuntime.ts",
     "server/travel/knowledgeEmbeddingPort.ts",
     "server/travel/knowledgeRepository.ts",
     "server/travel/knowledgeIngestionService.ts",

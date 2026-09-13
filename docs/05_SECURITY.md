@@ -1,209 +1,268 @@
 # ARVELIS AI — безопасность
 
-**Актуальность:** Qwen Runtime Adapter & AI Evaluation V1 / бесплатная user-facing модель, 2026-09-10.
+**Актуальность:** Free Local Qwen Live Evaluation V1, 2026-09-12.
 
 ## Global invariants
 
-- Account/Session and Trip ownership are server-authoritative;
+- Account/Session and Trip ownership remain server-authoritative;
 - client `ownerScopeId` is not an authorization credential;
-- OTP/session/provider/model secrets are server-side only;
-- external provider, retriever, tool and model output is untrusted input;
-- provider/model credentials and IDs do not enter `Trip`;
+- OTP/session/provider/model secrets remain server-side;
+- provider/retriever/tool/model output is untrusted input;
 - raw prompt/evidence/model response/secrets are not operational audit payloads by default;
-- billing/subscriptions/paywall remain outside Travel Domain;
 - private account Knowledge and Global Knowledge remain isolated;
 - user Trips/documents/conversations are not training data by default;
-- model inference never becomes an authoritative protected fact without the required current evidence/tool boundary.
+- model inference never becomes an authoritative protected fact without required evidence/tool policy;
+- local development/evaluation runtime must not become a public inference service.
 
-## AiGateway remains the security/policy boundary
+## AiGateway remains authoritative
 
-`AiGateway` is unchanged by the Qwen slice and remains vendor-neutral.
+`AiGateway` is unchanged by this slice and remains vendor-neutral.
 
-It owns:
+It owns request/context validation, account/trip authorization, optional retrieval, allowlisted tools, bounded rounds, model-turn validation, protected-fact enforcement, cancellation/timeout and sanitized audit metadata.
 
-- request/context validation;
-- authenticated account/trip boundary;
-- optional retrieval;
-- allowlisted tools;
-- bounded tool/evidence rounds;
-- model-turn validation;
-- protected-fact evidence enforcement;
-- global cancellation/timeout;
-- sanitized audit metadata.
+`accountScopeId` is absent from `AiRuntimeInput`, so neither `QwenVllmRuntime` nor `QwenLlamaCppRuntime` receives it through the model-runtime contract.
 
-`accountScopeId` exists only in server context and is deliberately absent from `AiRuntimeInput`; therefore the Qwen adapter cannot serialize it unless the provider-neutral contract itself is changed.
+## Runtime separation
 
-## Closed Retrieval/Knowledge security boundary
+`QwenVllmRuntime` and `QwenLlamaCppRuntime` are intentionally not interchangeable deployment classifications.
 
-Retrieval V1 remains in force:
+- `QwenVllmRuntime`: future production-oriented vLLM adapter; remote endpoints require HTTPS; no production endpoint/credential is active.
+- `QwenLlamaCppRuntime`: local development/evaluation adapter only; it accepts HTTP loopback and rejects all remote hosts.
 
-- explicit `global` and account namespaces;
-- composite PostgreSQL namespace PK/FKs;
-- Global Knowledge only with explicit `public|licensed` rights;
-- account Knowledge cannot be queried as another account;
-- SHA-256 dedup remains namespace-scoped;
-- no private→global implicit promotion;
-- no automatic Trip/chat/document ingestion;
-- no training/fine-tuning on user content;
-- PostgreSQL 18 + pgvector regression remains mandatory.
+The local adapter is not a fallback production service and must never be exposed to end users directly.
 
-## Qwen/vLLM endpoint boundary
+## Local endpoint boundary
 
-`QwenVllmRuntime` validates runtime configuration before network execution.
+Allowed llama.cpp base hosts:
 
-Rules:
+- `127.0.0.1`;
+- `localhost`;
+- `::1`.
 
-- remote base URL must use HTTPS;
-- plain HTTP is accepted only for loopback development hosts;
-- URL-embedded username/password is forbidden;
-- query/fragment in base URL is forbidden;
-- base path must be OpenAI-compatible `/v1`;
-- model identifier is bounded;
-- optional API key is runtime configuration only, never embedded in code/docs/tests;
-- no production endpoint/key exists in this slice.
+Required path: `/v1`.
 
-The adapter follows redirects with `redirect: error` rather than silently following an unexpected redirect target.
+Rejected before network execution:
 
-## Runtime data minimization
+- remote host;
+- public IP/hostname;
+- HTTPS production-style endpoint;
+- credentials embedded in URL;
+- query/fragment;
+- unexpected base path.
 
-Model request contains only normalized `AiRuntimeInput` information needed for execution:
+Fetch redirects are disabled (`redirect: error`).
+
+The local server command must use loopback `--host 127.0.0.1`. ngrok, cloudflared, public tunnels, public port forwarding and `0.0.0.0` inference exposure are forbidden in this slice.
+
+## Artifact integrity boundary
+
+Live qualification is bound to the committed metadata manifest, not floating `main`:
+
+- model: `Qwen/Qwen3-8B-GGUF`;
+- immutable revision: `7c41481f57cb95916b40956ab2f0b139b296d974`;
+- file: `Qwen3-8B-Q4_K_M.gguf`;
+- exact size: `5,027,783,488` bytes;
+- expected SHA-256: `d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785`;
+- llama.cpp release: `b10902`;
+- llama.cpp commit: `df03399b885831b2a1603b3abb0d8c156808e363`.
+
+Run mode recalculates the local GGUF SHA-256 before evaluation. Size/hash/version mismatch blocks the run.
+
+Weights and binaries are not committed. `.gitignore` excludes `.local-models/`, `.local-eval/` and `*.gguf`.
+
+## Replit / lifecycle safety
+
+`.replit` is unchanged.
+
+Forbidden automatic lifecycle behavior:
+
+- no 5+ GB model download during `npm install`/`npm ci`;
+- no llama.cpp build/install during normal dependency install;
+- no model startup from `npm run dev`;
+- no CUDA/GPU setup;
+- no committed model cache.
+
+Replit remains the ordinary ARVELIS web/backend dev environment and is not an inference host.
+
+## Preflight fail-closed boundary
+
+`scripts/qwen-local-live-eval.mjs` does not repair machines or provision anything.
+
+Preflight checks:
+
+- OS/architecture;
+- total RAM;
+- available RAM;
+- free disk;
+- `llama-server` presence;
+- observed pinned version/commit;
+- loopback host and port availability.
+
+Run mode additionally verifies:
+
+- exact local GGUF size;
+- SHA-256;
+- listener not exposed publicly;
+- local `/health`;
+- expected `/v1/models` alias.
+
+If listener exposure cannot be verified, the run fails closed rather than assuming privacy.
+
+## Runtime request minimization
+
+The local request contains only normalized `AiRuntimeInput` information needed by the model:
 
 - request ID;
 - locale/scope;
 - authorized Trip ID when applicable;
 - bounded evidence;
-- exposed tool descriptors;
-- user prompt.
+- current exposed tool descriptors;
+- user/evaluation prompt.
 
-It does not contain authenticated `accountScopeId`, session cookies, OTP data, database credentials or provider secrets.
+It does not contain authenticated account scope, cookies, OTP data, DB credentials or provider credentials.
 
-Fixture tests explicitly assert absence of `accountScopeId` in the serialized vLLM payload.
+The deterministic adapter test asserts no `accountScopeId` appears in the serialized request.
 
-## Prompt-injection / evidence boundary
+## Structured output boundary
 
-Runtime context labels retrieved/tool evidence as untrusted data, not instructions.
+The local adapter requests JSON-schema structured output and treats the returned body as untrusted data.
 
-This instruction is defense-in-depth only. Security does not depend on model obedience:
+Fail-closed conditions include:
 
-- model tool calls are parsed against the server-provided allowlist;
-- unknown/unavailable tools fail closed;
-- tool execution occurs through `AiToolRegistry`;
-- tool provenance is server-stamped;
-- final protected facts are revalidated by `AiGateway` against actual evidence.
+- oversized response;
+- non-2xx response;
+- malformed HTTP JSON body;
+- wrong/missing choice/message shape;
+- non-assistant response;
+- plain free-form final answer;
+- wrong request ID/version/claim shape;
+- malformed tool call/arguments.
 
-An injected Knowledge chunk cannot grant itself tool authority or bypass Legal/Transport/Map requirements.
+There is no heuristic extraction, repair or coercion of invalid model prose into a trusted ARVELIS answer.
 
-## Structured-output boundary
+Existing `validateAiModelTurn` is not weakened.
 
-The adapter requests strict JSON-schema output for `AiStructuredAnswer` and then parses it as untrusted data.
+## Tool-call boundary
 
-Fail-closed cases include:
-
-- missing/extra Chat Completion choice shape;
-- non-assistant result;
-- invalid JSON answer;
-- wrong request ID/version/shape through existing `validateAiModelTurn`;
-- malformed or unavailable tool call;
-- malformed tool arguments.
-
-Schema validity alone does not prove factual correctness. Gateway policy remains authoritative after adapter normalization.
-
-## Tool-call security
-
-Adapter-local runtime function names are mapped to fixed provider-neutral IDs:
+Fixed runtime function mapping:
 
 - `trip_read` → `trip.read`;
 - `transport_search` → `transport.search`;
 - `map_route` → `map.route`;
 - `legal_check` → `legal.check`.
 
-A tool call is accepted only when:
+A local-model tool call is accepted only when the function is known **and** the corresponding tool is exposed in the current `AiRuntimeInput.tools`.
 
-- type is `function`;
-- call ID is bounded/valid/unique;
-- runtime function name maps to a known ARVELIS tool;
-- the mapped tool is actually exposed in the current request;
-- arguments are bounded valid JSON object data.
+Unknown tool such as `shell_exec`, unavailable known tool, duplicate/invalid call ID, malformed JSON or non-object arguments fail closed before server execution.
 
-The adapter cannot dynamically construct arbitrary server function names.
+Actual tool execution remains inside `AiToolRegistry`, which stamps trusted provenance.
 
-The current generic tool parameter schema is not treated as authorization. `AiToolRegistry` and each normalized provider/orchestrator remain responsible for authoritative input validation and access control.
+## Prompt injection / protected facts
 
-## Qwen reasoning/output policy
+Evidence is labelled as data, but security never relies on model obedience.
 
-The adapter requests Qwen non-thinking mode via `chat_template_kwargs.enable_thinking=false`.
+`AiGateway` still rejects protected claims that do not have matching current authorized tool evidence. A local Qwen model cannot promote its own prose or RAG chunk into authoritative price/schedule/legal/map data.
 
-Hidden chain-of-thought/reasoning is not part of `AiModelTurn`, is not required for correctness and is not persisted/exposed by this runtime boundary.
+The local live evaluation deliberately uses deterministic synthetic retrieval and tool fixtures so no real provider access or private data is required.
 
-Final result must be presentation text + structured claims/evidence references only.
+## Thinking / template boundary
 
-## Cancellation / timeout / denial-of-service controls
+The client request sends:
 
-Adapter controls:
+- `chat_template_kwargs.enable_thinking=false`;
+- `reasoning_effort=none`.
 
-- caller `AbortSignal` propagation;
-- independent default runtime timeout 25 seconds;
-- maximum configured runtime timeout 120 seconds;
-- bounded `max_tokens`;
-- bounded tool-call count inherited from `AiModelTurn` validation;
-- bounded tool-argument JSON;
-- bounded response body;
-- non-2xx rejection.
+The pinned local-server launch also uses `--jinja` and `--reasoning off`.
 
-The Gateway independently maintains its overall timeout, evidence budget and tool-round bounds. Adapter timeout therefore does not replace the application-level execution budget.
+If the pinned llama.cpp/Qwen3 template does not produce safe structured/tool output under these settings, that is a live evaluation failure. ARVELIS must not loosen schema or tool policies to accommodate it.
 
-## Runtime response trust
+## Cancellation / resource bounds
 
-vLLM/model output remains untrusted even from a self-hosted endpoint.
+Local adapter controls:
 
-The adapter normalizes protocol-level data only. `AiGateway` still decides whether a factual claim is valid/authoritative.
+- caller cancellation;
+- default timeout 90 seconds;
+- maximum timeout 120 seconds;
+- bounded output tokens;
+- bounded tool argument size/count through existing contracts;
+- response body maximum 1,000,000 bytes.
 
-Examples:
-
-- model-declared price without current `transport.search` evidence → rejected;
-- model-declared Legal fact from Knowledge only → rejected;
-- stale protected fact → rejected;
-- current matching tool evidence → may become authoritative only after Gateway evaluation.
+The development timeout is longer than the vLLM adapter because CPU/local Q4 generation may be slower. It does not alter production-oriented runtime policy.
 
 ## Golden semantic evaluation boundary
 
-`server/travel/qwenGoldenEvaluation.ts` introduces a mandatory distinction between:
+The existing `QWEN_GOLDEN_CASES` and `runQwenGoldenEvaluation()` remain the single semantic evaluation foundation.
 
-- structural/schema success;
-- semantic claim-coverage success.
+The set now includes an explicit unknown-tool scenario in addition to unsupported price, tool-backed price, Knowledge-only Legal, stale evidence, general inference and externally-checkable prose coverage.
 
-Critical golden scenarios cover unsupported/stale/protected facts and structured-claim coverage.
+The live runner separates:
 
-For externally-checkable prose cases, `semanticCoveragePassed=true` must be explicitly supplied. Missing/false verdict fails closed.
+- schema validation;
+- protected-fact policy;
+- semantic coverage;
+- final qualification.
 
-Current tests use deterministic fixtures to validate this harness. They do **not** claim that an actual Qwen3-8B runtime has passed semantic evaluation.
+For `requiresSemanticCoverage=true`, only a separately supplied explicit reviewed verdict can set semantic coverage to pass. Valid JSON, successful tool execution or correct schema never auto-sets `semanticCoveragePassed=true`.
 
-Before real model activation, golden cases must be executed against the actual deployed candidate and semantic coverage must be evaluated by an approved deterministic/reviewed process.
+Missing semantic review means final status `NOT_QUALIFIED`.
 
-## Signal-bearing security tests
+## Repeated-generation requirement
 
-`test:qwen-runtime-evaluation` covers:
+Live Qwen is nondeterministic. Default qualification runs each case three times in the normal profile and once in a fixed-seed reproducibility profile.
 
-- remote insecure endpoint rejection;
-- base URL credential rejection;
-- account-scope non-leakage;
-- structured-output mapping;
-- tool allowlist mapping;
-- unknown tool rejection;
-- malformed tool arguments/answer rejection;
-- HTTP failure;
-- cancellation;
-- adapter timeout;
-- Gateway rejection of unsupported price;
-- tool-backed protected fact flow;
-- golden semantic coverage fail-closed behavior.
+Critical failures cannot be waived because another generation succeeded. One lucky output is not qualification evidence.
 
-Existing AI Engine, Retrieval, PostgreSQL/pgvector, Plan, Transport, Map, Legal, Yandex and Trip regressions remain mandatory.
+## Evaluation artifacts / privacy
 
-## Production / real-model STOP boundary
+Sanitized report may contain:
 
-No production GPU, vLLM server, model weights, runtime endpoint, model credential, paid AI API, production embedding activation, crawler or automatic external Knowledge ingestion is authorized.
+- model/revision/file/hash/quantization;
+- llama.cpp release/commit/version;
+- adapter/context/sampling metadata;
+- case/run counts;
+- validation/policy/semantic verdicts;
+- tool execution counts;
+- timeout/error counts;
+- latency;
+- server-reported throughput when numeric/trustworthy.
 
-No merge to `main`, production deployment or destructive migration is authorized.
+It must not contain:
 
-A future real-model deployment requires separate approval for runtime topology, exact model/version/checksum/licensing, endpoint authentication/networking, secrets, capacity/cost limits, live golden semantic evaluation, monitoring/rollback and privacy/data-transfer review.
+- credentials;
+- real account IDs;
+- session identifiers;
+- real user prompts;
+- private Trip data;
+- production data.
+
+Raw synthetic model transcripts are local-only in gitignored `.local-eval/qwen/raw/`.
+
+## Signal-bearing CI
+
+`test:qwen-llamacpp-runtime` is the one primary deterministic adapter gate. It uses a local fake HTTP server and no GGUF.
+
+It covers loopback/remote policy, request/schema/thinking/tool mapping, malformed/free-form output, unknown/unavailable/malformed tools, timeout, cancellation and response-size bound. The same gate compile-checks the live runner and syntax-checks the explicit CLI.
+
+A real Qwen3-8B model is intentionally excluded from GitHub CI to avoid multi-gigabyte downloads and to prevent CI from masquerading as a free live-model qualification environment.
+
+Existing Qwen/AI/Retrieval/PostgreSQL/Plan/Transport/Map/Legal/Yandex/Trip regressions remain mandatory.
+
+## Current free-compute truth boundary
+
+The inspected free environment has ~5.8 GiB total RAM, no swap, adequate disk but no pinned `llama-server`. This is below the manifest minimum for Qwen3-8B Q4.
+
+Therefore:
+
+- no GGUF was downloaded;
+- no real Qwen3-8B was started;
+- no live golden report exists;
+- no smaller model was substituted;
+- deterministic engineering PASS must not be described as model qualification.
+
+Status:
+
+`ENGINEERING READY / LIVE MODEL NOT EXECUTED / BLOCKED BY FREE COMPUTE`.
+
+## Hard STOP boundary
+
+No paid GPU/cloud, paid inference API, production deployment, production credentials, public llama.cpp endpoint, production embedding, crawler/production Knowledge ingestion, destructive migration, Trip Domain change or merge to `main` is authorized by this slice.

@@ -10,174 +10,158 @@
 
 ARVELIS AI на текущем этапе полностью бесплатен для пользователя. Billing/subscriptions/paywall не проектируются; provider/runtime quotas и cost controls остаются backend policy.
 
-## Closed lower checkpoint — Retrieval & Knowledge Ingestion V1
+## Closed AI foundations
 
-`ARVELIS Retrieval & Knowledge Ingestion Foundation V1` закрыт в Draft PR #36 на final HEAD `aab7f49c1dfc0909536e1afba7da84bcdf98be3d`.
+- `Retrieval & Knowledge Ingestion Foundation V1` — Draft PR #36, PostgreSQL 18 + pgvector, strict Global/account isolation, additive migration `003`, green final checkpoint.
+- `Qwen Runtime Adapter & AI Evaluation V1` — Draft PR #37, final HEAD `b5685472efdaaea57e674911a852f0bf9bf7aa78`, production-oriented `QwenVllmRuntime` adapter and deterministic golden-evaluation foundation, green final checkpoint.
 
-Final PR-triggered run #721 подтвердил:
+No production model has been deployed by either slice.
 
-- `validate` — PASS;
-- PostgreSQL 18 + pgvector `postgres-compat` — PASS;
-- migration chain `001 → 002 → 003` — PASS;
-- Trip PostgreSQL regression — PASS;
-- Knowledge pgvector namespace/retrieval gate — PASS.
-
-Retrieval storage остаётся PostgreSQL + pgvector; Global/private account Knowledge разделены; автоматического external ingestion и private→global promotion нет.
-
-## Current engineering slice — Qwen Runtime Adapter & AI Evaluation V1
+## Current slice — Free Local Qwen Live Evaluation V1
 
 Branch:
 
-`feat/travel-qwen-runtime-evaluation-v1`
+`feat/travel-free-local-qwen-live-evaluation-v1`
 
 Base:
 
-`feat/travel-retrieval-knowledge-ingestion-v1` / Draft PR #36.
+`feat/travel-qwen-runtime-evaluation-v1` / Draft PR #37.
 
-Цель slice — реализовать первый concrete runtime adapter **через существующий `AiModelRuntime`**, не меняя vendor-neutral policy внутри `AiGateway`.
+Current truthful state:
 
-Зафиксированный runtime target:
+`ENGINEERING READY / LIVE MODEL NOT EXECUTED / BLOCKED BY FREE COMPUTE`
 
-- model candidate: `Qwen3-8B`;
-- protocol/runtime boundary: OpenAI-compatible `vLLM`;
-- local development runtime может в будущем использовать `llama.cpp` через отдельный adapter;
-- production runtime/GPU/weights/credentials этим slice не подключаются.
+The goal is a first **free real-model qualification path** without rented GPU, paid inference API or production infrastructure:
 
-## Qwen vLLM adapter
+`AiGateway → AiModelRuntime → QwenLlamaCppRuntime → local llama.cpp → Qwen3-8B GGUF`.
 
-`server/travel/runtimes/qwenVllmRuntime.ts` реализует:
+This does **not** replace the future production-oriented path:
 
-`AiModelRuntime.generate(AiRuntimeInput, AbortSignal) → AiModelTurn`.
+`AiGateway → AiModelRuntime → QwenVllmRuntime → vLLM`.
 
-Adapter отвечает только за runtime/protocol concerns:
+`AiGateway` remains vendor-neutral.
 
-- validation OpenAI-compatible `/v1` endpoint;
-- `POST /v1/chat/completions` mapping;
-- Qwen model selector;
-- structured-output JSON schema;
-- OpenAI-style native tool calls;
-- ARVELIS tool-ID ↔ function-name mapping;
-- bounded timeout/cancellation;
-- bounded response size;
-- untrusted runtime-response parsing/validation.
+## Pinned local evaluation artifacts
 
-`AiGateway` не содержит Qwen/vLLM-specific code и этим slice не изменялся.
+Model manifest: `config/qwen-local-live-model-manifest.v1.json`.
 
-## Endpoint/security policy
+- repo: `Qwen/Qwen3-8B-GGUF`;
+- immutable revision: `7c41481f57cb95916b40956ab2f0b139b296d974`;
+- GGUF: `Qwen3-8B-Q4_K_M.gguf`;
+- quantization: `Q4_K_M`;
+- file size: `5,027,783,488` bytes;
+- expected SHA-256: `d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785`;
+- license: Apache-2.0;
+- local model alias: `arvelis-qwen3-8b-q4-k-m-v1`.
 
-- remote vLLM endpoint — HTTPS only;
-- HTTP разрешён только для loopback development (`localhost`, `127.0.0.1`, `::1`);
-- credentials/query/fragment в base URL запрещены;
-- optional API key может передаваться adapter configuration, но реальный key не добавлен;
-- `accountScopeId` не входит в `AiRuntimeInput` и не отправляется модели.
+Pinned llama.cpp:
 
-## Structured output
+- release: `b10902`;
+- commit: `df03399b885831b2a1603b3abb0d8c156808e363`.
 
-Final answer запрашивается через OpenAI-compatible `response_format.type = json_schema`.
+GGUF and local evaluation transcripts are never committed. `.gitignore` excludes `.local-models/`, `.local-eval/` and `*.gguf`.
 
-Schema соответствует существующему ARVELIS `AiStructuredAnswer`:
+Q4_K_M evaluation is not equivalent to the future BF16/vLLM baseline.
 
-- contract version;
-- exact request ID;
-- user-facing message;
-- typed claims;
-- fact domain;
-- `fact | inference` mode;
-- evidence IDs.
+## QwenLlamaCppRuntime
 
-После parsing adapter запускает существующую `validateAiModelTurn`. Полная evidence/protected-fact policy остаётся в `AiGateway`.
+`server/travel/runtimes/qwenLlamaCppRuntime.ts` implements the existing `AiModelRuntime` for development/evaluation only.
 
-## Tool calling
+Security/runtime properties:
 
-Adapter-local function names:
+- accepts only HTTP loopback `127.0.0.1`, `localhost`, `::1`;
+- exact OpenAI-compatible `/v1` base path;
+- no remote HTTP/HTTPS target;
+- no credentials/query/fragment in URL;
+- `POST /v1/chat/completions`;
+- system/user messages;
+- current ARVELIS tool descriptors and `tool_choice`;
+- strict `response_format.type=json_schema`;
+- Qwen3 non-thinking request metadata;
+- caller cancellation;
+- bounded adapter timeout;
+- bounded response body;
+- strict JSON/choice/message parsing;
+- unknown/unavailable/malformed tool calls fail closed;
+- free-form final answer fails closed;
+- no heuristic repair;
+- existing `validateAiModelTurn` remains mandatory.
 
-- `trip.read` → `trip_read`;
-- `transport.search` → `transport_search`;
-- `map.route` → `map_route`;
-- `legal.check` → `legal_check`.
+Normal sampling uses `temperature=0.7`, `top_p=0.8`, `top_k=20`. The reproducibility profile uses temperature `0`, `top_p=1`, `top_k=1`, fixed seed `424242`.
 
-Runtime может вернуть только tool, который реально присутствует в текущем `AiRuntimeInput.tools`. Unknown function name, duplicate/invalid call ID, malformed JSON arguments или unavailable tool fail closed до исполнения.
+## Golden live evaluation
 
-Фактическое выполнение и server-stamped provenance остаются в существующем `AiToolRegistry`.
+There is no second evaluation framework.
 
-## Qwen request mode
+`server/travel/qwenLocalLiveEvaluation.ts` reuses:
 
-Adapter использует non-thinking request mode:
+- `QWEN_GOLDEN_CASES`;
+- `runQwenGoldenEvaluation()`;
+- real `AiGateway`;
+- real `QwenLlamaCppRuntime`;
+- deterministic synthetic retrieval/tool fixtures.
 
-- `chat_template_kwargs.enable_thinking = false`;
-- `temperature = 0.7`;
-- `top_p = 0.8`;
-- `top_k = 20`;
-- bounded `max_tokens`.
+The golden set covers general inference, unsupported price, current tool-backed price, Knowledge-only Legal, stale protected evidence, unknown tool and externally-checkable prose coverage.
 
-Hidden reasoning не является частью ARVELIS runtime contract и не сохраняется/экспортируется этим adapter.
+Schema PASS, protected-fact policy PASS and semantic coverage PASS are separate signals. `semanticCoveragePassed=true` is never inferred automatically from JSON validity. Missing review means final qualification is `NOT_QUALIFIED`.
 
-## Golden semantic evaluation
+Raw model exchanges are stored only under gitignored `.local-eval/qwen/raw/`. Sanitized report excludes credentials, real account IDs, private Trip data and real user prompts.
 
-`server/travel/qwenGoldenEvaluation.ts` задаёт release-eval foundation для критических сценариев:
+## Explicit preflight and live command
 
-- general advice остаётся inference;
-- unsupported price fails closed;
-- current tool-backed price может быть authoritative;
-- Knowledge-only Legal fact fails closed;
-- stale protected fact fails closed;
-- externally-checkable prose должно иметь structured-claim coverage.
+Nothing heavy runs from Replit, `npm ci` or `npm run dev`.
 
-Ключевое правило: JSON/schema success **не равен semantic success**.
-
-Для кейсов с проверяемыми внешними утверждениями необходим отдельный explicit `semanticCoveragePassed: true`; отсутствие такого verdict закрывает evaluation fail-closed.
-
-В текущем slice harness проверяется deterministic fixtures. Реальный Qwen3-8B ещё не запускался, поэтому live-model golden suite не считается пройденным.
-
-## Signal-bearing verification
-
-Основная команда:
+On a suitable free local machine:
 
 ```bash
-npm run test:qwen-runtime-evaluation
+npm ci
+npm run eval:qwen-local-live -- --preflight
 ```
 
-Gate проверяет:
+Only after preflight passes should an operator acquire the exact pinned GGUF, verify its SHA-256, start the pinned `llama-server` on loopback with `--jinja`, `--reasoning off` and bounded context, then run:
 
-- endpoint/config validation;
-- отсутствие account-scope leakage;
-- structured-output request mapping;
-- native tool-call mapping;
-- malformed/unknown responses fail-closed;
-- HTTP failure;
-- direct cancellation;
-- adapter timeout;
-- unsupported protected price rejection через unchanged Gateway;
-- two-round tool-backed price flow через Gateway + Tool Registry;
-- golden semantic coverage fail-closed policy.
+```bash
+npm run eval:qwen-local-live -- --run
+```
 
-Push run #723 на implementation HEAD `d202c5632ecd923a8e0ce2e9d0f38e8214023d53` полностью PASS, включая Qwen gate, lower-layer AI/Retrieval regressions, server build, browser happy-path и frontend build.
+Detailed commands and security rules are in `docs/54_FREE_LOCAL_QWEN_LIVE_EVALUATION_V1.md`.
 
-## Closure criterion
+The current free execution environment inspected during this slice has about 5.8 GiB total RAM, no swap and no `llama-server`. That is below the manifest requirements, so the 5+ GB GGUF was **not downloaded** and Qwen3-8B was **not executed**. No smaller model was substituted.
 
-Qwen Runtime Adapter & AI Evaluation V1 считается CLOSED только после:
+## Deterministic verification
 
-1. documentation synchronization;
-2. stacked Draft PR с base `feat/travel-retrieval-knowledge-ingestion-v1`;
-3. PR-triggered `validate` PASS на exact final documentation HEAD;
-4. PR-triggered PostgreSQL/pgvector lower-layer regression PASS на том же HEAD;
-5. отсутствия production runtime/model activation.
+Main local adapter gate:
 
-## Explicit STOP boundary
+```bash
+npm run test:qwen-llamacpp-runtime
+```
 
-После green Qwen Runtime/Evaluation checkpoint работа останавливается перед real model deployment.
+It uses a loopback fake HTTP server and does not require GGUF. It also compile-checks the live-evaluation runner and syntax-checks its explicit CLI.
 
-Не входят и не разрешены этим slice:
+Full engineering checkpoint:
 
-- production GPU/runtime provisioning;
-- запуск production vLLM;
-- скачивание production model weights;
-- real runtime/model credentials;
-- paid AI APIs;
-- production embedding activation;
-- crawler/automatic external Knowledge ingestion;
-- production deployment;
-- destructive migrations;
-- merge в `main`.
+```bash
+npm run check
+```
 
-См. `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/07_DECISIONS.md`, `docs/52_RETRIEVAL_KNOWLEDGE_INGESTION_FOUNDATION_V1.md`, `docs/53_QWEN_RUNTIME_ADAPTER_AI_EVALUATION_V1.md`.
+Implementation push run #733 on HEAD `a959d8b46c0922cc1359026301ec5681f976dffb` passed typecheck, lower-layer regressions, existing Qwen evaluation, the new llama.cpp adapter gate, server build, server-backed browser happy-path and frontend build.
+
+## Replit boundary
+
+`.replit` is intentionally unchanged. Replit remains an ordinary ARVELIS web/backend development environment and is not a model host.
+
+No automatic model download, llama.cpp build/startup, GPU/CUDA setup or large model cache is attached to Replit/npm lifecycle commands.
+
+## STOP / DoD boundary
+
+Engineering DoD requires the adapter, deterministic gate, existing regressions, synchronized docs and a stacked Draft PR against `feat/travel-qwen-runtime-evaluation-v1`.
+
+The whole Free Local Qwen Live Evaluation V1 is **not CLOSED** until the exact hash-verified Qwen3-8B Q4_K_M artifact actually runs through pinned llama.cpp and produces the sanitized live report.
+
+Until suitable free compute exists, the state remains:
+
+`ENGINEERING READY / LIVE MODEL NOT EXECUTED / BLOCKED BY FREE COMPUTE`.
+
+Not authorized: paid GPU/cloud, paid inference API, production model/runtime, production credentials, public llama.cpp endpoint, merge to `main`, destructive migration, Trip Domain changes, crawler/production Knowledge ingestion or embedding deployment.
+
+See `docs/02_ARCHITECTURE.md`, `docs/03_ROADMAP.md`, `docs/05_SECURITY.md`, `docs/07_DECISIONS.md`, `docs/53_QWEN_RUNTIME_ADAPTER_AI_EVALUATION_V1.md`, `docs/54_FREE_LOCAL_QWEN_LIVE_EVALUATION_V1.md`.
