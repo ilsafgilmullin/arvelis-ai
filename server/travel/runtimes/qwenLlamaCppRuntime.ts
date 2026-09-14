@@ -1,3 +1,4 @@
+import { TRANSPORT_SEARCH_REQUEST_V1_SCHEMA } from '../../../src/travel/transportSearchSchema';
 import {
   AI_FACT_DOMAINS,
   AI_TOOL_IDS,
@@ -15,7 +16,7 @@ export const QWEN_LLAMACPP_DEFAULT_TIMEOUT_MS = 90_000;
 export const QWEN_LLAMACPP_MAX_TIMEOUT_MS = 120_000;
 export const QWEN_LLAMACPP_DEFAULT_MAX_TOKENS = 2_048;
 export const QWEN_LLAMACPP_MAX_RESPONSE_BYTES = 1_000_000;
-export const QWEN_LLAMACPP_ADAPTER_VERSION = 3 as const;
+export const QWEN_LLAMACPP_ADAPTER_VERSION = 4 as const;
 
 const SAFE_TOOL_CALL_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const SAFE_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/;
@@ -164,7 +165,7 @@ function toolForLlamaCpp(tool: AiToolDescriptor): Record<string, unknown> {
     function: {
       name: LLAMACPP_TOOL_NAME_BY_ID[tool.id],
       description: `${tool.description} Allowed factual domains: ${tool.allowedDomains.join(', ')}.`,
-      parameters: { type: 'object', additionalProperties: true },
+      parameters: tool.id === 'transport.search' ? TRANSPORT_SEARCH_REQUEST_V1_SCHEMA : { type: 'object', additionalProperties: true },
     },
   };
 }
@@ -176,6 +177,7 @@ function runtimeContext(input: AiRuntimeInput): string {
     locale: input.locale,
     scope: input.scope,
     ...(input.tripId !== undefined ? { tripId: input.tripId } : {}),
+    ...(input.transportSearchRequest ? { transportSearchRequest: input.transportSearchRequest } : {}),
     evidence: input.evidence.map((item) => ({
       id: item.id,
       origin: item.origin,

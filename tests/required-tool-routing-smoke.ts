@@ -1,3 +1,5 @@
+import { syntheticTransportSearch } from '../server/travel/testing/syntheticTransportSearch';
+const searchFixture = syntheticTransportSearch(new Date());
 import assert from 'node:assert/strict';
 import {
   AiGateway,
@@ -12,6 +14,7 @@ import type { AiGatewayRequest } from '../src/travel/aiKnowledgeContracts';
 const context = {
   accountScopeId: 'acct-required-routing',
   authorizedTripId: 'trip-required-routing',
+  transportSearchRequest: searchFixture,
 };
 
 function request(prompt: string): AiGatewayRequest {
@@ -28,7 +31,7 @@ function transportRegistry(onCall?: () => void, freshness: 'current' | 'expired'
     id: 'transport.search',
     async handler(input, toolContext) {
       onCall?.();
-      assert.deepEqual(input, { intent: 'required-live-transport' });
+      assert.deepEqual(input, searchFixture);
       assert.equal(toolContext.accountScopeId, context.accountScopeId);
       assert.equal(toolContext.authorizedTripId, context.authorizedTripId);
       return {
@@ -129,6 +132,9 @@ async function main(): Promise<void> {
 
   assert.equal(naturalToolCalls, 1, 'live transport fact intent must be routed server-side');
   assert.equal(naturalResult.audit.toolCallsExecuted, 1);
+  await new AiGateway({ runtime: naturalRuntime, tools: transportRegistry(() => { naturalToolCalls += 1; }), requestId: () => 'required-routing-how-much' })
+    .run(request('Сколько стоит поезд Москва — Казань на 20 сентября?'), context);
+  assert.equal(naturalToolCalls, 2, 'natural how-much phrasing also requires deterministic search');
 
   let generalToolCalls = 0;
   const generalRuntime: AiModelRuntime = {

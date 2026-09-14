@@ -1,3 +1,5 @@
+import { syntheticTransportSearch } from '../server/travel/testing/syntheticTransportSearch';
+const searchFixture = syntheticTransportSearch(new Date());
 import assert from 'node:assert/strict';
 import { AiGateway, AiGatewayError } from '../server/travel/aiGateway';
 import { AiToolRegistry } from '../server/travel/aiToolRegistry';
@@ -108,7 +110,7 @@ async function main() {
         tool_calls: [{
           id: 'qwen-call-1',
           type: 'function',
-          function: { name: 'transport_search', arguments: '{"intent":"best-price"}' },
+          function: { name: 'transport_search', arguments: JSON.stringify(searchFixture) },
         }],
       },
     }],
@@ -119,7 +121,7 @@ async function main() {
     version: 1,
     requestId: 'qwen-tool',
     kind: 'tool_calls',
-    calls: [{ id: 'qwen-call-1', toolId: 'transport.search', input: { intent: 'best-price' } }],
+    calls: [{ id: 'qwen-call-1', toolId: 'transport.search', input: searchFixture }],
   });
 
   const unknownToolFetch = (async () => jsonResponse({
@@ -196,7 +198,7 @@ async function main() {
   } satisfies AiGatewayRequest;
   await assert.rejects(
     new AiGateway({ runtime: unsupportedPriceRuntime, requestId: () => 'qwen-price-reject' })
-      .run(tripRequest, { accountScopeId: 'acct-qwen', authorizedTripId: 'trip-qwen' }),
+      .run(tripRequest, { accountScopeId: 'acct-qwen', authorizedTripId: 'trip-qwen', transportSearchRequest: searchFixture }),
     (error: unknown) => error instanceof AiGatewayError && error.code === 'invalid_model_output',
   );
 
@@ -209,7 +211,7 @@ async function main() {
         choices: [{
           message: {
             role: 'assistant',
-            tool_calls: [{ id: 'qwen-price-call', type: 'function', function: { name: 'transport_search', arguments: '{"intent":"best-price"}' } }],
+            tool_calls: [{ id: 'qwen-price-call', type: 'function', function: { name: 'transport_search', arguments: JSON.stringify(searchFixture) } }],
           },
         }],
       });
@@ -230,7 +232,7 @@ async function main() {
   const registry = new AiToolRegistry([{
     id: 'transport.search',
     async handler(input, context) {
-      assert.deepEqual(input, { intent: 'best-price' });
+      assert.deepEqual(input, searchFixture);
       assert.equal(context.accountScopeId, 'acct-qwen');
       return {
         evidence: [{
@@ -250,7 +252,7 @@ async function main() {
     tools: registry,
     requestId: () => 'qwen-price-ok',
     now: () => new Date('2026-09-10T00:00:00.000Z'),
-  }).run(tripRequest, { accountScopeId: 'acct-qwen', authorizedTripId: 'trip-qwen' });
+  }).run(tripRequest, { accountScopeId: 'acct-qwen', authorizedTripId: 'trip-qwen', transportSearchRequest: searchFixture });
   assert.equal(gatewayResult.evaluation[0]?.authoritative, true);
   assert.equal(gatewayResult.evaluation[0]?.reason, 'tool_evidence');
 

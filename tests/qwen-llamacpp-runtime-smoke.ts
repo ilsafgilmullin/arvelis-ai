@@ -1,3 +1,5 @@
+import { syntheticTransportSearch } from '../server/travel/testing/syntheticTransportSearch';
+const searchFixture = syntheticTransportSearch(new Date());
 import assert from 'node:assert/strict';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -87,7 +89,7 @@ async function expectRuntimeError(promise: Promise<unknown>, code: QwenLlamaCppR
 }
 
 async function main() {
-  assert.equal(QWEN_LLAMACPP_ADAPTER_VERSION, 3);
+  assert.equal(QWEN_LLAMACPP_ADAPTER_VERSION, 4);
   const captured = new Map<string, Record<string, unknown>>();
   const server = createServer(async (req, res) => {
     if (req.method !== 'POST' || req.url !== '/v1/chat/completions') {
@@ -120,7 +122,7 @@ async function main() {
       return;
     }
     if (requestId === 'tool-case') {
-      sendJson(res, { choices: [{ message: { role: 'assistant', tool_calls: [{ id: 'tool-1', type: 'function', function: { name: 'transport_search', arguments: '{"intent":"best-price"}' } }] } }] });
+      sendJson(res, { choices: [{ message: { role: 'assistant', tool_calls: [{ id: 'tool-1', type: 'function', function: { name: 'transport_search', arguments: JSON.stringify(searchFixture) } }] } }] });
       return;
     }
     if (requestId === 'timeout-case' || requestId === 'cancel-case') {
@@ -258,7 +260,7 @@ async function main() {
       version: 1,
       requestId: 'tool-case',
       kind: 'tool_calls',
-      calls: [{ id: 'tool-1', toolId: 'transport.search', input: { intent: 'best-price' } }],
+      calls: [{ id: 'tool-1', toolId: 'transport.search', input: searchFixture }],
     });
 
     await expectRuntimeError(

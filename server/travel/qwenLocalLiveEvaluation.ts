@@ -1,3 +1,4 @@
+import { syntheticTransportSearch } from './testing/syntheticTransportSearch';
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import { resolve } from 'node:path';
@@ -174,7 +175,7 @@ async function loadConfig(): Promise<LiveConfig> {
   };
 }
 
-function retrieverFor(testCase: QwenGoldenCase): KnowledgeRetriever | undefined {
+function retrieverFor(testCase: QwenGoldenCase, fixtureTime: Date): KnowledgeRetriever | undefined {
   if (testCase.id !== 'knowledge_only_legal_fails_closed') return undefined;
   return {
     id: 'synthetic-legal-retriever',
@@ -187,8 +188,8 @@ function retrieverFor(testCase: QwenGoldenCase): KnowledgeRetriever | undefined 
           title: 'Synthetic legal evaluation source',
           publisher: 'ARVELIS test fixture',
           sourceType: 'official',
-          retrievedAt: '2026-09-01T00:00:00.000Z',
-          validUntil: '2026-12-31T23:59:59.000Z',
+          retrievedAt: fixtureTime.toISOString(),
+          validUntil: new Date(fixtureTime.getTime() + 300_000).toISOString(),
         }],
         chunks: [{
           id: 'synthetic-legal-chunk',
@@ -202,7 +203,7 @@ function retrieverFor(testCase: QwenGoldenCase): KnowledgeRetriever | undefined 
   };
 }
 
-function toolRegistryFor(testCase: QwenGoldenCase): AiToolRegistry {
+function toolRegistryFor(testCase: QwenGoldenCase, fixtureTime: Date): AiToolRegistry {
   if (!CURRENT_TRANSPORT_CASES.has(testCase.id) && !STALE_TRANSPORT_CASES.has(testCase.id)) return new AiToolRegistry();
   const freshness = STALE_TRANSPORT_CASES.has(testCase.id) ? 'expired' as const : 'current' as const;
   return new AiToolRegistry([{
@@ -218,7 +219,8 @@ function toolRegistryFor(testCase: QwenGoldenCase): AiToolRegistry {
           freshness,
           sourceType: 'provider',
           providerId: 'synthetic-transport-provider',
-          retrievedAt: freshness === 'current' ? '2026-09-12T00:00:00.000Z' : '2025-01-01T00:00:00.000Z',
+          retrievedAt: new Date(fixtureTime.getTime() - (freshness === 'current' ? 0 : 600_000)).toISOString(),
+          expiresAt: new Date(fixtureTime.getTime() + (freshness === 'current' ? 300_000 : -300_000)).toISOString(),
         }],
       };
     },
@@ -292,11 +294,12 @@ async function executeCase(
 ): Promise<QwenGoldenObservation> {
   const runtime = new QwenLlamaCppRuntime({ baseUrl: config.baseUrl, model: config.modelId, samplingProfile: profile });
   const requestId = `live-${profile}-${run}-${testCase.id}`;
-  const retriever = retrieverFor(testCase);
+  const fixtureTime = new Date();
+  const retriever = retrieverFor(testCase, fixtureTime);
   const gateway = new AiGateway({
     runtime,
     ...(retriever ? { retriever } : {}),
-    tools: toolRegistryFor(testCase),
+    tools: toolRegistryFor(testCase, fixtureTime),
     timeoutMs: 120_000,
     requestId: () => requestId,
   });
@@ -317,6 +320,7 @@ async function executeCase(
     }, {
       accountScopeId: 'synthetic-eval-account',
       authorizedTripId: 'synthetic-eval-trip',
+      transportSearchRequest: syntheticTransportSearch(fixtureTime),
     });
     toolCallsExecuted = result.audit.toolCallsExecuted;
     const claims = result.answer.claims.map((claim) => {

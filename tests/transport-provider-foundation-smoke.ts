@@ -51,6 +51,8 @@ async function main() {
     termsRecheckedAt: '2026-09-09T08:20:00.000Z',
     credentialsConfigured: true,
     quotaConfirmed: true,
+    attributionImplemented: true,
+    operationalPolicyAccepted: true,
     userInitiatedBookingFlowApproved: false,
   }, now);
   assert.deepEqual(freeProductEligible, { eligible: true, blockers: [] });
@@ -60,6 +62,8 @@ async function main() {
     termsRecheckedAt: '2026-09-09T08:20:00.000Z',
     credentialsConfigured: true,
     quotaConfirmed: true,
+    attributionImplemented: true,
+    operationalPolicyAccepted: true,
     userInitiatedBookingFlowApproved: false,
   }, now);
   assert.equal(futurePaidProduct.eligible, false);
@@ -70,6 +74,8 @@ async function main() {
     termsRecheckedAt: '2026-09-07T08:20:00.000Z',
     credentialsConfigured: true,
     quotaConfirmed: true,
+    attributionImplemented: true,
+    operationalPolicyAccepted: true,
     userInitiatedBookingFlowApproved: false,
   }, now);
   assert.equal(staleTerms.blockers.includes('terms_review_stale'), true);

@@ -11,6 +11,7 @@ const allowed = new Map([
   ['trip-server', 'tests/.dist-trip-server'],
   ['trip-postgres', 'tests/.dist-trip-postgres'],
   ['plan-policy', 'tests/.dist-plan-policy'],
+  ['transport-search-contract', 'tests/.dist-transport-search-contract'],
   ['transport-policy', 'tests/.dist-transport-policy'],
   ['transport-provider-foundation', 'tests/.dist-transport-provider-foundation'],
   ['yandex-rasp-live', 'tests/.dist-yandex-rasp-live'],

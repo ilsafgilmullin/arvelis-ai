@@ -1,3 +1,5 @@
+import type { TransportSearchRequestV1 } from '../../src/travel/transportSearchRequest';
+import type { TransportSearchOutcome } from './transportSearchService';
 import type {
   AiEvidence,
   AiGatewayRequest,
@@ -8,11 +10,14 @@ import type {
 } from '../../src/travel/aiKnowledgeContracts';
 
 export type AiGatewayServerContext = {
+  /** Authorized domain interpretation of this request; routing never invents it. */
+  transportSearchRequest?: TransportSearchRequestV1;
   accountScopeId: string;
   authorizedTripId?: string;
 };
 
 export type AiRuntimeInput = {
+  transportSearchRequest?: TransportSearchRequestV1;
   version: 1;
   requestId: string;
   prompt: string;
@@ -49,6 +54,7 @@ export interface KnowledgeRetriever {
 }
 
 export type AiToolExecutionContext = {
+  now?: Date;
   accountScopeId: string;
   authorizedTripId?: string;
   requestId: string;
@@ -58,6 +64,7 @@ export type AiToolExecutionContext = {
 export type AiToolEvidenceInput = Omit<AiEvidence, 'origin' | 'toolId'>;
 
 export type AiToolResult = {
+  outcome?: TransportSearchOutcome;
   evidence: AiToolEvidenceInput[];
 };
 

@@ -1,3 +1,4 @@
+import { TRANSPORT_SEARCH_REQUEST_V1_SCHEMA } from '../../../src/travel/transportSearchSchema';
 import {
   AI_FACT_DOMAINS,
   AI_TOOL_IDS,
@@ -145,10 +146,7 @@ function toolForVllm(tool: AiToolDescriptor): Record<string, unknown> {
     function: {
       name: VLLM_TOOL_NAME_BY_ID[tool.id],
       description: `${tool.description} Allowed factual domains: ${tool.allowedDomains.join(', ')}.`,
-      parameters: {
-        type: 'object',
-        additionalProperties: true,
-      },
+      parameters: tool.id === 'transport.search' ? TRANSPORT_SEARCH_REQUEST_V1_SCHEMA : { type: 'object', additionalProperties: true },
     },
   };
 }
@@ -160,6 +158,7 @@ function runtimeContext(input: AiRuntimeInput): string {
     locale: input.locale,
     scope: input.scope,
     ...(input.tripId !== undefined ? { tripId: input.tripId } : {}),
+    ...(input.transportSearchRequest ? { transportSearchRequest: input.transportSearchRequest } : {}),
     evidence: input.evidence.map((item) => ({
       id: item.id,
       origin: item.origin,

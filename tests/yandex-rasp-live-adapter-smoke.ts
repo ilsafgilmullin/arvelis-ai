@@ -22,6 +22,8 @@ async function main() {
   const commonEnv = {
     YANDEX_RASP_TERMS_RECHECKED_AT: '2026-09-09T09:30:00.000Z',
     YANDEX_RASP_QUOTA_CONFIRMED: 'true',
+    YANDEX_RASP_ATTRIBUTION_IMPLEMENTED: 'true',
+    YANDEX_RASP_OPERATIONAL_POLICY_ACCEPTED: 'true',
   };
 
   const disabled = createYandexRaspLiveProvider({ env: commonEnv, now });

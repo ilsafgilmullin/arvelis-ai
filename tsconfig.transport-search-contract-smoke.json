@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.qwen-runtime-evaluation-smoke.json",
+  "compilerOptions": {
+    "outDir": "tests/.dist-transport-search-contract"
+  },
+  "include": [
+    "tests/transport-search-contract-smoke.ts"
+  ]
+}
