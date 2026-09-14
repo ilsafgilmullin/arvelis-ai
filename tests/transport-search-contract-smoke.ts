@@ -55,6 +55,7 @@ async function main() {
     ['oversized payload', { ...request, extra: 'x'.repeat(8001) }],
     ['unknown fields', { ...request, rawPrompt: 'not allowed' }],
     ['nested arbitrary object', { ...request, passengers: { adults: 1, custom: {} } }],
+    ['object-injected enum', { ...request, origin: { ...request.origin, type: Object.create(null) as object } }],
     ['unknown location enum', { ...request, origin: { ...request.origin, type: 'planet' } }],
     ['currency format', { ...request, preferredCurrency: 'rub' }],
     ['non-currency code', { ...request, preferredCurrency: 'ZZZ' }],
@@ -184,6 +185,7 @@ async function main() {
   assert.equal(mappedResult.status, 'results');
   assert.ok('evidence' in mappedResult && mappedResult.evidence.every((item) => item.freshness === 'unknown'), 'Yandex fixture cannot manufacture current evidence');
   assert.throws(() => mapYandexSearchResponse({ ...raw, segments: [{ ...raw.segments[0], tickets_info: { places: [{ currency: 'ZZZ', price: { whole: 12, cents: 0 } }] } }] }, request, mapped[0]!, context.requestId, NOW), YandexSearchMappingError);
+  assert.throws(() => mapYandexSearchResponse({ ...raw, segments: [{ ...raw.segments[0], departure: Object.create(null) as object }] }, request, mapped[0]!, context.requestId, NOW), YandexSearchMappingError);
   assert.throws(() => mapYandexSearchResponse({}, request, mapped[0]!, context.requestId, NOW), YandexSearchMappingError);
   assert.throws(() => mapYandexSearchResponse({ ...raw, pagination: { total: 2 } }, request, mapped[0]!, context.requestId, NOW), YandexSearchMappingError);
   console.log(`production transport search contract: PASS (${invalid.length} invalid request variants; provider, mapping, evidence, freshness, routing and cancellation regressions)`);

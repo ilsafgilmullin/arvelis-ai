@@ -198,7 +198,7 @@ network requests. Provider request IDs/provenance correlate completed results.
 ## Verification and release evidence
 
 `npm run test:transport-search-contract` covers one-way/round-trip requests,
-28 invalid request variants, local-date boundaries, unresolved locations,
+29 invalid request variants, local-date boundaries, unresolved locations,
 provider inactivity/activation prerequisites, capability mismatch, failure,
 timeout, pre/in-flight cancellation, valid/malformed/no-results/stale results,
 currency/price semantics, provenance, native parameter invention, deterministic

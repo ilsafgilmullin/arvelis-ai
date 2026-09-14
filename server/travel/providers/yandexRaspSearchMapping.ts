@@ -49,7 +49,7 @@ export function mapYandexSearchResponse(raw: unknown, request: TransportSearchRe
     if (!segment.thread?.uid || segment.thread.transport_type !== mapped.params.get('transport_types') || segment.has_transfers || !segment.from?.code || !mapped.originStationCodes.includes(segment.from.code) || !segment.to?.code || !mapped.destinationStationCodes.includes(segment.to.code)) return fail();
     const places = segment.tickets_info?.places;
     if (places !== undefined && (!Array.isArray(places) || places.length > 64 || places.some((place) => !place || !isTransportCurrency(place.currency) || !place.price || !Number.isSafeInteger(place.price.whole) || place.price.whole! < 0 || !Number.isInteger(place.price.cents) || place.price.cents! < 0 || place.price.cents! > 99))) return fail();
-    if (!segment.departure || !segment.arrival || !/(?:Z|[+-]\d{2}:\d{2})$/.test(segment.departure) || !/(?:Z|[+-]\d{2}:\d{2})$/.test(segment.arrival)) return fail();
+    if (typeof segment.departure !== 'string' || typeof segment.arrival !== 'string' || !/(?:Z|[+-]\d{2}:\d{2})$/.test(segment.departure) || !/(?:Z|[+-]\d{2}:\d{2})$/.test(segment.arrival)) return fail();
     let route;
     try { route = mapSegment({ id: mapped.legId, fromLabel: origin.rawLabel, toLabel: destination.rawLabel, date: mapped.params.get('date')! }, segment, index); } catch { return fail(); }
     if (!route) return fail();

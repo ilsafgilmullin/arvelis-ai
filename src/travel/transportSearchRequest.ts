@@ -99,7 +99,7 @@ export function validateTransportSearchRequestV1(value: unknown, now = new Date(
     if (location === undefined) continue;
     if (!record(location, key, ['rawLabel', 'type', 'resolution', 'displayName', 'locationId', 'countryCode', 'region'])) continue;
     if (!text(location.rawLabel, 160)) issue(`${key}.rawLabel`);
-    if (!['city', 'station', 'airport', 'unknown'].includes(String(location.type))) issue(`${key}.type`);
+    if (typeof location.type !== 'string' || !['city', 'station', 'airport', 'unknown'].includes(location.type)) issue(`${key}.type`);
     if (location.resolution === 'resolved') {
       if (location.type === 'unknown') issue(`${key}.type`);
       if (!text(location.displayName, 160)) issue(`${key}.displayName`);
