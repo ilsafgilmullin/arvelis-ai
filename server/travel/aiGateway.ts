@@ -16,6 +16,8 @@ import {
 } from '../../src/travel/aiKnowledgeContracts';
 import type { AiGatewayServerContext, AiModelRuntime, KnowledgeRetriever, KnowledgeQuery } from './aiEnginePorts';
 import { AiToolRegistry, AiToolRegistryError } from './aiToolRegistry';
+import { isSafeTransportJson, transportSearchCompleteness, validateTransportSearchRequestV1 } from '../../src/travel/transportSearchRequest';
+import type { TransportSearchOutcome } from './transportSearchService';
 
 export const DEFAULT_AI_GATEWAY_TIMEOUT_MS = 30_000;
 export const MAX_AI_GATEWAY_TIMEOUT_MS = 120_000;
@@ -64,11 +66,13 @@ export class AiGatewayError extends Error {
   readonly code: AiGatewayErrorCode;
   readonly audit?: AiGatewayAudit;
   readonly validationErrors?: AiValidationError[];
+  readonly transportOutcome?: TransportSearchOutcome;
 
-  constructor(code: AiGatewayErrorCode, message: string, details: { audit?: AiGatewayAudit; validationErrors?: AiValidationError[]; cause?: unknown } = {}) {
+  constructor(code: AiGatewayErrorCode, message: string, details: { audit?: AiGatewayAudit; validationErrors?: AiValidationError[]; cause?: unknown; transportOutcome?: TransportSearchOutcome } = {}) {
     super(message);
     this.name = 'AiGatewayError';
     this.code = code;
+    if (details.transportOutcome) this.transportOutcome = details.transportOutcome;
     if (details.audit) this.audit = details.audit;
     if (details.validationErrors) this.validationErrors = details.validationErrors;
     if (details.cause !== undefined) Object.defineProperty(this, 'cause', { value: details.cause, enumerable: false });
@@ -79,7 +83,7 @@ const SAFE_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const TIMEOUT_MARKER = Symbol('ai-gateway-timeout');
 const ABORT_MARKER = Symbol('ai-gateway-abort');
 const TRANSPORT_CONTEXT_PATTERN = /(?:билет|поезд|самол[её]т|автобус|электричк|рейс|транспорт)/iu;
-const LIVE_TRANSPORT_FACT_PATTERN = /(?:цен|стоимост|расписан|отправлен|прибыт|наличи|доступн|свободн(?:ое|ые)?\s+мест)/iu;
+const LIVE_TRANSPORT_FACT_PATTERN = /(?:цен|стоимост|стоит|стоят|расписан|отправлен|прибыт|наличи|доступн|свободн(?:ое|ые)?\s+мест)/iu;
 
 function validScope(value: string): boolean {
   return value.length > 0 && value.length <= 128 && value.trim() === value;
@@ -93,6 +97,8 @@ function requiredTransportSearchCall(
   request: AiGatewayRequest,
   connectedTools: readonly AiToolDescriptor[],
   evidence: readonly AiEvidence[],
+  context: AiGatewayServerContext,
+  now: Date,
 ): AiToolCall | null {
   if (request.scope !== 'trip') return null;
   if (!connectedTools.some((tool) => tool.id === 'transport.search')) return null;
@@ -106,8 +112,17 @@ function requiredTransportSearchCall(
   return {
     id: REQUIRED_TRANSPORT_TOOL_CALL_ID,
     toolId: 'transport.search',
-    input: { intent: 'required-live-transport' },
+    input: validatedTransportInput(context, now),
   };
+}
+
+function validatedTransportInput(context: AiGatewayServerContext, now: Date): Record<string, unknown> {
+  const result = validateTransportSearchRequestV1(context.transportSearchRequest, now);
+  const issues = result.ok ? transportSearchCompleteness(result.request) : result.issues;
+  if (issues.length || !result.ok) throw new AiGatewayError('invalid_input', 'Required transport search parameters are missing or invalid.', {
+    transportOutcome: { status: 'not_executed', code: issues[0]!.code, issues },
+  });
+  return { ...result.request };
 }
 
 export class AiGateway {
@@ -266,9 +281,17 @@ export class AiGateway {
       }
 
       const connectedTools = this.tools.listConnectedTools();
+      let transportSearchCompletedWithEvidence = false;
       const executeToolCall = async (call: AiToolCall): Promise<void> => {
         try {
+          if (call.toolId === 'transport.search') {
+            const approved = validatedTransportInput(context, this.now());
+            // Model-generated calls cannot change the server-approved interpretation.
+            const stable = (value: unknown): string => JSON.stringify(value, (_key, item: unknown) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
+            if (!isSafeTransportJson(call.input) || stable(call.input) !== stable(approved)) throw new AiToolRegistryError('invalid_tool_input', 'Transport tool parameters differ from the authorized domain request.');
+          }
           const toolEvidence = await this.tools.execute(call, {
+            now: this.now(),
             accountScopeId: context.accountScopeId,
             ...(context.authorizedTripId ? { authorizedTripId: context.authorizedTripId } : {}),
             requestId,
@@ -277,19 +300,34 @@ export class AiGateway {
           evidence.push(...toolEvidence);
           toolCallsExecuted += 1;
           if (evidence.length > MAX_AI_EVIDENCE_ITEMS) throw new AiToolRegistryError('invalid_tool_output', 'AI evidence budget exceeded.');
+          if (call.toolId === 'transport.search' && toolEvidence.length > 0) transportSearchCompletedWithEvidence = true;
         } catch (error) {
           if (controller.signal.aborted) throw error;
+          if (error instanceof AiGatewayError) throw error;
           throw new AiGatewayError('tool_failure', 'AI tool execution failed.', {
+            ...(error instanceof AiToolRegistryError && error.transportOutcome ? { transportOutcome: error.transportOutcome } : {}),
             audit: this.audit(requestId, request, context, startedAt, 'tool_failure', { retrievalStatus, toolCallsExecuted, evidenceCount: evidence.length }),
             cause: error,
           });
         }
       };
 
-      const requiredTransportCall = requiredTransportSearchCall(request, connectedTools, evidence);
-      if (requiredTransportCall !== null) await executeToolCall(requiredTransportCall);
+      try {
+        const requiredTransportCall = requiredTransportSearchCall(request, connectedTools, evidence, context, this.now());
+        if (requiredTransportCall !== null) await executeToolCall(requiredTransportCall);
+      } catch (error) {
+        if (error instanceof AiGatewayError && !error.audit) throw new AiGatewayError(error.code, error.message, {
+          audit: this.audit(requestId, request, context, startedAt, 'rejected', { retrievalStatus, toolCallsExecuted, evidenceCount: evidence.length }),
+          ...(error.transportOutcome ? { transportOutcome: error.transportOutcome } : {}),
+        });
+        throw error;
+      }
 
       for (let round = 0; round <= MAX_AI_TOOL_ROUNDS; round += 1) {
+        // Keep the approved production request in the server execution path. Once
+        // transport evidence exists, this turn needs the evidence, not another search.
+        const runtimeTools = connectedTools.filter((tool) => tool.id !== 'transport.search' || !transportSearchCompletedWithEvidence);
+        const runtimeNeedsTransportRequest = runtimeTools.some((tool) => tool.id === 'transport.search');
         let turn;
         try {
           turn = await this.runtime!.generate({
@@ -299,8 +337,9 @@ export class AiGateway {
             locale: request.locale,
             scope: request.scope,
             ...(context.authorizedTripId ? { tripId: context.authorizedTripId } : {}),
+            ...(runtimeNeedsTransportRequest && context.transportSearchRequest ? { transportSearchRequest: structuredClone(context.transportSearchRequest) } : {}),
             evidence: [...evidence],
-            tools: connectedTools,
+            tools: structuredClone(runtimeTools),
           }, controller.signal);
         } catch (error) {
           if (controller.signal.aborted) throw error;
@@ -310,7 +349,7 @@ export class AiGateway {
           });
         }
 
-        const turnErrors = validateAiModelTurn(turn, requestId, connectedTools);
+        const turnErrors = validateAiModelTurn(turn, requestId, runtimeTools);
         if (turnErrors.length > 0) {
           throw new AiGatewayError('invalid_model_output', 'AI runtime returned an invalid structured turn.', {
             audit: this.audit(requestId, request, context, startedAt, 'invalid_model_output', { retrievalStatus, toolCallsExecuted, evidenceCount: evidence.length, validationErrors: turnErrors }),
@@ -328,6 +367,7 @@ export class AiGateway {
           continue;
         }
 
+        for (const item of evidence) if (item.expiresAt && Date.parse(item.expiresAt) <= this.now().getTime()) item.freshness = 'expired';
         const answerErrors = validateAiStructuredAnswer(turn.answer, requestId, evidence);
         if (answerErrors.length > 0) {
           throw new AiGatewayError('invalid_model_output', 'AI answer violates structured-output/evidence policy.', {

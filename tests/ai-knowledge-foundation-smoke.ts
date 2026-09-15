@@ -1,3 +1,5 @@
+import { syntheticTransportSearch } from '../server/travel/testing/syntheticTransportSearch';
+const searchFixture = syntheticTransportSearch(new Date());
 import assert from 'node:assert/strict';
 import {
   AI_FOUNDATION_CRITICAL_EVAL_IDS,
@@ -15,7 +17,7 @@ const tripRequest = {
   locale: 'ru-RU',
   scope: 'trip',
 } satisfies AiGatewayRequest;
-const context = { accountScopeId: 'acct-ai', authorizedTripId: 'trip-ai' };
+const context = { accountScopeId: 'acct-ai', authorizedTripId: 'trip-ai', transportSearchRequest: searchFixture };
 
 async function expectGatewayError(promise: Promise<unknown>, code: AiGatewayError['code']) {
   await assert.rejects(promise, (error: unknown) => error instanceof AiGatewayError && error.code === code);
@@ -71,7 +73,7 @@ async function main() {
     async handler(input, toolContext) {
       assert.equal(toolContext.accountScopeId, 'acct-ai');
       assert.equal(toolContext.authorizedTripId, 'trip-ai');
-      assert.deepEqual(input, { intent: 'best-price' });
+      assert.deepEqual(input, searchFixture);
       return {
         evidence: [{
           id: 'price-1',
@@ -97,7 +99,7 @@ async function main() {
           version: 1,
           requestId: input.requestId,
           kind: 'tool_calls',
-          calls: [{ id: 'transport-call-1', toolId: 'transport.search', input: { intent: 'best-price' } }],
+          calls: [{ id: 'transport-call-1', toolId: 'transport.search', input: searchFixture }],
         };
       }
       const evidence = input.evidence.find((item) => item.id === 'tool:transport-call-1:price-1');
@@ -246,7 +248,7 @@ async function main() {
     id: 'runtime-stale',
     async generate(input) {
       staleRound += 1;
-      if (staleRound === 1) return { version: 1, requestId: input.requestId, kind: 'tool_calls', calls: [{ id: 'stale-call', toolId: 'transport.search', input: {} }] };
+      if (staleRound === 1) return { version: 1, requestId: input.requestId, kind: 'tool_calls', calls: [{ id: 'stale-call', toolId: 'transport.search', input: searchFixture }] };
       return {
         version: 1,
         requestId: input.requestId,

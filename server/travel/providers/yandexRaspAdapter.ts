@@ -128,7 +128,7 @@ function extractFromPrice(segment: YandexRaspSegment): TransportMoney | undefine
   };
 }
 
-function mapSegment(leg: TransportSearchLeg, segment: YandexRaspSegment, index: number): NormalizedTransportRoute | null {
+export function mapSegment(leg: TransportSearchLeg, segment: YandexRaspSegment, index: number): NormalizedTransportRoute | null {
   if (segment.has_transfers === true) return null;
   if (!segment.departure || !segment.arrival || !segment.from?.title || !segment.to?.title) return null;
 

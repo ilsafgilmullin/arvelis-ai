@@ -35,6 +35,8 @@ export type TransportSearchRequest = {
 };
 
 export type TransportLocation = {
+  /** Trusted ARVELIS location binding on production search results. */
+  locationId?: string;
   label: string;
   code?: string;
 };

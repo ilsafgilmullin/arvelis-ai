@@ -61,6 +61,8 @@ export type TransportProviderActivationContext = {
   termsRecheckedAt: string;
   credentialsConfigured: boolean;
   quotaConfirmed: boolean;
+  attributionImplemented?: boolean;
+  operationalPolicyAccepted?: boolean;
   monthlyActiveUsers?: number;
   userInitiatedBookingFlowApproved: boolean;
 };
@@ -69,6 +71,8 @@ export type TransportProviderActivationBlocker =
   | 'strategy_not_selected_for_live_adapter'
   | 'product_access_incompatible'
   | 'terms_review_stale'
+  | 'attribution_not_implemented'
+  | 'operational_policy_not_accepted'
   | 'credentials_missing'
   | 'quota_unconfirmed'
   | 'minimum_mau_not_met'
@@ -242,6 +246,8 @@ export function evaluateTransportProviderActivation(
   if (!isValidReviewTimestamp(context.termsRecheckedAt) || Math.abs(now.getTime() - reviewedAt) > MAX_TERMS_REVIEW_AGE_MS) {
     blockers.push('terms_review_stale');
   }
+  if (descriptor.attribution.required && context.attributionImplemented !== true) blockers.push('attribution_not_implemented');
+  if (context.operationalPolicyAccepted !== true) blockers.push('operational_policy_not_accepted');
   if (!context.credentialsConfigured) blockers.push('credentials_missing');
   if (descriptor.quota.verificationRequiredBeforeActivation && !context.quotaConfirmed) blockers.push('quota_unconfirmed');
 

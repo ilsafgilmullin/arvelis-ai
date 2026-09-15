@@ -60,6 +60,8 @@ export type AiEvidence = {
   providerId?: string;
   sourceUrl?: string;
   retrievedAt?: string;
+  expiresAt?: string;
+  provenance?: { requestId: string; routeId: string; providerRouteId: string; dataKind: 'synthetic' | 'provider' };
 };
 
 export type AiToolDescriptor = {

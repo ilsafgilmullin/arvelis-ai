@@ -234,6 +234,8 @@ export function createYandexRaspLiveProvider(options: YandexRaspLiveProviderOpti
     termsRecheckedAt,
     credentialsConfigured: apiKey.length > 0,
     quotaConfirmed,
+    attributionImplemented: readBoolean(env.YANDEX_RASP_ATTRIBUTION_IMPLEMENTED),
+    operationalPolicyAccepted: readBoolean(env.YANDEX_RASP_OPERATIONAL_POLICY_ACCEPTED),
     userInitiatedBookingFlowApproved: false,
   }, now());
 

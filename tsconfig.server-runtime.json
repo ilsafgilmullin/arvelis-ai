@@ -57,6 +57,7 @@
     "server/travel/postgresKnowledgeRetriever.ts",
     "server/travel/transportProviderPolicy.ts",
     "server/travel/providers/yandexRaspAdapter.ts",
+    "server/travel/providers/yandexRaspSearchMapping.ts",
     "server/travel/providers/yandexRaspHttpClient.ts",
     "server/travel/providers/yandexRaspLiveProvider.ts",
     "server/persistence/postgres/rows.ts",
