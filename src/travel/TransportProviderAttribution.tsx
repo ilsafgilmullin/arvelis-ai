@@ -1,0 +1,40 @@
+import type { ReactNode } from 'react';
+import type { TransportResultMetadata } from './transportResultMetadata';
+
+type TransportAttribution = TransportResultMetadata['attribution'];
+
+function safeHttpsHref(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Presentation-only attribution for normalized provider results.
+ * `banner` must be a trusted local React asset/component; provider HTML is never
+ * accepted or rendered here. A required-but-missing banner stays visibly marked in
+ * the DOM so activation cannot be confused with completed attribution.
+ */
+export function TransportProviderAttribution({ attribution, banner }: {
+  attribution: TransportAttribution;
+  banner?: ReactNode;
+}) {
+  if (!attribution.required) return null;
+  const href = safeHttpsHref(attribution.url);
+  const bannerState = attribution.bannerRequired ? (banner ? 'ready' : 'pending') : 'not-required';
+
+  return <aside
+    className="travel-provider-attribution"
+    aria-label={`Источник транспортных данных: ${attribution.providerName}`}
+    data-placement={attribution.placement}
+    data-banner-state={bannerState}
+  >
+    {banner ? <div className="travel-provider-attribution__banner" aria-hidden="true">{banner}</div> : null}
+    {href
+      ? <a href={href} target="_blank" rel="noopener noreferrer">{attribution.text}</a>
+      : <span>{attribution.text}</span>}
+  </aside>;
+}

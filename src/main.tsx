@@ -31,6 +31,7 @@ import './travel/travel-v2-responsive.css';
 import './travel/travel-v2-auth.css';
 import './travel/travel-v2-polish.css';
 import './travel/travel-map-v1.css';
+import './travel/travel-provider-attribution.css';
 
 const root = document.getElementById('root');
 
