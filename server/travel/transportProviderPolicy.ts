@@ -109,7 +109,7 @@ export const YANDEX_RASP_V3_DESCRIPTOR: TransportProviderDescriptor = {
     verificationRequiredBeforeActivation: true,
     publishedLimit: null,
   },
-  termsReviewedAt: '2026-09-09T08:00:00.000Z',
+  termsReviewedAt: '2026-09-15T00:00:00.000Z',
   officialTermsUrls: [
     'https://yandex.ru/legal/timetable_api/ru/',
     'https://yandex.ru/dev/rasp/doc/ru/',
@@ -122,6 +122,7 @@ export const YANDEX_RASP_V3_DESCRIPTOR: TransportProviderDescriptor = {
     'Raw or normalized provider data must not become long-lived Trip persistence; only temporary cache permitted by reviewed terms.',
     'No numeric public quota was confirmed in the reviewed public documentation; issued-key quota must be confirmed before activation.',
     'Electronic-ticket marker is not seat availability and must not be mapped to available.',
+    'Normalized live V1: direct schedules, no cache, bounded pages, prices only cached observations; copyright banner/UI attribution required before activation.',
   ],
 };
 

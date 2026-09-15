@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "environment": "development",
+  "entries": [
+    {
+      "locationId": "arvelis:dev:station:moscow-kazansky",
+      "locationType": "station",
+      "searchCode": "s2000003",
+      "stationCodes": ["s2000003"],
+      "verifiedAt": "2026-09-15T20:34:06.000Z"
+    },
+    {
+      "locationId": "arvelis:dev:station:kazan-pass",
+      "locationType": "station",
+      "searchCode": "s9623141",
+      "stationCodes": ["s9623141"],
+      "verifiedAt": "2026-09-15T20:34:06.000Z"
+    }
+  ]
+}

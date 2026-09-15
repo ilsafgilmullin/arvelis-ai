@@ -1,4 +1,5 @@
 import type { Trip } from './domain';
+import { validTransportResultMetadata, type TransportResultMetadata } from './transportResultMetadata';
 
 export const TRANSPORT_CONTRACT_VERSION = 1 as const;
 
@@ -68,6 +69,8 @@ export type NormalizedTransportRoute = {
   price?: TransportMoney;
   availability: TransportAvailability;
   validUntil?: string;
+  /** Actual page retrieval for this route, when multiple provider operations are combined. */
+  retrievedAt?: string;
   sourceUrl?: string;
 };
 
@@ -77,6 +80,7 @@ export type TransportSearchResponse = {
   requestId: string;
   retrievedAt: string;
   routes: NormalizedTransportRoute[];
+  metadata?: TransportResultMetadata;
 };
 
 export type TransportContractErrorCode =
@@ -217,6 +221,7 @@ export function validateTransportSearchResponse(
   if (!validId(response.requestId)) errors.push({ path: 'requestId', code: 'invalid_value' });
   else if (response.requestId !== expectedRequestId) errors.push({ path: 'requestId', code: 'request_mismatch' });
   if (!validIsoDateTime(response.retrievedAt)) errors.push({ path: 'retrievedAt', code: 'invalid_value' });
+  if (response.metadata !== undefined && !validTransportResultMetadata(response.metadata)) errors.push({ path: 'metadata', code: 'invalid_value' });
   if (!Array.isArray(response.routes) || response.routes.length > 128) errors.push({ path: 'routes', code: 'invalid_shape' });
   if (errors.length > 0) return errors;
 
@@ -226,6 +231,10 @@ export function validateTransportSearchResponse(
   const allowedLegIds = new Set(expectedLegIds);
 
   routes.forEach((route, routeIndex) => {
+    if (route.retrievedAt !== undefined && (!validIsoDateTime(route.retrievedAt) || Date.parse(route.retrievedAt) < retrievedAtMs
+      || (route.validUntil !== undefined && Date.parse(route.validUntil) < Date.parse(route.retrievedAt)))) {
+      errors.push({ path: `routes[${routeIndex}].retrievedAt`, code: 'invalid_value' });
+    }
     if (!validId(route.id)) errors.push({ path: `routes[${routeIndex}].id`, code: 'invalid_value' });
     if (!validId(route.legId)) errors.push({ path: `routes[${routeIndex}].legId`, code: 'invalid_value' });
     else if (allowedLegIds.size > 0 && !allowedLegIds.has(route.legId)) {
