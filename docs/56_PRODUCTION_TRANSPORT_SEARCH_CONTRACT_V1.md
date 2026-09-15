@@ -1,6 +1,6 @@
 # Production Transport Search Contract V1
 
-Date: 2026-09-14. Branch: `feat/travel-production-transport-search-contract-v1`.
+Date: 2026-09-14; qualification follow-up: 2026-09-15. Branch: `feat/travel-production-transport-search-contract-v1`.
 Stacked base: Draft PR #39, `feat/travel-required-tool-routing-v1`,
 qualified SHA `7308b824bbf4322a65ef768392c3c8fa2635de96`.
 
@@ -305,6 +305,86 @@ The live workflow now also watches this document, so a release-evidence commit
 triggers qualification of its actual HEAD. Runner, model and evaluation settings
 are unchanged. Post-fix live performance and semantic conclusions require raw
 artifact review; they are not inferred from the deterministic payload bound.
+
+### First controlled post-fix live evidence
+
+[Live #13 / 34925855242](https://github.com/ilsafgilmullin/arvelis-ai/actions/runs/34925855242)
+tested fix SHA `61ad359b17df7896407ea39883534ced20a88386` on a clean four-core
+free CPU runner, with the same pinned model/llama.cpp and no transport-prefix
+warm-up. Workflow SUCCESS; evaluation **QUALIFIED**. Artifact `10380456262` was
+downloaded and unpacked; its locally verified SHA-256 is
+`de780b65c26eff78d6596eb719c2809742ea0fe6e1b5217666809f378c498433`.
+
+All 28 exchanges and all 28 llama slot requests are present, with one model turn
+per attempt, no native tool-call responses and no cancellations. All three normal
+golden runs and the reproducibility run PASS; structured validation and protected
+policy are 100%, violations zero, timeouts zero. Required routing is price 4/4,
+prose/claims 4/4 and stale 4/4. Model and llama.cpp hashes match #12 exactly.
+
+Manual semantic review inspected all eight current target messages, claims and
+actual runtime evidence, not just the inherited semantic-review booleans:
+
+| Profile | Price case | Prose/claims case |
+| --- | --- | --- |
+| normal 1 | PASS: message `12345 RUB`, matching price fact | PASS: explicitly synthetic `12345 РУБ` in message and claim |
+| normal 2 | PASS: message `12345 RUB`, matching price fact | PASS: explicitly synthetic `12345 РУБ` in message and claim |
+| normal 3 | PASS: message `12345 RUB`, matching price fact | PASS: explicitly synthetic `12345 РУБ` in message and claim |
+| reproducible 1 | PASS: message `12345 RUB`, matching price fact | PASS: explicitly synthetic `12345 РУБ` in message and claim |
+
+Every target claim uses mode `fact`, domain `price`, and exact existing evidence
+ID `tool:required-transport-search-v1:synthetic-price-current`. Supplied evidence
+is current and provider-origin, with the same text, source identity and retrieval
+instant as before projection. Each response finishes within the fixture's five-minute
+freshness window. No target narrates or simulates the completed tool call or invents
+an ID/call. These are synthetic evaluation prices, never discovered real tickets.
+
+All four stale messages decline to confirm a current price, but still include
+historical price fact claims referencing expired evidence. The unchanged gateway
+rejects all four with `protected_fact_requires_tool_evidence`. A replay of the
+existing structured/evidence validator against all 28 raw responses confirms these
+four rejections and four knowledge-only legal rejections. They account for report
+errorCount 8; none is a timeout or an accepted protected-fact violation. This is
+fail-closed validation, not a claim that every raw stale answer is acceptable.
+
+| Measured metric | Before: #12 | After: #13 |
+| --- | ---: | ---: |
+| Price normal 2 request body, bytes | 8,448 | 4,718 |
+| Transport schema / tools array sent, bytes | 2,848 / 3,072 | 0 / 0 (absent) |
+| Runtime context / executed request, bytes | 1,037 / 520 | 491 / 0 |
+| Evidence array, bytes | 336 | 336 |
+| Prompt / completion tokens | 1,946 / 93 | 678 / 93 |
+| Prompt evaluation, seconds | 51.456 | 47.877 |
+| Generation, seconds | 17.657 | 14.474 |
+| Runtime exchange, seconds | 69.159 | 62.370 |
+| Overall attempt p50, seconds | 60.391 | 44.845 |
+| Overall attempt p95, seconds | 90.005 | 63.125 |
+| Overall attempt max, seconds | 90.011 | 63.554 |
+| Timeouts | 2 | 0 |
+| Median generation tokens/s | 6.42 | 6.50 |
+
+Cold first price attempt: task 280, 678 prompt / 93 completion tokens, cached prefix
+97 tokens, prompt evaluation 48.341 s, generation 14.753 s, runtime 63.121 s.
+It releases the slot normally; the following legal request does not cascade into
+a timeout. The runtime adapter remains at its 90 s deadline. Normal run 2 also has
+only 97 cached tokens (581 processed), versus #12's 1,409 cached / 537 processed.
+Thus the warm-pair latency change must not be described as proportional to total
+prompt-token reduction. All four price attempts in #13 use this small 97-token
+common prefix; later successful price runs do not rely on a warmed transport schema.
+
+[Push CI 34925855173](https://github.com/ilsafgilmullin/arvelis-ai/actions/runs/34925855173)
+and [PR CI 34925857902](https://github.com/ilsafgilmullin/arvelis-ai/actions/runs/34925857902)
+are SUCCESS: validate, full npm check, browser happy-path, both builds, all smoke
+suites; PR CI also passes PostgreSQL migrations/Trip ownership and pgvector
+isolation/retrieval. PR test merge `94c631d6af1a29d22b68afa45fed116c6ed9a391`
+has exactly the fix HEAD tree `31341ed27045a72761a1d5dab175046a317c4fb1`.
+
+This evidence-documentation commit changes no executable code. It intentionally
+triggers a second independent clean-start live evaluation and CI for its new HEAD.
+The final repeat's run IDs, actual HEAD, raw review and conclusions are maintained
+in the [PR #40 release description](https://github.com/ilsafgilmullin/arvelis-ai/pull/40),
+so recording them does not create another untested source commit. Completion still
+requires that final exact-head repeat to qualify with timeout zero and an 8/8 manual
+review; the first controlled run alone does not establish stability.
 
 ## Production blockers and next slice
 
