@@ -27,6 +27,7 @@
     "server/travel/providers/yandexRaspTrustedBindings.ts",
     "tests/yandex-rasp-live-adapter-smoke.ts",
     "tests/yandex-rasp-normalized-provider-smoke.ts",
-    "tests/yandex-rasp-trusted-bindings-smoke.ts"
+    "tests/yandex-rasp-trusted-bindings-smoke.ts",
+    "tests/yandex-rasp-development-live-smoke.ts"
   ]
 }

@@ -35,6 +35,7 @@
     "eval:qwen-local-live": "node scripts/qwen-local-live-eval.mjs",
     "test:transport-provider-foundation": "node scripts/prepare-smoke-runtime.mjs transport-provider-foundation && tsc -p tsconfig.transport-provider-foundation-smoke.json && node tests/.dist-transport-provider-foundation/tests/transport-provider-foundation-smoke.js && npm run test:map-provider-foundation && npm run test:legal-foundation",
     "test:yandex-rasp-live": "node scripts/prepare-smoke-runtime.mjs yandex-rasp-live && tsc -p tsconfig.yandex-rasp-live-smoke.json && node tests/.dist-yandex-rasp-live/tests/yandex-rasp-live-adapter-smoke.js && node tests/.dist-yandex-rasp-live/tests/yandex-rasp-normalized-provider-smoke.js && node tests/.dist-yandex-rasp-live/tests/yandex-rasp-trusted-bindings-smoke.js",
+    "smoke:yandex-rasp-development": "node scripts/prepare-smoke-runtime.mjs yandex-rasp-live && tsc -p tsconfig.yandex-rasp-live-smoke.json && node tests/.dist-yandex-rasp-live/tests/yandex-rasp-development-live-smoke.js",
     "test:travel-browser": "node tests/travel-browser-acceptance-runner.mjs",
     "db:migrate": "node scripts/migrate-auth-db.mjs",
     "test:server-db": "node scripts/prepare-smoke-runtime.mjs server-db && tsc -p tsconfig.server-db-smoke.json && node tests/.dist-server-db/tests/postgres-auth-persistence-smoke.js",
