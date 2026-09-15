@@ -34,11 +34,16 @@
   display: inline-flex;
   align-items: center;
   max-width: 100%;
+  overflow: hidden;
 }
 
-.travel-provider-attribution__banner > * {
+.travel-provider-attribution__official-banner {
+  display: block;
+  width: 240px;
   max-width: 100%;
-  height: auto;
+  height: 130px;
+  border: 0;
+  overflow: hidden;
 }
 
 @media (max-width: 700px) {

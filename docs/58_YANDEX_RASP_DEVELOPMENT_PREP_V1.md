@@ -49,23 +49,36 @@ Official references rechecked on 2026-09-15:
 - copyright endpoint: https://yandex.ru/dev/rasp/doc/ru/reference/query-copyright
 - API terms: https://yandex.ru/legal/timetable_api/ru/
 
-The current terms require Yandex Rasp attribution in the product description/help/site
-and on every screen/page using Yandex Rasp data, immediately above or below the data,
-with the specified source text and active link. The current `/copyright/` documentation
-also returns banner variants and instructs placing banner, notification text and URL near
-the schedule data.
+The current `/copyright/` documentation requires the provider material to sit immediately
+above or below the Yandex-backed schedule data and specifies the order: banner,
+notification text, then the Yandex Rasp URL. The current API terms also require the
+source indication to remain visible and not be hidden or modified.
 
-`TransportProviderAttribution` already provides a provider-neutral, mobile-safe text/link
-presentation without raw provider HTML. It does not use `dangerouslySetInnerHTML`.
-However the safe Yandex banner component and final placement beside actual provider-backed
-results are not complete because the current UI has no Yandex result surface.
+`TransportProviderAttribution` continues to provide provider-neutral text/link
+presentation without raw provider HTML and without `dangerouslySetInnerHTML`.
+The attribution foundation now also includes `YandexRaspCopyrightBanner` and
+`YandexRaspProviderAttribution`:
 
+- the banner uses the official documented provider-hosted monochrome vertical banner
+  endpoint `https://yandex.st/rasp/media/apicc/copyright_vert_mono.html`;
+- no provider iframe markup returned by `/copyright/` is injected into the DOM;
+- the iframe is sandboxed, non-focusable, lazy-loaded and sends no referrer;
+- the Yandex-specific wrapper supplies the banner only when the reviewed provider name,
+  canonical `https://rasp.yandex.ru/` link and `bannerRequired` metadata still match;
+- mobile CSS caps the banner to the available width and prevents horizontal overflow;
+- deterministic CI checks lock the banner URL and prohibit `dangerouslySetInnerHTML`
+  and `srcDoc` regressions.
+
+This completes the **safe banner presentation primitive**, but not the final product
+placement. The current Travel UI still has no user-facing Yandex-backed result surface,
+so there is nowhere truthful to attach the mandatory attribution adjacent to live data.
 Therefore:
 
 `YANDEX_RASP_ATTRIBUTION_IMPLEMENTED=false`
 
-must remain false. No user-facing Yandex data may be activated before that gate is
-completed.
+must remain false. No user-facing Yandex data may be activated before the real result
+surface uses `YandexRaspProviderAttribution` directly above or below every Yandex-backed
+result block and that placement is browser-tested.
 
 The current API terms allow use only in products available for free open use to an
 unlimited audience; registration itself is not treated as restricted access. ARVELIS is
@@ -109,12 +122,26 @@ YANDEX_RASP_OPERATIONAL_POLICY_ACCEPTED=false
 `YANDEX_RASP_TERMS_RECHECKED_AT` also remains an application activation gate rather than
 a requirement for this isolated credential/binding verification.
 
+## Automation boundary
+
+The protected development credential currently exists only inside the user's Replit
+secret store. GitHub Actions intentionally has no copy of that secret and ordinary CI
+must remain credential-free. This means repository-side automation can prepare, compile
+and test the live-smoke path, but cannot truthfully execute the external Yandex request
+unless the credential becomes available to that runtime through a separately approved
+protected-secret channel.
+
+No Replit Agent is required or used by this preparation. Production deployment,
+production secret changes and merge remain separately prohibited without explicit
+approval.
+
 ## Next gates
 
 After the private smoke succeeds:
 
 1. inspect the sanitized result and any strict-response mismatch before changing code;
-2. finish safe Yandex copyright banner presentation and result-adjacent placement;
+2. attach `YandexRaspProviderAttribution` directly to the first real provider-backed
+   result surface and browser-test the adjacent placement;
 3. record the current free-public/quota/operational decisions in the development
    activation policy without changing production secrets;
 4. only then run a bounded normalized provider live verification;

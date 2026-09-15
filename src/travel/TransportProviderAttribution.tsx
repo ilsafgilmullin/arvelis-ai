@@ -3,6 +3,13 @@ import type { TransportResultMetadata } from './transportResultMetadata';
 
 type TransportAttribution = TransportResultMetadata['attribution'];
 
+/**
+ * Official Yandex Rasp monochrome banner endpoint from the documented /copyright/
+ * response contract. We reference the provider-hosted banner directly instead of
+ * copying or modifying provider artwork and never render provider-supplied HTML.
+ */
+export const YANDEX_RASP_COPYRIGHT_BANNER_URL = 'https://yandex.st/rasp/media/apicc/copyright_vert_mono.html';
+
 function safeHttpsHref(value: string): string | null {
   try {
     const url = new URL(value);
@@ -10,6 +17,20 @@ function safeHttpsHref(value: string): string | null {
   } catch {
     return null;
   }
+}
+
+export function YandexRaspCopyrightBanner() {
+  return <iframe
+    className="travel-provider-attribution__official-banner"
+    src={YANDEX_RASP_COPYRIGHT_BANNER_URL}
+    title="Яндекс Расписания"
+    width="240"
+    height="130"
+    loading="lazy"
+    referrerPolicy="no-referrer"
+    sandbox=""
+    tabIndex={-1}
+  />;
 }
 
 /**
@@ -37,4 +58,20 @@ export function TransportProviderAttribution({ attribution, banner }: {
       ? <a href={href} target="_blank" rel="noopener noreferrer">{attribution.text}</a>
       : <span>{attribution.text}</span>}
   </aside>;
+}
+
+/**
+ * Yandex-specific fail-closed wrapper. If metadata no longer matches the reviewed
+ * provider identity/link contract, the official banner is withheld and the generic
+ * component remains in `pending` banner state.
+ */
+export function YandexRaspProviderAttribution({ attribution }: { attribution: TransportAttribution }) {
+  const reviewedYandexMetadata = attribution.providerName === 'Яндекс Расписания'
+    && attribution.url === 'https://rasp.yandex.ru/'
+    && attribution.bannerRequired;
+
+  return <TransportProviderAttribution
+    attribution={attribution}
+    banner={reviewedYandexMetadata ? <YandexRaspCopyrightBanner /> : undefined}
+  />;
 }
