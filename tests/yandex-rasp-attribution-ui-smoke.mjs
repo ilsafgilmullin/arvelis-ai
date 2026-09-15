@@ -14,10 +14,18 @@ assert.ok(component.includes('tabIndex={-1}'));
 assert.ok(component.includes("attribution.providerName === 'Яндекс Расписания'"));
 assert.ok(component.includes("attribution.url === 'https://rasp.yandex.ru/'"));
 assert.ok(component.includes('&& attribution.bannerRequired'));
-assert.ok(component.includes("data-banner-state={bannerState}"));
+assert.ok(component.includes('data-banner-state={bannerState}'));
+assert.ok(component.includes("data-link-state={href ? 'ready' : 'invalid'}"));
 assert.equal(component.includes('dangerouslySetInnerHTML'), false);
 assert.equal(component.includes('srcDoc='), false);
 assert.equal(component.includes('<script'), false);
+
+const bannerPosition = component.indexOf('travel-provider-attribution__banner');
+const textPosition = component.indexOf('travel-provider-attribution__text');
+const urlPosition = component.indexOf('travel-provider-attribution__url');
+assert.ok(bannerPosition >= 0 && textPosition > bannerPosition && urlPosition > textPosition, 'Attribution order must stay banner -> text -> URL.');
+assert.ok(component.includes('{attribution.text}</span>'));
+assert.ok(component.includes('>{attribution.url}</a>'));
 
 assert.ok(css.includes('.travel-provider-attribution__official-banner'));
 assert.ok(css.includes('width: 240px'));

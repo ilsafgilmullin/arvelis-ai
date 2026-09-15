@@ -38,6 +38,8 @@ export function YandexRaspCopyrightBanner() {
  * `banner` must be a trusted local React asset/component; provider HTML is never
  * accepted or rendered here. A required-but-missing banner stays visibly marked in
  * the DOM so activation cannot be confused with completed attribution.
+ *
+ * Ordering is deliberate: banner -> notification text -> provider URL.
  */
 export function TransportProviderAttribution({ attribution, banner }: {
   attribution: TransportAttribution;
@@ -52,11 +54,13 @@ export function TransportProviderAttribution({ attribution, banner }: {
     aria-label={`Источник транспортных данных: ${attribution.providerName}`}
     data-placement={attribution.placement}
     data-banner-state={bannerState}
+    data-link-state={href ? 'ready' : 'invalid'}
   >
     {banner ? <div className="travel-provider-attribution__banner" aria-hidden="true">{banner}</div> : null}
+    <span className="travel-provider-attribution__text">{attribution.text}</span>
     {href
-      ? <a href={href} target="_blank" rel="noopener noreferrer">{attribution.text}</a>
-      : <span>{attribution.text}</span>}
+      ? <a className="travel-provider-attribution__url" href={href} target="_blank" rel="noopener noreferrer">{attribution.url}</a>
+      : null}
   </aside>;
 }
 
