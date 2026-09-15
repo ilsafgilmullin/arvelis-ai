@@ -20,6 +20,7 @@ on:
       - 'server/travel/runtimes/qwenLlamaCppRuntime.ts'
       - 'server/travel/qwenGoldenEvaluation.ts'
       - 'scripts/qwen-local-live-eval.mjs'
+      - 'docs/56_PRODUCTION_TRANSPORT_SEARCH_CONTRACT_V1.md'
   workflow_dispatch:
 
 permissions:

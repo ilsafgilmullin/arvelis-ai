@@ -143,10 +143,12 @@ async function main() {
   assert.equal(result.evaluation[0]?.authoritative, true);
   assert.equal(result.answer.claims[0]?.evidenceIds[0], 'tool:required-transport-search-v1:route-0-price');
   const beforeCalls = runtimeCalls;
+  const beforeIncompleteProviderCalls = providerCalls;
   for (const params of [undefined, unresolved]) {
     await assert.rejects(gateway().run(aiRequest, { accountScopeId: context.accountScopeId, authorizedTripId: context.authorizedTripId, ...(params ? { transportSearchRequest: params } : {}) }), (e: unknown) => e instanceof AiGatewayError && e.transportOutcome?.status === 'not_executed');
   }
   assert.equal(runtimeCalls, beforeCalls, 'incomplete request invokes neither model nor provider');
+  assert.equal(providerCalls, beforeIncompleteProviderCalls, 'incomplete request never reaches the provider');
   await assert.rejects(gateway(provider(async () => expired)).run(aiRequest, gatewayContext), (e: unknown) => e instanceof AiGatewayError && e.validationErrors?.some((issue) => issue.code === 'protected_fact_requires_tool_evidence') === true);
   await assert.rejects(gateway(provider(async () => empty)).run(aiRequest, gatewayContext), (e: unknown) => e instanceof AiGatewayError && e.transportOutcome?.status === 'no_results');
   let modelClock = NOW;

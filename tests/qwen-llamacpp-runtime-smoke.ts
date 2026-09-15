@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { AiRuntimeInput } from '../server/travel/aiEnginePorts';
+import { AiGateway } from '../server/travel/aiGateway';
+import { AiToolRegistry } from '../server/travel/aiToolRegistry';
 import {
   QWEN_LLAMACPP_ADAPTER_VERSION,
   QWEN_LLAMACPP_MAX_RESPONSE_BYTES,
@@ -204,6 +206,52 @@ async function main() {
     // Run #8 reproduced a status-only message despite a correct numeric claim.
     // Lock the post-tool task at the model input boundary, without repairing output.
     const pricePrompt = QWEN_GOLDEN_CASES.find((item) => item.id === 'tool_backed_price_can_be_authoritative')!.prompt;
+
+    // Exercise the actual Gateway -> llama.cpp serializer boundary. Run #12 sent
+    // an 8.4 KB body because the completed production tool/request were repeated.
+    const projectionNow = new Date();
+    const approvedRequest = syntheticTransportSearch(projectionNow);
+    const projectionRequestId = 'live-normal-1-tool_backed_price_can_be_authoritative';
+    const suppliedEvidence = { ...runtimeInput(projectionRequestId, true, true).evidence[0]!, retrievedAt: projectionNow.toISOString() };
+    const projectedBodies: string[] = [];
+    let projectionToolCalls = 0;
+    const projectionRuntime = new QwenLlamaCppRuntime({ baseUrl, fetchImpl: async (_url, options) => {
+      const body = String(options?.body);
+      projectedBodies.push(body);
+      const projected = JSON.parse(body) as Record<string, unknown>;
+      assert.equal(Object.hasOwn(projected, 'tools'), false, 'no completed transport schema reaches HTTP');
+      assert.equal(projected.tool_choice, 'none');
+      const messages = projected.messages as Array<{ content: string }>;
+      const modelContext = JSON.parse(messages[1]!.content.split('\n')[1]!) as Record<string, unknown>;
+      assert.equal(Object.hasOwn(modelContext, 'transportSearchRequest'), false);
+      assert.equal(body.includes('arvelis:synthetic-origin'), false, 'executed location/request is not duplicated in any message');
+      assert.deepEqual(modelContext.evidence, [suppliedEvidence], 'all existing model-facing evidence fields survive unchanged');
+      assert.ok(Buffer.byteLength(body) < 5_000, 'synthetic price payload must stay below 5 KB without transport schema/request');
+      return new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: JSON.stringify({
+        version: 1, requestId: projectionRequestId, message: 'SYNTHETIC: 12345 RUB.',
+        claims: [{ id: 'synthetic-price', domain: 'price', statement: 'SYNTHETIC: 12345 RUB.', mode: 'fact', evidenceIds: [suppliedEvidence.id] }],
+      }) } }] }), { headers: { 'content-type': 'application/json' } });
+    } });
+    const projectionGateway = new AiGateway({ runtime: projectionRuntime, now: () => projectionNow, requestId: () => projectionRequestId,
+      tools: new AiToolRegistry([{ id: 'transport.search', async handler(input) {
+        projectionToolCalls += 1;
+        assert.deepEqual(input, approvedRequest, 'full approved production request still reaches server execution');
+        return { evidence: [{ ...suppliedEvidence, id: 'synthetic-price-current' }] };
+      } }]),
+    });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const result = await projectionGateway.run({ version: 1, prompt: pricePrompt, locale: 'ru-RU', scope: 'trip' }, {
+        accountScopeId: 'synthetic-account', authorizedTripId: 'synthetic-eval-trip', transportSearchRequest: approvedRequest,
+      });
+      assert.equal(result.evaluation[0]?.authoritative, true);
+      assert.deepEqual(result.evidence, [suppliedEvidence]);
+      assert.equal(result.audit.toolCallsExecuted, 1);
+      assert.equal(projectionRuntime.drainLocalExchanges().length, 1, 'one generation per target attempt; no retry/extra turn');
+    }
+    assert.equal(projectionToolCalls, 2);
+    assert.equal(projectedBodies.length, 2);
+    assert.equal(projectedBodies[0], projectedBodies[1], 'runtime projection is deterministic for the same input and clock');
+
     const regressionInput = { ...runtimeInput('post-tool-regression-case', true, true), prompt: pricePrompt };
     await postToolRuntime.generate(regressionInput, new AbortController().signal);
     const regressionPayload = captured.get('post-tool-regression-case')!;

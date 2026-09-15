@@ -109,7 +109,13 @@ is used to conceal the missing information. General advice remains unaffected.
 
 Native model calls must equal the approved domain request, independent of object
 key order. They cannot substitute dates/places/passengers. Both runtime adapters
-publish the new structural tool schema and the approved request in runtime context.
+publish the structural tool schema when the gateway advertises transport.search.
+The approved request is projected into runtime context only while that tool remains
+available. Successful server execution with transport evidence removes only the
+completed transport tool and its request from subsequent model turns. Other tools
+remain available. The server validates returned calls against that turn's advertised
+allowlist, held separately from the runtime's copy. Full request validation,
+registry/provider execution and all normalized evidence remain server-side.
 The llama.cpp adapter identity is now V4; its qualified V3 post-tool answer policy
 and downstream validators remain in force. No output-rewriting fallback exists.
 
@@ -220,6 +226,85 @@ expires after five minutes, stale evidence expired five minutes before the insta
 No hardcoded future freshness date is used. The semantic review configuration is
 unchanged from #39. Inherited booleans do not prove new transcripts: any new live
 qualification claim requires downloading and manually reviewing that run's artifact.
+
+## Timeout regression and selective runtime projection
+
+Run #12 ([34819671925](https://github.com/ilsafgilmullin/arvelis-ai/actions/runs/34819671925))
+at `1865c5caee89d77c0a47a18f6c8cbf7b5db73434` completed its workflow successfully
+but was **NOT_QUALIFIED**: 28 attempts, two timeouts, normal run 1 failed,
+normal runs 2/3 and reproducibility passed. Structured/protected policy rates were
+100%, protected violations zero, required routing 4/4 + 4/4. CI runs 34819671921
+and 34819676162 passed; CI success did not qualify the live model.
+
+The forensic comparison with qualified run #10 (34778247895) confirmed redundant
+post-tool input, not evidence inflation or an extra model turn. For the price case
+in normal run 2, actual captured requests and llama.cpp timings were:
+
+| Metric | #10 | #12 |
+| --- | ---: | ---: |
+| HTTP request body, UTF-8 bytes | 5,023 | 8,448 |
+| Transport parameter schema, bytes | 45 | 2,848 |
+| Tools array, bytes | 269 | 3,072 |
+| Runtime context, bytes | 491 | 1,037 |
+| Executed request within context, bytes | 0 | 520 |
+| Model-facing evidence array, bytes | 336 | 336 |
+| Prompt tokens | 812 | 1,946 |
+| Completion tokens | 93 | 93 |
+| Prompt evaluation, seconds | 34.059 | 51.456 |
+| Generation, seconds | 15.178 | 17.657 |
+| Runtime exchange, seconds | 49.267 | 69.159 |
+| Overall attempt p50 / p95 / max, seconds | 45.597 / 55.723 / 74.378 | 60.391 / 90.005 / 90.011 |
+| Timeouts | 0 | 2 |
+
+87.46% of this pair's added latency was prompt evaluation. The full production
+schema added 1,002 prompt tokens and the redundant request another 132. Even cases
+without a connected transport tool received that extra request. Median generation
+speed changed from 6.60 to 6.42 tokens/s; this alone does not explain the regression.
+Model GGUF hash, pinned llama.cpp revision, CPU strategy, context size, sampling,
+output budget and timeout limits were the same.
+
+- Primary timeout: `live-normal-1-tool_backed_price_can_be_authoritative`, llama
+  task 270. Slot launch at server-log time 106.786 s, cancellation at 196.790 s,
+  release at 272.394 s. The larger prompt occupied the slot through the deadline.
+- Cascade timeout: `live-normal-1-knowledge_only_legal_fails_closed`, task 273.
+  It waited approximately 75.6 s for the single slot, launched at 272.435 s,
+  cancelled at 286.819 s and released at 299.508 s. Only about 14.4 s of its
+  90 s budget remained for computation. The pinned server processes cancellation
+  after its synchronous decode work yields; client abort is not instant slot release.
+- Timed-out HTTP exchanges were not recorded by the old response-only recorder.
+  Their completion-token count, first-token time and prompt/generation split are
+  unavailable; terminal prompt counters are not completion-token measurements.
+
+The fix is a selective `AiGateway` projection, shared by runtime adapters. After a
+successful transport execution supplies evidence, the model receives that complete
+existing evidence but no repeated transport schema or executed request. Evidence
+freshness may be expired; hiding the completed action does not promote stale facts.
+Without evidence, the completed-with-evidence state is not entered. Unexecuted,
+connected transport retains its approved request. Turns without a transport tool
+omit an unusable request. Native calls use the same server-owned turn allowlist;
+a custom runtime cannot restore transport availability by mutating its input.
+
+The full Production Transport Search Contract, provider service/mapping, lockfile,
+model adapter, generation policy, evidence serialization, validators and golden
+configuration are unchanged. No retry or extra generation is added. Runtime timeout
+stays 90 s; the live harness gateway budget stays 120 s. Cancellation and the
+post-generation evidence expiry check are unchanged. The response-only timeout
+telemetry gap remains a documented operational limitation; it is not hidden by a
+synthetic success record or an evaluator exception.
+
+Regression coverage now includes full server input, complete evidence/provenance,
+selective tool availability across turns, rejected repeated calls (including runtime
+allowlist mutation), no-tool/unexecuted paths, empty evidence and no extra turns.
+An integration smoke exercises Gateway through the real llama.cpp serializer with
+a synthetic price fixture: no production schema/request in the HTTP body, preserved
+evidence, deterministic serialization and a body smaller than 5 KB. Existing
+incomplete-request, stale rejection and expiry-during-generation tests remain.
+The incomplete-request regression also explicitly checks the provider call count.
+
+The live workflow now also watches this document, so a release-evidence commit
+triggers qualification of its actual HEAD. Runner, model and evaluation settings
+are unchanged. Post-fix live performance and semantic conclusions require raw
+artifact review; they are not inferred from the deterministic payload bound.
 
 ## Production blockers and next slice
 

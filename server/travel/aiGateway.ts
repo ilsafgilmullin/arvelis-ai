@@ -281,6 +281,7 @@ export class AiGateway {
       }
 
       const connectedTools = this.tools.listConnectedTools();
+      let transportSearchCompletedWithEvidence = false;
       const executeToolCall = async (call: AiToolCall): Promise<void> => {
         try {
           if (call.toolId === 'transport.search') {
@@ -299,6 +300,7 @@ export class AiGateway {
           evidence.push(...toolEvidence);
           toolCallsExecuted += 1;
           if (evidence.length > MAX_AI_EVIDENCE_ITEMS) throw new AiToolRegistryError('invalid_tool_output', 'AI evidence budget exceeded.');
+          if (call.toolId === 'transport.search' && toolEvidence.length > 0) transportSearchCompletedWithEvidence = true;
         } catch (error) {
           if (controller.signal.aborted) throw error;
           if (error instanceof AiGatewayError) throw error;
@@ -322,6 +324,10 @@ export class AiGateway {
       }
 
       for (let round = 0; round <= MAX_AI_TOOL_ROUNDS; round += 1) {
+        // Keep the approved production request in the server execution path. Once
+        // transport evidence exists, this turn needs the evidence, not another search.
+        const runtimeTools = connectedTools.filter((tool) => tool.id !== 'transport.search' || !transportSearchCompletedWithEvidence);
+        const runtimeNeedsTransportRequest = runtimeTools.some((tool) => tool.id === 'transport.search');
         let turn;
         try {
           turn = await this.runtime!.generate({
@@ -331,9 +337,9 @@ export class AiGateway {
             locale: request.locale,
             scope: request.scope,
             ...(context.authorizedTripId ? { tripId: context.authorizedTripId } : {}),
-            ...(context.transportSearchRequest ? { transportSearchRequest: structuredClone(context.transportSearchRequest) } : {}),
+            ...(runtimeNeedsTransportRequest && context.transportSearchRequest ? { transportSearchRequest: structuredClone(context.transportSearchRequest) } : {}),
             evidence: [...evidence],
-            tools: connectedTools,
+            tools: structuredClone(runtimeTools),
           }, controller.signal);
         } catch (error) {
           if (controller.signal.aborted) throw error;
@@ -343,7 +349,7 @@ export class AiGateway {
           });
         }
 
-        const turnErrors = validateAiModelTurn(turn, requestId, connectedTools);
+        const turnErrors = validateAiModelTurn(turn, requestId, runtimeTools);
         if (turnErrors.length > 0) {
           throw new AiGatewayError('invalid_model_output', 'AI runtime returned an invalid structured turn.', {
             audit: this.audit(requestId, request, context, startedAt, 'invalid_model_output', { retrievalStatus, toolCallsExecuted, evidenceCount: evidence.length, validationErrors: turnErrors }),

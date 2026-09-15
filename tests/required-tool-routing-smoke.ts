@@ -1,5 +1,4 @@
 import { syntheticTransportSearch } from '../server/travel/testing/syntheticTransportSearch';
-const searchFixture = syntheticTransportSearch(new Date());
 import assert from 'node:assert/strict';
 import {
   AiGateway,
@@ -7,9 +6,12 @@ import {
   REQUIRED_TRANSPORT_TOOL_CALL_ID,
   REQUIRED_TRANSPORT_TOOL_ROUTING_VERSION,
 } from '../server/travel/aiGateway';
-import type { AiModelRuntime } from '../server/travel/aiEnginePorts';
+import type { AiModelRuntime, AiToolRegistration } from '../server/travel/aiEnginePorts';
 import { AiToolRegistry } from '../server/travel/aiToolRegistry';
-import type { AiGatewayRequest } from '../src/travel/aiKnowledgeContracts';
+import { AI_TOOL_CATALOG, type AiGatewayRequest } from '../src/travel/aiKnowledgeContracts';
+
+const fixtureNow = new Date();
+const searchFixture = syntheticTransportSearch(fixtureNow);
 
 const context = {
   accountScopeId: 'acct-required-routing',
@@ -26,7 +28,7 @@ function request(prompt: string): AiGatewayRequest {
   };
 }
 
-function transportRegistry(onCall?: () => void, freshness: 'current' | 'expired' = 'current'): AiToolRegistry {
+function transportRegistry(onCall?: () => void, freshness: 'current' | 'expired' = 'current', extra: AiToolRegistration[] = []): AiToolRegistry {
   return new AiToolRegistry([{
     id: 'transport.search',
     async handler(input, toolContext) {
@@ -44,11 +46,14 @@ function transportRegistry(onCall?: () => void, freshness: 'current' | 'expired'
           freshness,
           sourceType: 'provider',
           providerId: 'synthetic-required-routing',
-          retrievedAt: freshness === 'current' ? '2026-09-13T00:00:00.000Z' : '2025-01-01T00:00:00.000Z',
+          sourceUrl: 'https://synthetic.example.test/transport/required-price',
+          retrievedAt: new Date(fixtureNow.getTime() - 60_000).toISOString(),
+          expiresAt: new Date(fixtureNow.getTime() + (freshness === 'current' ? 300_000 : -1)).toISOString(),
+          provenance: { requestId: toolContext.requestId, routeId: 'synthetic-route', providerRouteId: 'synthetic-service', dataKind: 'synthetic' },
         }],
       };
     },
-  }]);
+  }, ...extra]);
 }
 
 async function main(): Promise<void> {
@@ -63,6 +68,17 @@ async function main(): Promise<void> {
       assert.equal(input.evidence.length, 1, 'required tool evidence must exist before the model runs');
       assert.equal(input.evidence[0]?.toolId, 'transport.search');
       assert.equal(input.evidence[0]?.id, `tool:${REQUIRED_TRANSPORT_TOOL_CALL_ID}:required-price`);
+      assert.deepEqual(input.tools, [], 'completed transport search is no longer advertised');
+      assert.equal(Object.hasOwn(input, 'transportSearchRequest'), false, 'executed request stays server-side');
+      assert.deepEqual(input.evidence[0], {
+        id: `tool:${REQUIRED_TRANSPORT_TOOL_CALL_ID}:required-price`, origin: 'tool', toolId: 'transport.search',
+        domain: 'price', text: 'SYNTHETIC: provider-confirmed price is 12345 RUB.', freshness: 'current',
+        sourceType: 'provider', providerId: 'synthetic-required-routing',
+        sourceUrl: 'https://synthetic.example.test/transport/required-price',
+        retrievedAt: new Date(fixtureNow.getTime() - 60_000).toISOString(),
+        expiresAt: new Date(fixtureNow.getTime() + 300_000).toISOString(),
+        provenance: { requestId: input.requestId, routeId: 'synthetic-route', providerRouteId: 'synthetic-service', dataKind: 'synthetic' },
+      }, 'the projection preserves the entire registry-normalized evidence');
       return {
         version: 1,
         requestId: input.requestId,
@@ -87,7 +103,7 @@ async function main(): Promise<void> {
     runtime: explicitRuntime,
     tools: transportRegistry(() => { explicitToolCalls += 1; }),
     requestId: () => 'required-routing-explicit',
-    now: () => new Date('2026-09-13T12:00:00.000Z'),
+    now: () => fixtureNow,
   }).run(
     request('Для ответа сначала обязательно вызови transport.search и сообщи подтверждённую цену билета.'),
     context,
@@ -141,6 +157,8 @@ async function main(): Promise<void> {
     id: 'required-routing-general-runtime',
     async generate(input) {
       assert.equal(input.evidence.length, 0, 'general advice must not trigger transport.search');
+      assert.deepEqual(input.tools.map((tool) => tool.id), ['transport.search']);
+      assert.deepEqual(input.transportSearchRequest, searchFixture, 'unexecuted connected transport keeps its approved input');
       return {
         version: 1,
         requestId: input.requestId,
@@ -170,11 +188,81 @@ async function main(): Promise<void> {
   assert.equal(generalToolCalls, 0);
   assert.equal(generalResult.audit.toolCallsExecuted, 0);
 
+  // Other connected tools remain usable after transport completes, across turns.
+  let otherToolCalls = 0;
+  let mixedTransportCalls = 0;
+  let mixedRuntimeCalls = 0;
+  const mixedRegistry = transportRegistry(() => { mixedTransportCalls += 1; }, 'current',
+    (['trip.read', 'map.route', 'legal.check'] as const).map((id) => ({
+      id, async handler() { otherToolCalls += 1; return { evidence: [] }; },
+    })));
+  const mixedRuntime: AiModelRuntime = {
+    id: 'required-routing-other-tools',
+    async generate(input, signal) {
+      mixedRuntimeCalls += 1;
+      assert.deepEqual(input.tools.map((tool) => tool.id), ['trip.read', 'map.route', 'legal.check']);
+      assert.equal(Object.hasOwn(input, 'transportSearchRequest'), false);
+      if (mixedRuntimeCalls === 1) return {
+        version: 1, requestId: input.requestId, kind: 'tool_calls',
+        calls: input.tools.map((tool, index) => ({ id: `other-${index}`, toolId: tool.id, input: {} })),
+      };
+      return explicitRuntime.generate({ ...input, tools: [] }, signal);
+    },
+  };
+  const mixedResult = await new AiGateway({ runtime: mixedRuntime, tools: mixedRegistry, now: () => fixtureNow })
+    .run(request('Сначала вызови transport.search и сообщи цену.'), context);
+  assert.equal(mixedTransportCalls, 1);
+  assert.equal(otherToolCalls, 3);
+  assert.equal(mixedRuntimeCalls, 2, 'only the explicitly requested other-tool round adds a generation');
+  assert.equal(mixedResult.audit.toolCallsExecuted, 4);
+
+  // A custom runtime cannot restore a hidden tool by mutating its input allowlist.
+  for (const mutateRuntimeTools of [false, true]) {
+    let repeatedTransportCalls = 0;
+    let repeatRuntimeCalls = 0;
+    const repeatRuntime: AiModelRuntime = { id: 'required-routing-repeat', async generate(input) {
+      repeatRuntimeCalls += 1;
+      assert.equal(input.tools.length, 0);
+      if (mutateRuntimeTools) input.tools.push(structuredClone(AI_TOOL_CATALOG.find((tool) => tool.id === 'transport.search')!));
+      return { version: 1, requestId: input.requestId, kind: 'tool_calls', calls: [{ id: 'repeat-transport', toolId: 'transport.search', input: searchFixture }] };
+    } };
+    await assert.rejects(new AiGateway({ runtime: repeatRuntime, tools: transportRegistry(() => { repeatedTransportCalls += 1; }) })
+      .run(request('Вызови transport.search и сообщи цену.'), context),
+    (error: unknown) => error instanceof AiGatewayError && error.code === 'invalid_model_output');
+    assert.equal(repeatedTransportCalls, 1, 'repeated transport call must not reach the registry handler');
+    assert.equal(repeatRuntimeCalls, 1, 'rejected output does not trigger retry');
+  }
+
+  let unavailableRuntimeCalls = 0;
+  await new AiGateway({ runtime: { id: 'required-routing-no-transport', async generate(input) {
+    unavailableRuntimeCalls += 1;
+    assert.deepEqual(input.tools, []);
+    assert.equal(Object.hasOwn(input, 'transportSearchRequest'), false, 'unrelated turns do not serialize an unusable transport request');
+    return { version: 1, requestId: input.requestId, kind: 'answer', answer: { version: 1, requestId: input.requestId, message: 'Общая рекомендация.', claims: [] } };
+  } } }).run(request('Дай общий чек-лист.'), context);
+  assert.equal(unavailableRuntimeCalls, 1);
+
+  // An empty tool result must not be mistaken for supplied transport evidence.
+  let emptyRuntimeCalls = 0;
+  await new AiGateway({
+    tools: new AiToolRegistry([{ id: 'transport.search', async handler(input) { assert.deepEqual(input, searchFixture); return { evidence: [] }; } }]),
+    runtime: { id: 'required-routing-empty-evidence', async generate(input) {
+      emptyRuntimeCalls += 1;
+      assert.deepEqual(input.tools.map((tool) => tool.id), ['transport.search']);
+      assert.deepEqual(input.transportSearchRequest, searchFixture);
+      assert.deepEqual(input.evidence, []);
+      return { version: 1, requestId: input.requestId, kind: 'answer', answer: { version: 1, requestId: input.requestId, message: 'Подтверждённых данных нет.', claims: [] } };
+    } },
+  }).run(request('Вызови transport.search и сообщи цену.'), context);
+  assert.equal(emptyRuntimeCalls, 1);
+
   let staleToolCalls = 0;
   const staleRuntime: AiModelRuntime = {
     id: 'required-routing-stale-runtime',
     async generate(input) {
       assert.equal(input.evidence[0]?.freshness, 'expired');
+      assert.deepEqual(input.tools, []);
+      assert.equal(Object.hasOwn(input, 'transportSearchRequest'), false);
       return {
         version: 1,
         requestId: input.requestId,
