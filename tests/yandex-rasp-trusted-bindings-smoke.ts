@@ -30,7 +30,11 @@ function main() {
   checks++;
 
   const checkedIn = JSON.parse(readFileSync('config/yandex-rasp-development-bindings.v1.json', 'utf8')) as unknown;
-  assert.equal(parseYandexRaspTrustedBindingsManifest(checkedIn, 'development').size, 0);
+  const developmentBindings = parseYandexRaspTrustedBindingsManifest(checkedIn, 'development');
+  assert.equal(developmentBindings.size, 2);
+  assert.deepEqual(developmentBindings.get('arvelis:dev:station:moscow-kazansky'), { searchCode: 's2000003', stationCodes: ['s2000003'] });
+  assert.deepEqual(developmentBindings.get('arvelis:dev:station:kazan-pass'), { searchCode: 's9623141', stationCodes: ['s9623141'] });
+  assert.throws(() => parseYandexRaspTrustedBindingsManifest(checkedIn, 'production'));
   checks++;
 
   assert.throws(() => parseYandexRaspTrustedBindingsManifest(manifest([{ ...city }, { ...city }]), 'development'));
