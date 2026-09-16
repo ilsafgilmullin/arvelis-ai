@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"],
+    "outDir": "tests/.dist-geonames-controlled-ingestion",
+    "rootDir": "."
+  },
+  "include": [
+    "src/travel/locationResolution.ts",
+    "src/travel/transportSearchRequest.ts",
+    "server/travel/locationSources/geonamesSource.ts",
+    "server/travel/locationSources/geonamesIngestionEvaluation.ts",
+    "scripts/geonames-controlled-ingestion-eval.ts",
+    "tests/geonames-controlled-ingestion-eval-smoke.ts"
+  ]
+}
