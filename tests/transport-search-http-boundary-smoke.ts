@@ -6,12 +6,15 @@ import { searchTransportForAuthorizedTrip, transportHttpFailure } from '../serve
 import { TransportSearchService, type NormalizedTransportProvider } from '../server/travel/transportSearchService';
 
 const NOW = new Date('2026-09-16T12:00:00.000Z');
+const ORIGIN_ID = 'arvelis:dev:station:moscow-kazansky';
+const DESTINATION_ID = 'arvelis:dev:station:kazan-pass';
+const RETURN_DATE = '2026-09-26';
 const REQUEST: TransportSearchRequestV1 = {
   version: 1,
-  origin: { resolution: 'resolved', type: 'station', rawLabel: 'Казанский вокзал, Москва', displayName: 'Казанский вокзал, Москва', locationId: 'arvelis:dev:station:moscow-kazansky' },
-  destination: { resolution: 'resolved', type: 'station', rawLabel: 'Казань-Пасс.', displayName: 'Казань-Пасс.', locationId: 'arvelis:dev:station:kazan-pass' },
+  origin: { resolution: 'resolved', type: 'station', rawLabel: 'Казанский вокзал, Москва', displayName: 'Казанский вокзал, Москва', locationId: ORIGIN_ID },
+  destination: { resolution: 'resolved', type: 'station', rawLabel: 'Казань-Пасс.', displayName: 'Казань-Пасс.', locationId: DESTINATION_ID },
   departureDate: '2026-09-23',
-  returnDate: '2026-09-26',
+  returnDate: RETURN_DATE,
   passengers: { adults: 1 },
   allowedModes: ['train'],
   preferredMode: 'train',
@@ -28,7 +31,7 @@ const TRIP: Trip = {
   origin: REQUEST.origin.rawLabel,
   destination: REQUEST.destination.rawLabel,
   startDate: REQUEST.departureDate,
-  endDate: REQUEST.returnDate,
+  endDate: RETURN_DATE,
   durationDays: 4,
   travelers: [{ id: 'traveler-1', label: 'Путешественник 1' }],
   status: 'planning',
@@ -69,8 +72,8 @@ const provider: NormalizedTransportProvider = {
         segments: [{
           id: 'segment-http-1',
           mode: 'train',
-          from: { label: REQUEST.origin.rawLabel, locationId: REQUEST.origin.locationId },
-          to: { label: REQUEST.destination.rawLabel, locationId: REQUEST.destination.locationId },
+          from: { label: REQUEST.origin.rawLabel, locationId: ORIGIN_ID },
+          to: { label: REQUEST.destination.rawLabel, locationId: DESTINATION_ID },
           departureAt: '2026-09-23T18:00:00+03:00',
           arrivalAt: '2026-09-24T06:00:00+03:00',
         }],
@@ -90,7 +93,7 @@ async function run() {
   assert.equal(valid.status, 'results');
   assert.equal(providerCalls, 1);
   assert.ok('response' in valid);
-  assert.equal(valid.response.routes[0]?.segments[0]?.from.locationId, REQUEST.origin.locationId);
+  assert.equal(valid.response.routes[0]?.segments[0]?.from.locationId, ORIGIN_ID);
 
   for (const [label, trip, input, expected] of [
     ['owner mismatch', TRIP, REQUEST, 'access_denied'],
@@ -100,7 +103,7 @@ async function run() {
     ['trip flexible', { ...TRIP, preferences: { ...TRIP.preferences, flexibleDates: true } }, REQUEST, 'trip_not_ready'],
     ['trip destination unknown', { ...TRIP, preferences: { ...TRIP.preferences, destinationUnknown: true } }, REQUEST, 'trip_not_ready'],
   ] as const) {
-    const before = providerCalls;
+    const before: number = providerCalls;
     const result = await searchTransportForAuthorizedTrip({
       service: service(),
       accountScopeId: label === 'owner mismatch' ? 'other-account' : TRIP.ownerScopeId,
@@ -142,4 +145,7 @@ async function run() {
   console.log('Trip-bound transport HTTP boundary: PASS');
 }
 
-await run();
+run().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
