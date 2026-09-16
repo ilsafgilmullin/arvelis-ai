@@ -30,8 +30,26 @@ async function main() {
   assert.equal(disabled.status, 'disabled');
   assert.equal(disabled.provider, null);
   assert.equal(disabled.blockers.includes('credentials_missing'), true);
+  assert.equal(disabled.blockers.includes('legacy_path_disabled'), true);
   assert.equal(disabled.attribution.text, 'Данные предоставлены сервисом Яндекс.Расписания');
   assert.equal(disabled.cachePolicy.persistence, 'temporary_memory_only');
+
+  const legacyWithCredentials = createYandexRaspLiveProvider({
+    env: { ...commonEnv, YANDEX_RASP_API_KEY: FAKE_TEST_KEY },
+    now,
+  });
+  assert.equal(legacyWithCredentials.status, 'disabled');
+  assert.equal(legacyWithCredentials.provider, null);
+  assert.equal(legacyWithCredentials.blockers.includes('legacy_path_disabled'), true);
+
+  const productionLegacyAttempt = createYandexRaspLiveProvider({
+    env: { ...commonEnv, NODE_ENV: 'production', YANDEX_RASP_API_KEY: FAKE_TEST_KEY },
+    now,
+    allowLegacyDevelopmentResolver: true,
+  });
+  assert.equal(productionLegacyAttempt.status, 'disabled');
+  assert.equal(productionLegacyAttempt.provider, null);
+  assert.equal(productionLegacyAttempt.blockers.includes('legacy_path_disabled'), true);
 
   const trip = createTripDraft({
     origin: 'Казань',
@@ -140,6 +158,7 @@ async function main() {
       now,
       baseUrl,
       allowInsecureTestEndpoint: true,
+      allowLegacyDevelopmentResolver: true,
       searchCacheTtlMs: 60_000,
       locationDirectoryTtlMs: 60_000,
     });
