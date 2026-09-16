@@ -59,7 +59,6 @@
     "server/travel/providers/yandexRaspAdapter.ts",
     "server/travel/providers/yandexRaspSearchMapping.ts",
     "server/travel/providers/yandexRaspHttpClient.ts",
-    "server/travel/providers/yandexRaspLiveProvider.ts",
     "server/travel/providers/yandexRaspNormalizedProvider.ts",
     "server/persistence/postgres/rows.ts",
     "server/persistence/postgres/accountIdentityStore.ts",
