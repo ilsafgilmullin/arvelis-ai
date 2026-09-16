@@ -44,6 +44,7 @@
     "server/travel/planOrchestrator.ts",
     "server/travel/transportOrchestrator.ts",
     "server/travel/locationResolutionService.ts",
+    "server/travel/locationSources/geonamesSource.ts",
     "server/travel/mapOrchestrator.ts",
     "server/travel/legalOrchestrator.ts",
     "server/travel/aiEnginePorts.ts",
