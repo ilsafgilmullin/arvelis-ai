@@ -23,6 +23,13 @@
     "server/travel/providers/yandexRaspAdapter.ts",
     "server/travel/providers/yandexRaspHttpClient.ts",
     "server/travel/providers/yandexRaspLiveProvider.ts",
-    "tests/yandex-rasp-live-adapter-smoke.ts"
+    "server/travel/providers/yandexRaspNormalizedProvider.ts",
+    "server/travel/providers/yandexRaspTrustedBindings.ts",
+    "server/travel/providers/yandexRaspRuntimeProvider.ts",
+    "tests/yandex-rasp-live-adapter-smoke.ts",
+    "tests/yandex-rasp-normalized-provider-smoke.ts",
+    "tests/yandex-rasp-trusted-bindings-smoke.ts",
+    "tests/yandex-rasp-runtime-provider-smoke.ts",
+    "tests/yandex-rasp-development-live-smoke.ts"
   ]
 }

@@ -80,6 +80,18 @@ async function main() {
   }, now);
   assert.equal(staleTerms.blockers.includes('terms_review_stale'), true);
 
+  const futureTerms = evaluateTransportProviderActivation(YANDEX_RASP_V3_DESCRIPTOR, {
+    productAccessModel: 'free_public',
+    termsRecheckedAt: '2026-09-09T09:00:00.000Z',
+    credentialsConfigured: true,
+    quotaConfirmed: true,
+    attributionImplemented: true,
+    operationalPolicyAccepted: true,
+    userInitiatedBookingFlowApproved: false,
+  }, now);
+  assert.equal(futureTerms.eligible, false);
+  assert.equal(futureTerms.blockers.includes('terms_review_stale'), true);
+
   assert.equal(AVIASALES_SEARCH_API_DESCRIPTOR.minimumMau, 50_000);
   assert.equal(AVIASALES_SEARCH_API_DESCRIPTOR.strategyStatus, 'blocked_until_scale_requirement');
   assert.equal(AVIASALES_SEARCH_API_DESCRIPTOR.deeplinkPolicy, 'user_initiated_booking_required');

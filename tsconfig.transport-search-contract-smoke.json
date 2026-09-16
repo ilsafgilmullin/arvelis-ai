@@ -4,6 +4,7 @@
     "outDir": "tests/.dist-transport-search-contract"
   },
   "include": [
-    "tests/transport-search-contract-smoke.ts"
+    "tests/transport-search-contract-smoke.ts",
+    "tests/transport-search-http-boundary-smoke.ts"
   ]
 }

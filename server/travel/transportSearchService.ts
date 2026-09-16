@@ -24,7 +24,7 @@ export interface NormalizedTransportProvider {
   search(request: TransportSearchRequestV1, context: TransportSearchContext): Promise<TransportSearchResponse>;
 }
 
-export type TransportSearchFailureCode = TransportSearchIssue['code'] | 'provider_not_configured' | 'provider_unavailable' | 'provider_timeout' | 'aborted' | 'access_denied' | 'malformed_provider_response' | 'unsupported_constraint';
+export type TransportSearchFailureCode = TransportSearchIssue['code'] | 'provider_not_configured' | 'provider_unavailable' | 'provider_timeout' | 'provider_rate_limited' | 'provider_unauthorized' | 'unsupported_request' | 'aborted' | 'access_denied' | 'malformed_provider_response' | 'unsupported_constraint';
 export type TransportSearchOutcome =
   | { status: 'results' | 'no_results'; response: TransportSearchResponse; evidence: AiToolEvidenceInput[] }
   | { status: 'not_executed' | 'failed'; code: TransportSearchFailureCode; issues?: TransportSearchIssue[] };
@@ -44,8 +44,8 @@ const timestamp = (value: string) => OFFSET_TIMESTAMP.test(value) && Number.isFi
 const validId = (value: unknown): value is string => typeof value === 'string' && ID.test(value);
 const keys = (value: object, allowed: string[]) => Object.keys(value).every((key) => allowed.includes(key));
 function strictResponse(response: TransportSearchResponse): boolean {
-  return keys(response, ['version', 'providerId', 'requestId', 'retrievedAt', 'routes']) && response.routes.every((route) =>
-    keys(route, ['id', 'legId', 'providerRouteId', 'segments', 'price', 'availability', 'validUntil', 'sourceUrl'])
+  return keys(response, ['version', 'providerId', 'requestId', 'retrievedAt', 'routes', 'metadata']) && response.routes.every((route) =>
+    keys(route, ['id', 'legId', 'providerRouteId', 'segments', 'price', 'availability', 'validUntil', 'sourceUrl', 'retrievedAt'])
     && (!route.price || keys(route.price, ['amountMinor', 'currency', 'semantics']))
     && route.segments.every((segment) => keys(segment, ['id', 'mode', 'from', 'to', 'departureAt', 'arrivalAt', 'carrierName', 'serviceNumber'])
       && keys(segment.from, ['label', 'code', 'locationId']) && keys(segment.to, ['label', 'code', 'locationId'])));
@@ -93,6 +93,8 @@ export class TransportSearchService {
           if (!isSafeTransportJson(response, 256_000) || validateTransportSearchResponse(response, provider.id, context.requestId, request.returnDate ? ['outbound', 'return'] : ['outbound']).length) return failure('malformed_provider_response');
           if (!strictResponse(response) || !timestamp(response.retrievedAt) || Date.parse(response.retrievedAt) > now.getTime() || response.routes.length > 20) return failure('malformed_provider_response');
           for (const route of response.routes) {
+            if (route.retrievedAt && (!timestamp(route.retrievedAt) || Date.parse(route.retrievedAt) > now.getTime())) return failure('malformed_provider_response');
+            if (response.metadata && (!route.retrievedAt || !route.validUntil || Date.parse(route.validUntil) - Date.parse(route.retrievedAt) !== response.metadata.freshnessPolicy.ttlMs)) return failure('malformed_provider_response');
             if (route.price && !isTransportCurrency(route.price.currency)) return failure('malformed_provider_response');
             if (route.validUntil && (!timestamp(route.validUntil) || Date.parse(route.validUntil) - Date.parse(response.retrievedAt) > 900_000)) return failure('malformed_provider_response');
             if (route.segments.length - 1 > (request.constraints?.maxTransfers ?? provider.maxTransfers)) return failure('malformed_provider_response');
@@ -111,12 +113,13 @@ export class TransportSearchService {
             const dataKind = provider.activation.kind === 'synthetic' ? 'synthetic' as const : 'provider' as const;
             const common = {
               sourceType: 'provider' as const, providerId: provider.id, sourceUrl: provider.sourceUrl,
-              retrievedAt: response.retrievedAt, ...(route.validUntil ? { expiresAt: route.validUntil } : {}),
+              retrievedAt: route.retrievedAt ?? response.retrievedAt, ...(route.validUntil ? { expiresAt: route.validUntil } : {}),
               provenance: { requestId: response.requestId, routeId: route.id, providerRouteId: route.providerRouteId, dataKind },
             };
             const prefix = dataKind === 'synthetic' ? 'SYNTHETIC EVALUATION ONLY: ' : '';
             const items: AiToolEvidenceInput[] = [{ ...common, id: `route-${index}-schedule`, domain: 'transport_schedule', freshness,
-              text: prefix + JSON.stringify({ legId: route.legId, segments: route.segments }) }];
+              text: prefix + JSON.stringify({ legId: route.legId, segments: route.segments,
+                ...(response.metadata ? { coverage: response.metadata.coverage.status, freshnessPolicy: response.metadata.freshnessPolicy.id, providerGuarantee: false } : {}) }) }];
             if (route.price) items.push({ ...common, id: `route-${index}-price`, domain: 'price',
               freshness: freshness === 'current' && route.price.semantics !== 'quoted' ? 'unknown' : freshness,
               text: prefix + JSON.stringify({ routeId: route.id, price: route.price, priceBasis: route.price.semantics === 'quoted' ? 'request_total' : 'observation_not_current_quote', passengers: request.passengers }) });
@@ -124,9 +127,17 @@ export class TransportSearchService {
             return items;
           });
           if (evidence.some((item) => item.text.length > 4_000)) return failure('malformed_provider_response');
+          if (!response.routes.length && response.metadata?.coverage.status === 'partial') return failure('unsupported_request');
           return { status: response.routes.length ? 'results' : 'no_results', response: structuredClone(response), evidence };
         } catch { return failure('malformed_provider_response'); }
-      }).catch(() => failure('provider_unavailable'));
+      }).catch((error: unknown): TransportSearchOutcome => {
+        if (controller.signal.aborted) return failure(context.signal.aborted ? 'aborted' : 'provider_timeout');
+        // Preserve only known typed codes, never provider messages, raw bodies or causes.
+        if (error instanceof TransportSearchError && ['provider_not_configured', 'provider_timeout', 'provider_rate_limited', 'provider_unauthorized', 'unsupported_request', 'malformed_provider_response', 'unresolved_location', 'unsupported_transport_mode', 'unsupported_constraint', 'invalid_search_request', 'aborted'].includes(error.outcome.code)) {
+          return { status: error.outcome.status === 'not_executed' ? 'not_executed' : 'failed', code: error.outcome.code };
+        }
+        return failure('provider_unavailable');
+      });
       return await Promise.race([stopped, execution]);
     } finally {
       if (timer) clearTimeout(timer);

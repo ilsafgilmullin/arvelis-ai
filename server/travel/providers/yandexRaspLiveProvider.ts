@@ -16,10 +16,12 @@ export type YandexRaspLiveAttribution = {
   placement: 'adjacent_to_data';
 };
 
+export type YandexRaspLegacyBlocker = TransportProviderActivationBlocker | 'legacy_path_disabled';
+
 export type YandexRaspLiveProviderState = {
   status: 'ready' | 'disabled';
   provider: TransportProvider | null;
-  blockers: TransportProviderActivationBlocker[];
+  blockers: YandexRaspLegacyBlocker[];
   attribution: YandexRaspLiveAttribution;
   cachePolicy: {
     persistence: 'temporary_memory_only';
@@ -34,6 +36,11 @@ export type YandexRaspLiveProviderOptions = {
   baseUrl?: string;
   fetchImpl?: typeof fetch;
   allowInsecureTestEndpoint?: boolean;
+  /**
+   * Legacy label-based resolver escape hatch for deterministic development/tests only.
+   * The production path is createYandexRaspNormalizedProvider with trusted bindings.
+   */
+  allowLegacyDevelopmentResolver?: boolean;
   searchCacheTtlMs?: number;
   locationDirectoryTtlMs?: number;
 };
@@ -222,6 +229,11 @@ export const YANDEX_RASP_ATTRIBUTION: YandexRaspLiveAttribution = {
   placement: 'adjacent_to_data',
 };
 
+/**
+ * @deprecated Production code must use createYandexRaspNormalizedProvider with
+ * trusted ARVELIS location bindings. This label-based stations_list resolver exists
+ * only for deterministic legacy-development coverage.
+ */
 export function createYandexRaspLiveProvider(options: YandexRaspLiveProviderOptions = {}): YandexRaspLiveProviderState {
   const env = options.env ?? process.env;
   const now = options.now ?? (() => new Date());
@@ -246,6 +258,17 @@ export function createYandexRaspLiveProvider(options: YandexRaspLiveProviderOpti
     searchTtlMs,
     locationDirectoryTtlMs,
   };
+
+  const legacyDevelopmentAllowed = options.allowLegacyDevelopmentResolver === true && env.NODE_ENV !== 'production';
+  if (!legacyDevelopmentAllowed) {
+    return {
+      status: 'disabled',
+      provider: null,
+      blockers: [...activation.blockers, 'legacy_path_disabled'],
+      attribution: YANDEX_RASP_ATTRIBUTION,
+      cachePolicy,
+    };
+  }
 
   if (!activation.eligible || apiKey.length === 0) {
     return {

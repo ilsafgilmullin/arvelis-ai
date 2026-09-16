@@ -1,0 +1,55 @@
+/* Provider attribution is intentionally restrained and inherits the active Travel UI.
+   It must sit immediately adjacent to provider-backed data when that result UI exists. */
+.travel-provider-attribution {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-top: 12px;
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.travel-provider-attribution a,
+.travel-provider-attribution span {
+  color: inherit;
+  font: inherit;
+}
+
+.travel-provider-attribution a {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.travel-provider-attribution a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.travel-provider-attribution__banner {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.travel-provider-attribution__official-banner {
+  display: block;
+  width: 240px;
+  max-width: 100%;
+  height: 130px;
+  border: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 700px) {
+  .travel-provider-attribution {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}

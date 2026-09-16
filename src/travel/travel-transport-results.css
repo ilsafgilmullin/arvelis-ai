@@ -1,0 +1,202 @@
+.travel-transport-results {
+  width: 100%;
+}
+
+.travel-transport-results__provider-block,
+.travel-transport-results__list {
+  display: grid;
+  gap: 14px;
+}
+
+.travel-transport-results__provider-block {
+  min-width: 0;
+}
+
+.travel-transport-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--travel-border);
+  border-radius: var(--travel-radius-md);
+  background: var(--travel-surface);
+  box-shadow: var(--travel-shadow-sm);
+}
+
+.travel-transport-card__topline,
+.travel-transport-card__facts {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.travel-transport-card__topline {
+  margin-bottom: 16px;
+  color: var(--travel-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.travel-transport-card__mode {
+  color: var(--travel-text-primary);
+  font-weight: 800;
+}
+
+.travel-transport-card__route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(90px, .55fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+
+.travel-transport-card__route > div:first-child,
+.travel-transport-card__route > div:last-child {
+  min-width: 0;
+}
+
+.travel-transport-card__route > div:last-child {
+  text-align: right;
+}
+
+.travel-transport-card__route strong,
+.travel-transport-card__route span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.travel-transport-card__route strong {
+  color: var(--travel-text-primary);
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.travel-transport-card__route > div:not(.travel-transport-card__duration) span {
+  margin-top: 5px;
+  color: var(--travel-text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.travel-transport-card__duration {
+  display: grid;
+  gap: 6px;
+  color: var(--travel-text-tertiary);
+  font-size: 11px;
+  text-align: center;
+}
+
+.travel-transport-card__duration i {
+  position: relative;
+  display: block;
+  height: 1px;
+  background: var(--travel-border-strong);
+}
+
+.travel-transport-card__duration i::before,
+.travel-transport-card__duration i::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--travel-text-tertiary);
+  transform: translateY(-50%);
+}
+
+.travel-transport-card__duration i::before { left: 0; }
+.travel-transport-card__duration i::after { right: 0; }
+
+.travel-transport-card__facts {
+  align-items: stretch;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--travel-border);
+}
+
+.travel-transport-card__facts > div {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.travel-transport-card__facts span,
+.travel-transport-card__facts strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.travel-transport-card__facts span {
+  color: var(--travel-text-tertiary);
+  font-size: 11px;
+}
+
+.travel-transport-card__facts strong {
+  margin-top: 5px;
+  color: var(--travel-text-primary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.travel-transport-card__notice {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--travel-border);
+  border-radius: 12px;
+  color: var(--travel-text-secondary);
+  background: rgba(255, 255, 255, .55);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.travel-transport-card__notice.is-warning {
+  border-color: #ecd7a8;
+  background: #fffaf0;
+}
+
+@media (max-width: 700px) {
+  .travel-transport-card {
+    padding: 16px;
+  }
+
+  .travel-transport-card__route {
+    grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .travel-transport-card__route strong {
+    font-size: 14px;
+  }
+
+  .travel-transport-card__facts {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .travel-transport-card__facts > div {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .travel-transport-card__facts strong {
+    margin-top: 0;
+    text-align: right;
+  }
+}
+
+@media (max-width: 390px) {
+  .travel-transport-card__route {
+    grid-template-columns: 1fr;
+  }
+
+  .travel-transport-card__route > div:last-child,
+  .travel-transport-card__duration {
+    text-align: left;
+  }
+
+  .travel-transport-card__duration {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+  }
+}
