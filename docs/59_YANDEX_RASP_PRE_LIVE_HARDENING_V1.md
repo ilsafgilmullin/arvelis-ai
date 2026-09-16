@@ -110,8 +110,8 @@ actually execute it.
 ## Status vocabulary
 
 - `IMPLEMENTATION_COMPLETE`: achieved for the provider implementation.
-- `PRE_LIVE_HARDENED`: achieved once exact-head CI for this boundary is green.
-- `RESULT_PRESENTATION_READY`: achieved once exact-head CI covers the normalized result
+- `PRE_LIVE_HARDENED`: achieved after exact-head CI at the recorded checkpoint is green.
+- `RESULT_PRESENTATION_READY`: achieved after exact-head CI covers the normalized result
   surface and result-adjacent attribution boundary.
 - `LIVE_PROVIDER_VERIFIED`: not achieved until the real Yandex development smoke runs.
 - `END_TO_END_VERIFIED`: not achieved until real provider data traverses evidence,
