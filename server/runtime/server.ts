@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 import { Pool } from 'pg';
@@ -24,7 +25,10 @@ import {
 import { openSqliteAuthDatabase } from '../persistence/sqlite/database';
 import { SqliteTripStore } from '../persistence/sqlite/tripStore';
 import { TripApplicationError, type ServerTripStore } from '../travel/contracts';
+import { loadYandexRaspRuntimeProvider } from '../travel/providers/yandexRaspRuntimeProvider';
 import { TripApplicationService } from '../travel/service';
+import { searchTransportForAuthorizedTrip, transportHttpFailure } from '../travel/transportSearchHttpBoundary';
+import { TransportSearchService } from '../travel/transportSearchService';
 import { loadAuthRuntimeConfig } from './config';
 import {
   getClientKey,
@@ -40,6 +44,7 @@ import {
 
 const EMAIL_METHOD_ID = 'email_otp';
 const TRIP_JSON_LIMIT = 256 * 1024;
+const TRANSPORT_JSON_LIMIT = 12 * 1024;
 
 type RuntimeAccounts = AccountIdentityStore & AccountAuthenticationReader;
 
@@ -122,6 +127,16 @@ function tripIdFromPath(pathname: string): string | null {
   }
 }
 
+function transportSearchTripIdFromPath(pathname: string): string | null {
+  const match = /^\/api\/trips\/([^/]+)\/transport\/search$/.exec(pathname);
+  if (!match?.[1]) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+
 async function main(): Promise<void> {
   const config = loadAuthRuntimeConfig();
 
@@ -184,6 +199,8 @@ async function main(): Promise<void> {
   });
   const accountAuth = new AccountAuthApplicationService({ accounts, sessions });
   const trips = new TripApplicationService(tripStore);
+  const yandexTransport = await loadYandexRaspRuntimeProvider();
+  const transportSearch = new TransportSearchService(yandexTransport.provider);
 
   const buildPublicSession = async (sessionId: string, createdAt: number, expiresAt: number, accountId: string) => {
     const account = await accounts.getAccount(accountId);
@@ -303,6 +320,64 @@ async function main(): Promise<void> {
         sendJson(response, 200, { trips: await trips.list(current.authenticated.account.id) });
       } catch {
         sendJson(response, 503, { error: authFailure('service_unavailable', 'Trip service unavailable') });
+      }
+      return;
+    }
+
+    const transportTripId = transportSearchTripIdFromPath(url.pathname);
+    if (method === 'POST' && transportTripId !== null) {
+      const current = await requireTripAccount(request, response);
+      if (!current) return;
+
+      let body: Record<string, unknown>;
+      try {
+        body = await readJsonObject(request, TRANSPORT_JSON_LIMIT);
+      } catch {
+        sendJson(response, 400, { error: authFailure('invalid_input', 'Invalid transport search request') });
+        return;
+      }
+      if (Object.keys(body).length !== 1 || !Object.hasOwn(body, 'request')) {
+        sendJson(response, 400, { error: authFailure('invalid_input', 'Invalid transport search request') });
+        return;
+      }
+
+      let trip;
+      try {
+        trip = await trips.get(current.authenticated.account.id, transportTripId);
+      } catch (error) {
+        if (error instanceof TripApplicationError && error.code === 'invalid_input') {
+          sendJson(response, 400, { error: authFailure('invalid_input', 'Invalid trip id') });
+        } else {
+          sendJson(response, 503, { error: authFailure('service_unavailable', 'Trip service unavailable') });
+        }
+        return;
+      }
+      if (!trip) {
+        sendJson(response, 404, { error: authFailure('not_found', 'Trip not found') });
+        return;
+      }
+
+      const controller = new AbortController();
+      const abort = () => controller.abort();
+      request.once('aborted', abort);
+      if (request.aborted) controller.abort();
+      try {
+        const result = await searchTransportForAuthorizedTrip({
+          service: transportSearch,
+          accountScopeId: current.authenticated.account.id,
+          trip,
+          input: body.request,
+          requestId: randomUUID(),
+          signal: controller.signal,
+        });
+        if ('response' in result) {
+          sendJson(response, 200, { status: result.status, response: result.response });
+        } else {
+          const failure = transportHttpFailure(result);
+          sendJson(response, failure.statusCode, failure.body);
+        }
+      } finally {
+        request.off('aborted', abort);
       }
       return;
     }
