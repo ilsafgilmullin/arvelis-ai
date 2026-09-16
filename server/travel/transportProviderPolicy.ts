@@ -244,7 +244,8 @@ export function evaluateTransportProviderActivation(
   }
 
   const reviewedAt = Date.parse(context.termsRecheckedAt);
-  if (!isValidReviewTimestamp(context.termsRecheckedAt) || Math.abs(now.getTime() - reviewedAt) > MAX_TERMS_REVIEW_AGE_MS) {
+  const reviewAgeMs = now.getTime() - reviewedAt;
+  if (!isValidReviewTimestamp(context.termsRecheckedAt) || reviewAgeMs < 0 || reviewAgeMs > MAX_TERMS_REVIEW_AGE_MS) {
     blockers.push('terms_review_stale');
   }
   if (descriptor.attribution.required && context.attributionImplemented !== true) blockers.push('attribution_not_implemented');
