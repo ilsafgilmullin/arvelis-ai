@@ -32,7 +32,9 @@ function line(overrides: Partial<Record<number, string>> = {}): string {
     'Europe/Moscow',
     '2026-09-15',
   ];
-  for (const [index, value] of Object.entries(overrides)) fields[Number(index)] = value;
+  for (const [index, value] of Object.entries(overrides)) {
+    if (value !== undefined) fields[Number(index)] = value;
+  }
   return fields.join('\t');
 }
 
