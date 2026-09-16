@@ -7,6 +7,7 @@ import { AssistantScreen } from './AssistantScreen';
 import { CreateTripScreen } from './CreateTripScreen';
 import { HomeScreen, TripsScreen } from './HomeTripsScreens';
 import { HelpScreen, ServiceFoundation, SettingsScreen } from './ServiceScreens';
+import { TransportResultsScreen } from './TransportResultsScreen';
 import { TripWorkspace, type WorkspaceTab } from './TripWorkspace';
 import { EMPTY_FORM, EmptyState } from './ui';
 
@@ -322,7 +323,7 @@ export function TravelApp({ ownerScopeId, tripPersistenceMode, profileName, onli
       {screen === 'create' ? <CreateTripScreen form={form} setForm={setForm} errors={errors} storageAvailable={storageAvailable} saving={savingTrip} onSubmit={createTrip} onCancel={() => navigate('trips')} /> : null}
       {screen === 'trip' ? tripScreen : null}
       {screen === 'documents' ? <ServiceFoundation kicker="ДОКУМЕНТЫ" icon="document" title="Документы поездки" text="Здесь будут храниться билеты, страховка, бронирования и другие документы." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
-      {screen === 'routes' ? <ServiceFoundation kicker="МАРШРУТЫ" icon="route" title="Маршруты" text="Здесь ARVELIS будет сравнивать самолёты, поезда, автобусы и смешанные варианты." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
+      {screen === 'routes' ? <TransportResultsScreen response={null} emptyText="Здесь ARVELIS будет сравнивать самолёты, поезда, автобусы и смешанные варианты." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
       {screen === 'budgetService' ? <ServiceFoundation kicker="БЮДЖЕТ" icon="budget" title="Бюджет поездки" text="Расходы и лимит бюджета ведутся внутри конкретной поездки." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
       {screen === 'legalService' ? <ServiceFoundation kicker="ПРАВИЛА И ДОКУМЕНТЫ" icon="shield" title="Проверка документов и правил" text="Выберите поездку, чтобы проверить правила въезда, транзита и документы для конкретного маршрута." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
       {screen === 'mapService' ? <ServiceFoundation kicker="КАРТА" icon="map" title="Карта маршрута" text="После подключения картографического сервиса здесь появится маршрут поездки." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
