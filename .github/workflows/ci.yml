@@ -176,11 +176,9 @@ jobs:
           set -euo pipefail
           workdir="$(mktemp -d)"
           trap 'rm -rf "$workdir"' EXIT
-          echo "GEONAMES_EVIDENCE_DIR=$workdir" >> "$GITHUB_ENV"
           python3 - "$workdir" <<'PY'
           import hashlib
           import json
-          import os
           import stat
           import sys
           import urllib.request
@@ -191,6 +189,8 @@ jobs:
           url = 'https://download.geonames.org/export/dump/RU.zip'
           max_archive_bytes = 32 * 1024 * 1024
           max_member_bytes = 512 * 1024 * 1024
+          max_total_uncompressed_bytes = 520 * 1024 * 1024
+          max_members = 10
           workdir = Path(sys.argv[1])
           archive_path = workdir / 'RU.zip'
           tsv_path = workdir / 'RU.txt'
@@ -226,16 +226,31 @@ jobs:
 
           with zipfile.ZipFile(archive_path, 'r') as archive:
               members = archive.infolist()
-              if len(members) != 1:
+              if not members or len(members) > max_members:
                   raise RuntimeError('unexpected_zip_members')
-              member = members[0]
-              mode = (member.external_attr >> 16) & 0xFFFF
-              if member.filename != 'RU.txt' or member.is_dir() or '/' in member.filename or '\\' in member.filename:
-                  raise RuntimeError('unexpected_zip_member')
-              if mode and stat.S_ISLNK(mode):
-                  raise RuntimeError('symlink_not_allowed')
-              if member.file_size < 1 or member.file_size > max_member_bytes:
-                  raise RuntimeError('member_size_out_of_bounds')
+
+              safe_member_evidence = []
+              target_members = []
+              total_uncompressed_bytes = 0
+              for member in members:
+                  name = member.filename
+                  mode = (member.external_attr >> 16) & 0xFFFF
+                  if not name or name in {'.', '..'} or member.is_dir() or '/' in name or '\\' in name:
+                      raise RuntimeError('unsafe_zip_member')
+                  if mode and stat.S_ISLNK(mode):
+                      raise RuntimeError('symlink_not_allowed')
+                  if member.file_size < 0 or member.file_size > max_member_bytes:
+                      raise RuntimeError('member_size_out_of_bounds')
+                  total_uncompressed_bytes += member.file_size
+                  if total_uncompressed_bytes > max_total_uncompressed_bytes:
+                      raise RuntimeError('archive_uncompressed_size_out_of_bounds')
+                  safe_member_evidence.append({'name': name, 'bytes': member.file_size})
+                  if name == 'RU.txt':
+                      target_members.append(member)
+
+              if len(target_members) != 1 or target_members[0].file_size < 1:
+                  raise RuntimeError('ru_member_missing_or_ambiguous')
+              member = target_members[0]
 
               extracted_bytes = 0
               with archive.open(member, 'r') as source, tsv_path.open('wb') as output:
@@ -259,8 +274,10 @@ jobs:
               'archiveBytes': archive_bytes,
               'archiveSha256': sha256.hexdigest(),
               'sourceModifiedDate': source_modified_date,
-              'member': 'RU.txt',
-              'memberBytes': extracted_bytes,
+              'archiveMemberCount': len(safe_member_evidence),
+              'archiveMembers': safe_member_evidence,
+              'evaluatedMember': 'RU.txt',
+              'evaluatedMemberBytes': extracted_bytes,
               'rawDataPersisted': False,
               'artifactUploaded': False,
           }
