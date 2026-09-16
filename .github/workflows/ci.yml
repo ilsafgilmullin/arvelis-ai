@@ -151,3 +151,132 @@ jobs:
 
       - name: PostgreSQL pgvector Knowledge isolation and retrieval
         run: npm run test:knowledge-postgres-foundation
+
+  geonames-real-data-evidence:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feat/travel-geonames-controlled-ingestion-eval-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Download and validate official RU dump ephemerally
+        shell: bash
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "$workdir"' EXIT
+          echo "GEONAMES_EVIDENCE_DIR=$workdir" >> "$GITHUB_ENV"
+          python3 - "$workdir" <<'PY'
+          import hashlib
+          import json
+          import os
+          import stat
+          import sys
+          import urllib.request
+          import zipfile
+          from email.utils import parsedate_to_datetime
+          from pathlib import Path
+
+          url = 'https://download.geonames.org/export/dump/RU.zip'
+          max_archive_bytes = 32 * 1024 * 1024
+          max_member_bytes = 512 * 1024 * 1024
+          workdir = Path(sys.argv[1])
+          archive_path = workdir / 'RU.zip'
+          tsv_path = workdir / 'RU.txt'
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  raise RuntimeError('redirect_not_allowed')
+
+          opener = urllib.request.build_opener(NoRedirect)
+          request = urllib.request.Request(url, headers={'User-Agent': 'ARVELIS-AI-GeoNames-Evidence/1.0'})
+          sha256 = hashlib.sha256()
+          archive_bytes = 0
+          with opener.open(request, timeout=30) as response:
+              if response.status != 200 or response.geturl() != url:
+                  raise RuntimeError('unexpected_http_response')
+              content_length = response.headers.get('Content-Length')
+              if content_length is not None and int(content_length) > max_archive_bytes:
+                  raise RuntimeError('archive_too_large')
+              last_modified = response.headers.get('Last-Modified')
+              with archive_path.open('wb') as output:
+                  while True:
+                      chunk = response.read(1024 * 1024)
+                      if not chunk:
+                          break
+                      archive_bytes += len(chunk)
+                      if archive_bytes > max_archive_bytes:
+                          raise RuntimeError('archive_too_large')
+                      sha256.update(chunk)
+                      output.write(chunk)
+
+          if archive_bytes < 1:
+              raise RuntimeError('empty_archive')
+
+          with zipfile.ZipFile(archive_path, 'r') as archive:
+              members = archive.infolist()
+              if len(members) != 1:
+                  raise RuntimeError('unexpected_zip_members')
+              member = members[0]
+              mode = (member.external_attr >> 16) & 0xFFFF
+              if member.filename != 'RU.txt' or member.is_dir() or '/' in member.filename or '\\' in member.filename:
+                  raise RuntimeError('unexpected_zip_member')
+              if mode and stat.S_ISLNK(mode):
+                  raise RuntimeError('symlink_not_allowed')
+              if member.file_size < 1 or member.file_size > max_member_bytes:
+                  raise RuntimeError('member_size_out_of_bounds')
+
+              extracted_bytes = 0
+              with archive.open(member, 'r') as source, tsv_path.open('wb') as output:
+                  while True:
+                      chunk = source.read(1024 * 1024)
+                      if not chunk:
+                          break
+                      extracted_bytes += len(chunk)
+                      if extracted_bytes > max_member_bytes:
+                          raise RuntimeError('member_size_out_of_bounds')
+                      output.write(chunk)
+
+          source_modified_date = None
+          if last_modified:
+              source_modified_date = parsedate_to_datetime(last_modified).date().isoformat()
+
+          provenance = {
+              'source': 'geonames',
+              'countryCode': 'RU',
+              'archiveUrl': url,
+              'archiveBytes': archive_bytes,
+              'archiveSha256': sha256.hexdigest(),
+              'sourceModifiedDate': source_modified_date,
+              'member': 'RU.txt',
+              'memberBytes': extracted_bytes,
+              'rawDataPersisted': False,
+              'artifactUploaded': False,
+          }
+          print('GEONAMES_RU_PROVENANCE=' + json.dumps(provenance, ensure_ascii=False, sort_keys=True))
+          PY
+
+          npm run eval:geonames-controlled-ingestion -- \
+            "$workdir/RU.txt" RU \
+            "Москва" "Moscow" \
+            "Казань" "Kazan" \
+            "Санкт-Петербург" "Saint Petersburg" \
+            "Сочи" "Sochi" \
+            "Екатеринбург" "Yekaterinburg" \
+            "Новосибирск" "Novosibirsk" \
+            "Владивосток" "Vladivostok" \
+            "Калининград" "Kaliningrad"
+
+          rm -rf "$workdir"
+          trap - EXIT
