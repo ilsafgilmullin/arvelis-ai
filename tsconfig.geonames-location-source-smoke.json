@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"],
+    "outDir": "tests/.dist-geonames-location-source",
+    "rootDir": "."
+  },
+  "include": [
+    "src/travel/locationResolution.ts",
+    "src/travel/transportSearchRequest.ts",
+    "server/travel/locationSources/geonamesSource.ts",
+    "tests/geonames-location-source-smoke.ts"
+  ]
+}
