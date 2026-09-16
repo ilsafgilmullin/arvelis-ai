@@ -64,6 +64,10 @@ Evidence harness controls:
 
 The temporary network evidence job is removed from the permanent CI after this evidence was captured. Final qualification returns to deterministic/offline CI only.
 
+## Final acceptance gate
+
+The evidence run alone does not qualify the slice. After removing the temporary network job, the final branch HEAD must pass the normal PR CI again with only deterministic/offline repository gates plus the existing PostgreSQL compatibility job. The PR description may record `QUALIFIED` only after that exact-head run succeeds.
+
 ## Captured provenance
 
 Official archive evidence from run `35145985849`:
