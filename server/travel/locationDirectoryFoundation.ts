@@ -11,7 +11,7 @@ import type {
 
 export const LOCATION_DIRECTORY_FOUNDATION_VERSION = 1 as const;
 export const MAX_LOCATION_DIRECTORY_SEARCH_NAMES = 128;
-export const MAX_LOCATION_DIRECTORY_LOOKUP_MATCHES = 100;
+export const MAX_LOCATION_DIRECTORY_LOOKUP_MATCHES = 512;
 
 export type LocationDirectorySourceV1 = 'geonames';
 
@@ -415,7 +415,7 @@ export class RepositoryTravelLocationDirectory implements TravelLocationDirector
       normalizedLabel: normalizeLocationDirectoryName(query.rawLabel),
       ...(query.countryCode === undefined ? {} : { countryCode: query.countryCode }),
       ...(query.types === undefined ? {} : { types: query.types }),
-      maxMatches: Math.max(2, Math.min(MAX_LOCATION_DIRECTORY_LOOKUP_MATCHES, limit)),
+      maxMatches: MAX_LOCATION_DIRECTORY_LOOKUP_MATCHES,
     });
     return rankLocationDirectoryHits(query, hits).slice(0, limit).map((hit) => toCandidate(hit.record));
   }
