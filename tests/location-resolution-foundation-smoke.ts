@@ -51,6 +51,7 @@ async function run() {
   assert.equal(validateLocationResolutionQueryV1({ ...QUERY, countryCode: 'ru' }).ok, false);
   assert.equal(validateLocationResolutionQueryV1({ ...QUERY, types: ['city', 'city'] }).ok, false);
   assert.equal(validateLocationResolutionQueryV1({ ...QUERY, types: ['hotel'] }).ok, false);
+  assert.equal(validateLocationResolutionQueryV1({ ...QUERY, limit: 1 }).ok, false, 'limit=1 must not hide ambiguous candidates');
   assert.equal(validateLocationResolutionQueryV1({ ...QUERY, limit: 11 }).ok, false);
   assert.equal(validateLocationResolutionQueryV1({ ...QUERY, providerCode: 'c43' }).ok, false);
 
@@ -125,10 +126,10 @@ async function run() {
   assert.deepEqual(invalidInput, { status: 'not_executed', code: 'invalid_location_query' });
   assert.equal(invalidCalls, 0);
 
-  const overLimit = await new LocationResolutionService({
-    id: 'reviewed-location-directory', revision: '1', async resolve() { return [CITY, STATION]; },
+  const unsafeLimit = await new LocationResolutionService({
+    id: 'reviewed-location-directory', revision: '1', async resolve() { return [CITY]; },
   }).resolve({ ...QUERY, limit: 1 }, context());
-  assert.deepEqual(overLimit, { status: 'failed', code: 'malformed_resolver_response' });
+  assert.deepEqual(unsafeLimit, { status: 'not_executed', code: 'invalid_location_query' });
 
   const duplicate = await new LocationResolutionService({
     id: 'reviewed-location-directory', revision: '1', async resolve() { return [CITY, CITY]; },
