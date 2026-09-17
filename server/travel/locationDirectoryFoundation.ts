@@ -134,6 +134,23 @@ export function normalizeLocationDirectoryName(value: string): string {
     .toLocaleLowerCase('ru-RU');
 }
 
+export function validateLocationDirectoryLookupV1(value: LocationDirectoryLookupV1): boolean {
+  return validSource(value.source)
+    && validRevisionToken(value.sourceRevision)
+    && value.normalizedLabel.length > 0
+    && value.normalizedLabel.length <= 400
+    && value.normalizedLabel === normalizeLocationDirectoryName(value.normalizedLabel)
+    && (value.countryCode === undefined || /^[A-Z]{2}$/.test(value.countryCode))
+    && (value.types === undefined
+      || (value.types.length >= 1
+        && value.types.length <= 3
+        && value.types.every(validTravelType)
+        && new Set(value.types).size === value.types.length))
+    && Number.isInteger(value.maxMatches)
+    && value.maxMatches >= 2
+    && value.maxMatches <= MAX_LOCATION_DIRECTORY_LOOKUP_MATCHES;
+}
+
 export function validateLocationDirectoryRevisionV1(value: unknown): value is LocationDirectoryRevisionV1 {
   if (!plainRecord(value)) return false;
   if (!Object.keys(value).every((key) => [
@@ -276,18 +293,7 @@ export class InMemoryLocationDirectoryRepository implements LocationDirectoryRep
   }
 
   async searchExact(lookup: LocationDirectoryLookupV1): Promise<LocationDirectorySearchHitV1[]> {
-    if (!validSource(lookup.source)
-      || !validRevisionToken(lookup.sourceRevision)
-      || !lookup.normalizedLabel
-      || lookup.normalizedLabel !== normalizeLocationDirectoryName(lookup.normalizedLabel)
-      || lookup.normalizedLabel.length > 400
-      || (lookup.countryCode !== undefined && !/^[A-Z]{2}$/.test(lookup.countryCode))
-      || (lookup.types !== undefined && (lookup.types.length < 1 || lookup.types.some((type) => !validTravelType(type))))
-      || !Number.isInteger(lookup.maxMatches)
-      || lookup.maxMatches < 2
-      || lookup.maxMatches > MAX_LOCATION_DIRECTORY_LOOKUP_MATCHES) {
-      throw new Error('Invalid location directory lookup');
-    }
+    if (!validateLocationDirectoryLookupV1(lookup)) throw new Error('Invalid location directory lookup');
 
     const typeSet = lookup.types ? new Set(lookup.types) : null;
     const matches: LocationDirectorySearchHitV1[] = [];
@@ -302,7 +308,7 @@ export class InMemoryLocationDirectoryRepository implements LocationDirectoryRep
         matchedName,
         matchedPrimaryName: normalizeLocationDirectoryName(record.displayName) === lookup.normalizedLabel,
       });
-      if (matches.length >= lookup.maxMatches) break;
+      if (matches.length > lookup.maxMatches) throw new Error('Location directory lookup exceeds bounded match limit');
     }
     return matches;
   }

@@ -14,6 +14,8 @@ const allowed = new Map([
   ['transport-search-contract', 'tests/.dist-transport-search-contract'],
   ['location-resolution-foundation', 'tests/.dist-location-resolution-foundation'],
   ['location-directory-foundation', 'tests/.dist-location-directory-foundation'],
+  ['location-directory-sqlite', 'tests/.dist-location-directory-sqlite'],
+  ['location-directory-postgres', 'tests/.dist-location-directory-postgres'],
   ['geonames-location-source', 'tests/.dist-geonames-location-source'],
   ['geonames-controlled-ingestion', 'tests/.dist-geonames-controlled-ingestion'],
   ['transport-policy', 'tests/.dist-transport-policy'],
