@@ -30,7 +30,11 @@ async function main(): Promise<void> {
   ensureSqliteAuthSchema(database);
 
   const migrations = database.prepare('SELECT id FROM auth_schema_migrations ORDER BY id').all() as Array<{ id: string }>;
-  assert.deepEqual(migrations.map((row) => row.id), ['001_auth_foundation', '002_travel_trip_persistence']);
+  assert.deepEqual(migrations.map((row) => row.id), [
+    '001_auth_foundation',
+    '002_travel_trip_persistence',
+    '004_location_directory_foundation',
+  ]);
 
   const now = 1_800_000_000_000;
   for (const accountId of ['account-a', 'account-b']) {
