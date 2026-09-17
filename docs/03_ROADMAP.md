@@ -1,186 +1,147 @@
 # ARVELIS AI — дорожная карта
 
-**Актуальность:** 2026-09-12.
+**Актуальность:** 2026-09-17, Project State Sync V1.
 
-Travel Product Pivot остаётся текущим направлением. ARVELIS AI на текущем этапе — полностью бесплатный user-facing сервис; billing/subscriptions/paywall не проектируются.
+ARVELIS AI развивается как бесплатный user-facing **AI Travel Assistant**. Billing/subscriptions/paywall на текущем этапе не проектируются.
 
-## Закрытые stacked layers
+Главный принцип roadmap: закрывать последовательные проверяемые vertical slices и не активировать production provider/UI раньше, чем квалифицированы identity, authorization, evidence, freshness и fail-closed boundaries.
+
+## Закрытые / квалифицированные stacked layers
 
 - [x] Travel Pivot Foundation V1;
 - [x] Travel UI Redesign V2;
-- [x] Server-side Trip Persistence & API V1 — Draft PR #28;
-- [x] Plan Real-Data Contract & AI Orchestration Policy V1 — Draft PR #29;
-- [x] Transport Normalized Route Contract V1 — Draft PR #30;
-- [x] Transport Provider Strategy & Adapter Foundation V1 — Draft PR #31;
-- [x] Yandex Rasp Live Adapter V1 — Draft PR #32, production key not activated;
-- [x] Map Provider Foundation & Route Map V1 — Draft PR #33;
-- [x] Legal Sources & Travel Legal Foundation V1 — Draft PR #34;
-- [x] ARVELIS AI Engine & Knowledge Foundation V1 — Draft PR #35;
-- [x] Retrieval & Knowledge Ingestion Foundation V1 — Draft PR #36, PostgreSQL 18 + pgvector green;
-- [x] Qwen Runtime Adapter & AI Evaluation V1 — Draft PR #37, final HEAD `b5685472efdaaea57e674911a852f0bf9bf7aa78`, green; no production model deployment.
+- [x] Server-side Trip Persistence & API V1;
+- [x] Plan Real-Data Contract & AI Orchestration Policy V1;
+- [x] Transport Normalized Route Contract V1;
+- [x] Transport Provider Strategy & Adapter Foundation V1;
+- [x] Yandex Rasp adapter/provider foundation — production activation остаётся выключенной;
+- [x] Map Provider Foundation & Route Map V1;
+- [x] Legal Sources & Travel Legal Foundation V1;
+- [x] ARVELIS AI Engine & Knowledge Foundation V1;
+- [x] Retrieval & Knowledge Ingestion Foundation V1 — PostgreSQL + pgvector compatibility;
+- [x] Qwen Runtime Adapter & AI Evaluation V1;
+- [x] real Qwen3-8B Q4_K_M controlled local evaluation;
+- [x] Required Tool Routing V1 — server-side deterministic required transport routing;
+- [x] Production Transport Search Contract V1 — controlled Qwen qualification;
+- [x] Yandex Rasp Live Provider Integration V1 repository boundary — live E2E ещё не подтверждён;
+- [x] authenticated Trip-bound Transport Runtime API Boundary V1;
+- [x] Location Resolution Foundation V1;
+- [x] Location Provider Strategy V1;
+- [x] GeoNames Source Boundary V1;
+- [x] GeoNames Controlled Ingestion Evaluation V1 — official RU snapshot evidence qualified.
 
-## Current checkpoint — Free Local Qwen Live Evaluation V1
+## Текущий checkpoint
 
-Branch:
+Parent before this documentation sync:
 
-`feat/travel-free-local-qwen-live-evaluation-v1`
+- Draft PR #44;
+- branch `feat/travel-geonames-controlled-ingestion-eval-v1`;
+- exact HEAD `ec28cd0dd6159a24c4c8c6a33da6f74be3cb8e52`;
+- exact-head CI `35146640908` — SUCCESS.
 
-Base:
+GeoNames RU evaluation подтвердил, что dataset пригоден для следующего controlled internal-directory prototype, но также выявил существенную неоднозначность location names. Поэтому name-only auto-resolution запрещён.
 
-`feat/travel-qwen-runtime-evaluation-v1` / Draft PR #37.
+## Pass 1 — Project State & Documentation Sync V1
 
-Truthful current status:
+Цель: убрать опасный documentation drift перед новым функциональным slice.
 
-`ENGINEERING READY / LIVE MODEL NOT EXECUTED / BLOCKED BY FREE COMPUTE`.
+- [x] зафиксировать текущий exact parent checkpoint;
+- [x] синхронизировать `00_PROJECT_CONTEXT`;
+- [x] синхронизировать `03_ROADMAP`;
+- [x] синхронизировать `06_MVP_GATES`;
+- [x] добавить `64_PROJECT_STATE_SYNC_V1`;
+- [ ] получить exact-head CI для documentation-sync branch/PR;
+- [ ] не менять runtime/dependencies/migrations/secrets/activation flags.
 
-### Engineering scope
+## Pass 2 — Location Directory Persistence & Ranking Foundation V1
 
-- [x] keep `AiGateway` vendor-neutral and unchanged;
-- [x] add separate development/evaluation `QwenLlamaCppRuntime` through existing `AiModelRuntime`;
-- [x] preserve `QwenVllmRuntime` as future production-oriented runtime candidate;
-- [x] enforce loopback-only llama.cpp endpoint;
-- [x] reject every remote endpoint;
-- [x] OpenAI-compatible `/v1/chat/completions` mapping;
-- [x] system/user messages;
-- [x] tools + tool choice;
-- [x] strict JSON-schema structured answer mapping;
-- [x] Qwen3 non-thinking metadata;
-- [x] normal + reproducibility sampling profiles;
-- [x] caller cancellation;
-- [x] bounded timeout/output/body;
-- [x] unknown/unavailable/malformed tool fail-closed;
-- [x] free-form final answer fail-closed;
-- [x] no heuristic output repair;
-- [x] reuse existing `validateAiModelTurn`;
-- [x] reuse `QWEN_GOLDEN_CASES` / `runQwenGoldenEvaluation()` rather than adding another evaluation framework;
-- [x] add unknown-tool golden case;
-- [x] deterministic synthetic Tool/Retrieval fixtures only;
-- [x] explicit semantic-review verdict remains mandatory;
-- [x] typed sanitized live report;
-- [x] local raw-transcript directory gitignored;
-- [x] explicit preflight/run CLI;
-- [x] exactly one primary deterministic adapter gate;
-- [x] no real GGUF in GitHub CI;
-- [x] no new browser suite;
-- [x] no database migration;
-- [x] `.replit` unchanged;
-- [x] no automatic model download/build/startup;
-- [x] dedicated `docs/54_FREE_LOCAL_QWEN_LIVE_EVALUATION_V1.md`.
+Следующий функциональный slice.
 
-### Reproducibility identity
+Обязательные результаты:
 
-Pinned model:
+- provider-neutral durable ARVELIS location identity;
+- source provenance/revision records;
+- source external ID остаётся provenance, а не trusted browser/model identity;
+- canonical location отдельно от source names/aliases;
+- bounded normalized-name lookup;
+- deterministic ranking inputs: requested type, country/admin context, population и другие явно утверждённые сигналы;
+- ambiguity сохраняется, если данных недостаточно для однозначного выбора;
+- no silent first-match behavior;
+- refresh/revision semantics определены до production import;
+- deterministic repository tests;
+- никаких Routes UI/Yandex production activation.
 
-- `Qwen/Qwen3-8B-GGUF`;
-- revision `7c41481f57cb95916b40956ab2f0b139b296d974`;
-- `Qwen3-8B-Q4_K_M.gguf`;
-- SHA-256 `d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785`;
-- size `5,027,783,488` bytes;
-- Q4_K_M;
-- Apache-2.0.
+Перед любым реальным persistent import отдельно проверяются migration shape, storage bounds, rollback/update semantics и лицензионная attribution boundary.
 
-Pinned llama.cpp:
+## Pass 3 — Trusted Location → Transport Provider Binding
 
-- release `b10902`;
-- commit `df03399b885831b2a1603b3abb0d8c156808e363`.
+После квалификации внутреннего directory:
 
-Q4 qualification is not equivalent to the future BF16/vLLM baseline.
+- разрешать transport search только через trusted ARVELIS location identities;
+- provider-specific codes хранить только в server-side binding layer;
+- development и production bindings жёстко разделять;
+- browser/model не используют provider code как ARVELIS identity;
+- отсутствие binding должно давать typed unavailable/unresolved, а не guessed code.
 
-### Deterministic engineering gate
+## Pass 4 — Isolated Live Yandex Development Verification
 
-`npm run test:qwen-llamacpp-runtime` validates a loopback fake HTTP server path without GGUF:
+Только после готовности trusted identity/binding path:
 
-- loopback-only configuration;
-- remote rejection;
-- request/thinking/schema/tool mapping;
-- normal/reproducibility sampling;
-- malformed/free-form responses;
-- unknown/unavailable/malformed tool calls;
-- timeout;
-- cancellation;
-- response-size bound;
-- local metric capture;
-- live-runner compilation;
-- explicit CLI syntax.
+- использовать разрешённый development credential из защищённой среды;
+- не копировать ключ в Git/PR/CI/chat;
+- application production gates не включать;
+- проверить bounded live request, attribution, normalization, timeout/cancellation и sanitized errors;
+- зафиксировать evidence без credential/raw secret leakage.
 
-The existing Qwen, AI, Retrieval, Yandex, Trip, server/browser/build regressions remain in `npm run check`.
+Успешный provider smoke не является production activation.
 
-Implementation run #733 on `a959d8b46c0922cc1359026301ec5681f976dffb` passed all of those gates before documentation synchronization. A later documentation-head PR run remains the final engineering checkpoint.
+## Pass 5 — Routes End-to-End V1
 
-### Live-model qualification gate
+Пользовательский вертикальный сценарий:
 
-The entire slice can be marked **CLOSED** only after all of the following actually occur on suitable free local compute:
+`origin/destination text → Location Resolution → explicit disambiguation when needed → trusted ARVELIS IDs → provider binding → transport search → normalized validated response → attribution/freshness → Routes UI`.
 
-1. preflight passes;
-2. exact immutable GGUF is downloaded manually outside npm/Replit lifecycle;
-3. actual file size and SHA-256 match the manifest;
-4. pinned llama.cpp starts only on loopback with Jinja and reasoning disabled;
-5. `/health` and `/v1/models` prove the expected local alias;
-6. actual Qwen3-8B executes through `AiGateway → QwenLlamaCppRuntime`;
-7. normal and reproducibility repeated golden runs complete;
-8. schema and protected-fact results are captured;
-9. semantic-coverage cases receive explicit review verdicts;
-10. a sanitized live report is produced;
-11. final report is `QUALIFIED` with no protected-fact violation.
+До этого этапа Routes UI не должен показывать mock/fixture transport как live data.
 
-One successful generation is never sufficient.
+## Integration checkpoint
 
-### Current live block
+После E2E Routes V1:
 
-The current free environment inspected during this slice has approximately:
+- аудит длинной stacked PR chain;
+- проверка exact HEAD каждого required lower layer;
+- актуализация PR descriptions;
+- branch-protection/required-check verification;
+- подготовка merge plan.
 
-- 5.8 GiB total RAM;
-- no swap;
-- ~30 GiB free disk;
-- no pinned `llama-server` installed.
+**Merge в `main` выполняется только после отдельного подтверждения пользователя.**
 
-Disk is sufficient, but RAM/runtime requirements are not. Therefore Qwen3-8B Q4 was not downloaded or executed. A smaller model was not substituted.
+## Позднее — не начинать автоматически
 
-This is an expected valid checkpoint, not a test PASS:
-
-`ENGINEERING READY / LIVE MODEL NOT EXECUTED / BLOCKED BY FREE COMPUTE`.
-
-## Engineering closure criterion for current branch
-
-Engineering implementation is ready after:
-
-1. synchronized README/Architecture/Roadmap/Security/Decisions + doc 54;
-2. stacked Draft PR targets `feat/travel-qwen-runtime-evaluation-v1`;
-3. exact final documentation HEAD receives PR-triggered CI;
-4. `validate` is PASS, including deterministic local adapter gate;
-5. existing PostgreSQL/pgvector lower-layer PR regression remains PASS;
-6. no paid or production infrastructure is activated.
-
-This engineering closure does **not** imply live-model qualification.
-
-## Next STOP boundary
-
-Stop after Engineering Ready until suitable **free** compute for exact Qwen3-8B Q4 is available or the user explicitly changes the deployment/evaluation decision.
-
-Do not automatically proceed to:
-
-- paid GPU/cloud;
-- paid inference provider;
-- production model/runtime;
-- public llama.cpp endpoint;
-- production credentials;
-- production embedding;
-- crawler/Knowledge production ingestion;
-- destructive migration;
-- Trip Domain change;
-- production deploy;
-- merge to `main`.
-
-## Later roadmap — not started
-
-- real hash-verified free-local Qwen3-8B live qualification;
-- BF16/vLLM controlled qualification on separately approved infrastructure;
-- production runtime/GPU decision and rollout;
-- production Knowledge source approval/operations;
-- retention/refresh/deletion policy for Knowledge;
-- reranker decision from measured evaluation;
-- Budget/Currency providers;
-- real Legal/Map/Stay/Weather integrations;
+- production BF16/vLLM/GPU topology;
+- production model capacity/SLA/load qualification;
+- production Knowledge ingestion operations;
+- Stay/Hotel provider integration;
+- Budget/Currency live providers;
+- production Legal/Map/Weather integrations;
 - Trip Book generation;
 - Live Companion;
-- Safe/emergency capabilities.
+- Safe/emergency capabilities;
+- billing/subscriptions;
+- native mobile applications.
+
+## Production readiness blockers
+
+До production остаются как минимум:
+
+- Location Directory persistence/ranking;
+- trusted provider bindings;
+- live transport E2E;
+- production AI runtime/capacity;
+- backup/recovery;
+- monitoring/observability/incident operations;
+- production privacy/legal/data-residency review;
+- secrets/IAM hardening;
+- physical mobile/accessibility acceptance;
+- explicit release/rollback plan.
+
+Текущий статус: **development / controlled qualification, не production-ready**.
