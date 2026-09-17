@@ -52,6 +52,9 @@ jobs:
       - name: Location resolution foundation
         run: npm run test:location-resolution-foundation
 
+      - name: Location directory persistence and ranking foundation
+        run: npm run test:location-directory-foundation
+
       - name: GeoNames location source contract
         run: npm run test:geonames-location-source
 
