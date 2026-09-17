@@ -2,6 +2,7 @@ import type { TransportSearchLocationV1 } from './transportSearchRequest';
 
 export const LOCATION_RESOLUTION_VERSION = 1 as const;
 export const MAX_LOCATION_QUERY_BYTES = 2_048;
+export const MIN_LOCATION_CANDIDATES = 2;
 export const MAX_LOCATION_CANDIDATES = 10;
 export const TRAVEL_LOCATION_TYPES = ['city', 'station', 'airport'] as const;
 export type TravelLocationType = (typeof TRAVEL_LOCATION_TYPES)[number];
@@ -124,7 +125,10 @@ export function validateLocationResolutionQueryV1(value: unknown): LocationResol
       issue('types', 'unsupported_location_type');
     }
   }
-  if (value.limit !== undefined && (typeof value.limit !== 'number' || !Number.isInteger(value.limit) || value.limit < 1 || value.limit > MAX_LOCATION_CANDIDATES)) issue('limit');
+  if (value.limit !== undefined && (typeof value.limit !== 'number'
+    || !Number.isInteger(value.limit)
+    || value.limit < MIN_LOCATION_CANDIDATES
+    || value.limit > MAX_LOCATION_CANDIDATES)) issue('limit');
   if (issues.length > 0) return { ok: false, issues };
   return { ok: true, query: structuredClone(value) as LocationResolutionQueryV1 };
 }
