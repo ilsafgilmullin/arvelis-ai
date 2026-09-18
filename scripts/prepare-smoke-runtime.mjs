@@ -19,6 +19,7 @@ const allowed = new Map([
   ['geonames-location-source', 'tests/.dist-geonames-location-source'],
   ['geonames-controlled-ingestion', 'tests/.dist-geonames-controlled-ingestion'],
   ['geonames-controlled-directory-import', 'tests/.dist-geonames-controlled-directory-import'],
+  ['geonames-real-directory', 'tests/.dist-geonames-real-directory'],
   ['transport-policy', 'tests/.dist-transport-policy'],
   ['transport-provider-foundation', 'tests/.dist-transport-provider-foundation'],
   ['yandex-rasp-live', 'tests/.dist-yandex-rasp-live'],
