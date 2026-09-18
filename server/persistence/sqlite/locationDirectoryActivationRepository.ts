@@ -6,6 +6,7 @@ import type {
 } from '../../travel/locationDirectoryActivation';
 import type { LocationDirectoryRevisionV1, LocationDirectorySourceV1 } from '../../travel/locationDirectoryFoundation';
 import { inSqliteTransaction } from './database';
+import { ensureSqliteLocationDirectoryActivationSchema } from './locationDirectoryActivationSchema';
 import { SqliteLocationDirectoryRepository } from './locationDirectoryRepository';
 
 type ActiveRow = { source?: unknown; country_code?: unknown; revision?: unknown; activated_at?: unknown };
@@ -19,7 +20,10 @@ function parseActive(row: ActiveRow | undefined, previousRevision: string | null
 
 export class SqliteLocationDirectoryActivationRepository implements LocationDirectoryActivationRepository {
   readonly #directory: SqliteLocationDirectoryRepository;
-  constructor(private readonly database: DatabaseSync) { this.#directory = new SqliteLocationDirectoryRepository(database); }
+  constructor(private readonly database: DatabaseSync) {
+    ensureSqliteLocationDirectoryActivationSchema(database);
+    this.#directory = new SqliteLocationDirectoryRepository(database);
+  }
 
   getRevision(source: LocationDirectorySourceV1, revision: string): Promise<LocationDirectoryRevisionV1 | null> {
     return this.#directory.getRevision(source, revision);
