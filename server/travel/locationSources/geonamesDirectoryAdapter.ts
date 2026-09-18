@@ -51,7 +51,7 @@ export function geoNamesSeedToDirectoryLocation(
     source: 'geonames',
     sourceRevision,
     externalSourceId: String(seed.geonameId),
-    displayName: seed.displayName,
+    displayName: seed.displayName.trim(),
     searchNames: structuredClone(seed.searchNames),
     type: seed.type,
     countryCode: seed.countryCode,

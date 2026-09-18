@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   GEONAMES_ATTRIBUTION_URL,
   GEONAMES_LICENSE,
+  parseGeoNamesDumpLine,
   type GeoNamesDumpManifestV1,
 } from '../server/travel/locationSources/geonamesSource';
 import {
@@ -10,6 +11,7 @@ import {
 } from '../server/travel/locationSources/geonamesControlledDirectoryImport';
 import {
   geoNamesManifestToDirectoryRevision,
+  geoNamesSeedToDirectoryLocation,
 } from '../server/travel/locationSources/geonamesDirectoryAdapter';
 import {
   InMemoryLocationDirectoryRepository,
@@ -92,6 +94,13 @@ function sourceFactory(lines: readonly string[]) {
 }
 
 async function main(): Promise<void> {
+  const spaced = parseGeoNamesDumpLine(line({ 1: '  Казань  ', 3: '  Казань  ,Kazan,Qazan' }), 'RU');
+  assert.equal(spaced.status, 'accepted');
+  if (spaced.status !== 'accepted') throw new Error('expected accepted spaced GeoNames fixture');
+  const canonicalSpaced = geoNamesSeedToDirectoryLocation(spaced.seed, 'geonames:RU:2026-09-17:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
+  assert.equal(canonicalSpaced.displayName, 'Казань');
+  assert.equal(canonicalSpaced.searchNames[0], 'Казань');
+
   const repository = new InMemoryLocationDirectoryRepository();
   let identity = 0;
   const importer = new GeoNamesControlledDirectoryImporter(repository);
