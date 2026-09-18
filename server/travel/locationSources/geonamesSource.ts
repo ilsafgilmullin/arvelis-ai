@@ -134,7 +134,7 @@ function uniqueSearchNames(name: string, asciiName: string, alternateNames: stri
     const value = item.trim();
     if (!value || value.length > 400 || /[\u0000-\u001f\u007f]/u.test(value)) continue;
     const key = value.normalize('NFKC').toLocaleLowerCase('ru-RU');
-    if (seen.has(key)) continue;
+    if (!key || key.length > 400 || seen.has(key)) continue;
     seen.add(key);
     if (names.length >= MAX_GEONAMES_SEARCH_NAMES) {
       truncated = true;
@@ -266,14 +266,19 @@ export function parseGeoNamesDumpLine(line: string, expectedCountryCode: string)
     return { status: 'invalid', code: 'invalid_target_record' };
   }
 
-  const searchNames = uniqueSearchNames(name, asciiName, alternateNames);
-  if (searchNames.names.length === 0) return { status: 'invalid', code: 'invalid_target_record' };
+  const displayName = name.trim();
+  const displayNameKey = displayName.normalize('NFKC').toLocaleLowerCase('ru-RU');
+  if (!displayName || displayNameKey.length > 400) return { status: 'invalid', code: 'invalid_target_record' };
+  const searchNames = uniqueSearchNames(displayName, asciiName, alternateNames);
+  if (searchNames.names.length === 0 || !searchNames.names.some((candidate) => (
+    candidate.normalize('NFKC').toLocaleLowerCase('ru-RU') === displayNameKey
+  ))) return { status: 'invalid', code: 'invalid_target_record' };
 
   const seed: GeoNamesLocationSeedV1 = {
     version: GEONAMES_SOURCE_VERSION,
     source: 'geonames',
     geonameId,
-    displayName: name,
+    displayName,
     searchNames: searchNames.names,
     aliasesTruncated: searchNames.truncated,
     type,
