@@ -52,7 +52,7 @@ async function resolveProbe(
     signal: new AbortController().signal,
   });
 
-  if (result.status === 'failed' || result.status === 'not_executed') {
+  if (!('response' in result)) {
     throw new Error(`location_probe_failed:${rawLabel}:${result.code}`);
   }
   if (result.status === 'unresolved' || result.response.candidates.length < 1) {
