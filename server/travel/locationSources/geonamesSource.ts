@@ -128,7 +128,7 @@ function normalizeGeoNamesSearchName(value: string): string {
   return value
     .normalize('NFKC')
     .trim()
-    .replace(/\\s+/gu, ' ')
+    .replace(/\s+/gu, ' ')
     .toLocaleLowerCase('ru-RU');
 }
 
