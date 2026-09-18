@@ -19,7 +19,10 @@
     "src/travel/transportSearchRequest.ts",
     "server/travel/locationResolutionService.ts",
     "server/travel/locationDirectoryFoundation.ts",
+    "server/travel/locationDirectoryActivation.ts",
     "server/persistence/postgres/locationDirectoryRepository.ts",
-    "tests/location-directory-postgres-persistence-smoke.ts"
+    "server/persistence/postgres/locationDirectoryActivationRepository.ts",
+    "tests/location-directory-postgres-persistence-smoke.ts",
+    "tests/location-directory-postgres-activation-persistence-smoke.ts"
   ]
 }
