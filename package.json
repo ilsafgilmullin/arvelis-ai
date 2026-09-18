@@ -50,7 +50,8 @@
     "check:free-auth": "npm run auth:readiness && npm run check",
     "check:with-db": "npm run check && npm run db:migrate && npm run test:trip-postgres && npm run test:knowledge-postgres-foundation && npm run test:location-directory-postgres",
     "test:transport-search-contract": "node scripts/prepare-smoke-runtime.mjs transport-search-contract && tsc -p tsconfig.transport-search-contract-smoke.json && node tests/.dist-transport-search-contract/tests/transport-search-contract-smoke.js && node tests/.dist-transport-search-contract/tests/transport-search-http-boundary-smoke.js",
-    "test:geonames-controlled-directory-import": "node scripts/prepare-smoke-runtime.mjs geonames-controlled-directory-import && tsc -p tsconfig.geonames-controlled-directory-import-smoke.json && node tests/.dist-geonames-controlled-directory-import/tests/geonames-controlled-directory-import-smoke.js"
+    "test:geonames-controlled-directory-import": "node scripts/prepare-smoke-runtime.mjs geonames-controlled-directory-import && tsc -p tsconfig.geonames-controlled-directory-import-smoke.json && node tests/.dist-geonames-controlled-directory-import/tests/geonames-controlled-directory-import-smoke.js",
+    "eval:geonames-real-directory": "node scripts/prepare-smoke-runtime.mjs geonames-real-directory && tsc -p tsconfig.geonames-real-directory-eval.json && node --experimental-sqlite tests/.dist-geonames-real-directory/scripts/geonames-real-directory-eval.js"
   },
   "dependencies": {
     "nodemailer": "9.1.1",
