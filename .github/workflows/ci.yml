@@ -55,8 +55,10 @@ jobs:
       - name: Location directory persistence and ranking foundation
         run: npm run test:location-directory-foundation
 
-      - name: SQLite location directory persistence
-        run: npm run test:location-directory-sqlite
+      - name: SQLite location directory persistence and activation
+        run: |
+          npm run test:location-directory-sqlite
+          node --experimental-sqlite tests/.dist-location-directory-sqlite/tests/location-directory-sqlite-activation-persistence-smoke.js
 
       - name: Location directory revision activation
         run: |
@@ -151,5 +153,7 @@ jobs:
       - name: PostgreSQL pgvector Knowledge isolation and retrieval
         run: npm run test:knowledge-postgres-foundation
 
-      - name: PostgreSQL location directory persistence
-        run: npm run test:location-directory-postgres
+      - name: PostgreSQL location directory persistence and activation
+        run: |
+          npm run test:location-directory-postgres
+          node tests/.dist-location-directory-postgres/tests/location-directory-postgres-activation-persistence-smoke.js
