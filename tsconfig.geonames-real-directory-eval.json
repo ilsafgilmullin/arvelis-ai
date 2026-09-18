@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"],
+    "outDir": "tests/.dist-geonames-real-directory",
+    "rootDir": "."
+  },
+  "include": [
+    "src/travel/locationResolution.ts",
+    "server/travel/locationResolutionService.ts",
+    "server/travel/locationDirectoryFoundation.ts",
+    "server/travel/locationSources/geonamesSource.ts",
+    "server/travel/locationSources/geonamesIngestionEvaluation.ts",
+    "server/travel/locationSources/geonamesDirectoryAdapter.ts",
+    "server/travel/locationSources/geonamesControlledDirectoryImport.ts",
+    "server/persistence/sqlite/database.ts",
+    "server/persistence/sqlite/locationDirectoryRepository.ts",
+    "scripts/geonames-real-directory-eval.ts"
+  ]
+}
