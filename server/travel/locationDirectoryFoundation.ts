@@ -211,7 +211,7 @@ export function validateLocationDirectorySourceLocationV1(value: unknown): value
   for (const name of value.searchNames) {
     if (!validText(name, 400)) return false;
     const key = normalizeLocationDirectoryName(name);
-    if (!key || normalized.has(key)) return false;
+    if (!key || key.length > 400 || normalized.has(key)) return false;
     normalized.add(key);
   }
   return normalized.has(normalizeLocationDirectoryName(value.displayName));
