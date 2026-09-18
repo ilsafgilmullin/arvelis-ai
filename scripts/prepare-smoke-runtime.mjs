@@ -18,6 +18,7 @@ const allowed = new Map([
   ['location-directory-postgres', 'tests/.dist-location-directory-postgres'],
   ['geonames-location-source', 'tests/.dist-geonames-location-source'],
   ['geonames-controlled-ingestion', 'tests/.dist-geonames-controlled-ingestion'],
+  ['geonames-controlled-directory-import', 'tests/.dist-geonames-controlled-directory-import'],
   ['transport-policy', 'tests/.dist-transport-policy'],
   ['transport-provider-foundation', 'tests/.dist-transport-provider-foundation'],
   ['yandex-rasp-live', 'tests/.dist-yandex-rasp-live'],

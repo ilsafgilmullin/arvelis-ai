@@ -64,6 +64,9 @@ jobs:
       - name: GeoNames controlled ingestion evaluation
         run: npm run test:geonames-controlled-ingestion-eval
 
+      - name: GeoNames controlled directory import
+        run: npm run test:geonames-controlled-directory-import
+
       - name: Transport contract business and freshness
         run: npm run test:transport-policy
 
