@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"],
+    "outDir": "tests/.dist-location-directory-revision-activation",
+    "rootDir": "."
+  },
+  "include": [
+    "src/travel/locationResolution.ts",
+    "server/travel/locationResolutionService.ts",
+    "server/travel/locationDirectoryFoundation.ts",
+    "server/travel/locationDirectoryActivation.ts",
+    "tests/location-directory-revision-activation-smoke.ts"
+  ]
+}
