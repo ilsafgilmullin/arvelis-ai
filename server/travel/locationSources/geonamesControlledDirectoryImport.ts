@@ -251,12 +251,11 @@ export class GeoNamesControlledDirectoryImporter {
       if (pending.length === 0) return;
       const batch = pending;
       pending = [];
-      try {
-        await Promise.all(batch.map((location) => ingestion.upsert(location)));
-        persisted += batch.length;
-      } catch {
+      const results = await Promise.allSettled(batch.map((location) => ingestion.upsert(location)));
+      if (results.some((result) => result.status === 'rejected')) {
         throw new GeoNamesControlledDirectoryImportError('persistence_failed');
       }
+      persisted += batch.length;
     };
 
     try {
