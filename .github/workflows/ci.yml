@@ -58,6 +58,11 @@ jobs:
       - name: SQLite location directory persistence
         run: npm run test:location-directory-sqlite
 
+      - name: Location directory revision activation
+        run: |
+          npx tsc -p tsconfig.location-directory-revision-activation-smoke.json
+          node tests/.dist-location-directory-revision-activation/tests/location-directory-revision-activation-smoke.js
+
       - name: GeoNames location source contract
         run: npm run test:geonames-location-source
 
