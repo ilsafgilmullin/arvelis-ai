@@ -132,6 +132,23 @@ function main() {
   const deduped = accepted(parseGeoNamesDumpLine(line({ 1: 'Казань', 2: 'Kazan', 3: 'казань,KAZAN,Казань' }), 'RU'));
   assert.deepEqual(deduped.searchNames, ['Казань', 'Kazan']);
 
+  const spacedPrimary = accepted(parseGeoNamesDumpLine(line({ 1: '  Казань  ', 2: 'Kazan', 3: 'Казань,Kazan' }), 'RU'));
+  assert.equal(spacedPrimary.displayName, 'Казань');
+
+  const expandingAlias = '㍍'.repeat(101);
+  assert.ok(expandingAlias.length <= 400);
+  assert.ok(expandingAlias.normalize('NFKC').length > 400);
+  const boundedNormalizedAliases = accepted(parseGeoNamesDumpLine(line({
+    3: `Казань,${expandingAlias},Safe Alias`,
+  }), 'RU'));
+  assert.equal(boundedNormalizedAliases.searchNames.includes(expandingAlias), false);
+  assert.ok(boundedNormalizedAliases.searchNames.every((name) => name.normalize('NFKC').length <= 400));
+
+  assert.deepEqual(
+    parseGeoNamesDumpLine(line({ 1: expandingAlias, 2: '', 3: 'Safe Alias' }), 'RU'),
+    { status: 'invalid', code: 'invalid_target_record' },
+  );
+
   console.log('GeoNames location source contract: PASS (synthetic TSV only; no real dump/network)');
 }
 
