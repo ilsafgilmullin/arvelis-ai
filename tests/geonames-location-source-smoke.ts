@@ -132,6 +132,13 @@ function main() {
   const deduped = accepted(parseGeoNamesDumpLine(line({ 1: 'Казань', 2: 'Kazan', 3: 'казань,KAZAN,Казань' }), 'RU'));
   assert.deepEqual(deduped.searchNames, ['Казань', 'Kazan']);
 
+  const whitespaceDeduped = accepted(parseGeoNamesDumpLine(line({
+    1: 'Новый  Город',
+    2: 'Новый Город',
+    3: 'Новый\u00a0Город,Новый   Город',
+  }), 'RU'));
+  assert.deepEqual(whitespaceDeduped.searchNames, ['Новый  Город']);
+
   const spacedPrimary = accepted(parseGeoNamesDumpLine(line({ 1: '  Казань  ', 2: 'Kazan', 3: 'Казань,Kazan' }), 'RU'));
   assert.equal(spacedPrimary.displayName, 'Казань');
 
