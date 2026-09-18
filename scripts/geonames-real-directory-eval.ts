@@ -14,12 +14,85 @@ import {
 } from '../server/travel/locationSources/geonamesDirectoryAdapter';
 import {
   RepositoryTravelLocationDirectory,
+  normalizeLocationDirectoryName,
+  type LocationDirectoryLookupV1,
+  type LocationDirectoryRepository,
+  type LocationDirectoryRevisionV1,
+  type LocationDirectorySearchHitV1,
+  type LocationDirectorySourceLocationV1,
+  type LocationDirectorySourceV1,
+  type StoredLocationDirectoryRecordV1,
 } from '../server/travel/locationDirectoryFoundation';
 import { LocationResolutionService } from '../server/travel/locationResolutionService';
 
 const MAX_TSV_BYTES = 512 * 1024 * 1024;
 const MAX_ACCEPTED = 250_000;
 const MAX_INVALID = 1_000;
+
+type PersistenceFailureEvidence = {
+  externalSourceId: string;
+  type: string;
+  displayNameLength: number;
+  searchNameCount: number;
+  maxSearchNameLength: number;
+  maxNormalizedNameLength: number;
+  errorName: string;
+  errorCode?: string;
+  errorMessage: string;
+};
+
+function safeErrorMessage(error: unknown): { name: string; code?: string; message: string } {
+  if (!(error instanceof Error)) return { name: 'UnknownError', message: 'non_error_throw' };
+  const code = 'code' in error && typeof error.code === 'string' ? error.code : undefined;
+  const message = error.message
+    .replace(/[\r\n\t]+/gu, ' ')
+    .replace(/[\u0000-\u001f\u007f]/gu, '')
+    .slice(0, 240);
+  return { name: error.name, ...(code ? { code } : {}), message };
+}
+
+class DiagnosticLocationDirectoryRepository implements LocationDirectoryRepository {
+  lastFailure: PersistenceFailureEvidence | null = null;
+
+  constructor(private readonly delegate: LocationDirectoryRepository) {}
+
+  putRevision(revision: LocationDirectoryRevisionV1): Promise<void> {
+    return this.delegate.putRevision(revision);
+  }
+
+  getRevision(source: LocationDirectorySourceV1, revision: string): Promise<LocationDirectoryRevisionV1 | null> {
+    return this.delegate.getRevision(source, revision);
+  }
+
+  async upsertSourceLocation(
+    location: LocationDirectorySourceLocationV1,
+    createLocationId: () => string,
+  ): Promise<StoredLocationDirectoryRecordV1> {
+    try {
+      return await this.delegate.upsertSourceLocation(location, createLocationId);
+    } catch (error) {
+      const safe = safeErrorMessage(error);
+      this.lastFailure = {
+        externalSourceId: location.externalSourceId,
+        type: location.type,
+        displayNameLength: location.displayName.length,
+        searchNameCount: location.searchNames.length,
+        maxSearchNameLength: Math.max(...location.searchNames.map((name) => name.length)),
+        maxNormalizedNameLength: Math.max(
+          ...location.searchNames.map((name) => normalizeLocationDirectoryName(name).length),
+        ),
+        errorName: safe.name,
+        ...(safe.code ? { errorCode: safe.code } : {}),
+        errorMessage: safe.message,
+      };
+      throw error;
+    }
+  }
+
+  searchExact(lookup: LocationDirectoryLookupV1): Promise<LocationDirectorySearchHitV1[]> {
+    return this.delegate.searchExact(lookup);
+  }
+}
 
 function sourceFactory(inputPath: string): GeoNamesLineSourceFactory {
   return () => (async function* (): AsyncGenerator<string> {
@@ -89,7 +162,8 @@ async function main(): Promise<void> {
 
   const manifest = JSON.parse(await readFile(manifestArg, 'utf8')) as GeoNamesDumpManifestV1;
   const database = openSqliteAuthDatabase(':memory:');
-  const repository = new SqliteLocationDirectoryRepository(database);
+  const sqliteRepository = new SqliteLocationDirectoryRepository(database);
+  const repository = new DiagnosticLocationDirectoryRepository(sqliteRepository);
   const importer = new GeoNamesControlledDirectoryImporter(repository);
 
   const startedAt = performance.now();
@@ -163,6 +237,11 @@ async function main(): Promise<void> {
     };
 
     process.stdout.write(`GEONAMES_REAL_DIRECTORY_EVIDENCE=${JSON.stringify(evidence)}\n`);
+  } catch (error) {
+    if (repository.lastFailure) {
+      console.error(`GEONAMES_REAL_DIRECTORY_FAILURE=${JSON.stringify(repository.lastFailure)}`);
+    }
+    throw error;
   } finally {
     database.close();
   }
