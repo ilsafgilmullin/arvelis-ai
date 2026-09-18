@@ -35,7 +35,8 @@ export type GeoNamesControlledDirectoryImportOptions = {
    */
   maxAcceptedRecords: number;
   /**
-   * Explicit operator-approved invalid-row budget. A hard 1% ratio ceiling also applies.
+   * Explicit operator-approved invalid-row budget. For datasets with at least 1,000 rows,
+   * a hard 1% invalid-row ratio ceiling also applies.
    */
   maxInvalidRecords: number;
   writeConcurrency?: number;
@@ -108,7 +109,7 @@ function preflightAccepted(
   return report.accepted > 0
     && report.accepted <= options.maxAcceptedRecords
     && report.invalid <= options.maxInvalidRecords
-    && invalidRatio(report) <= MAX_GEONAMES_IMPORT_INVALID_RATIO;
+    && (report.totalLines < 1_000 || invalidRatio(report) <= MAX_GEONAMES_IMPORT_INVALID_RATIO);
 }
 
 async function preflightWithDigest(
