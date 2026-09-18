@@ -54,10 +54,11 @@ async function main(): Promise<void> {
     assert.equal(activatedSecond.previousRevision, first.revision);
     assert.equal((await repository.getActive('geonames', 'RU'))?.revision, second.revision);
 
-    const audit = database.prepare(`
+    const auditRows = database.prepare(`
       SELECT revision, previous_revision FROM travel_location_directory_activation_audit
       WHERE source = 'geonames' AND country_code = 'RU' ORDER BY activation_id
     `).all() as Array<{ revision: string; previous_revision: string | null }>;
+    const audit = auditRows.map(({ revision, previous_revision }) => ({ revision, previous_revision }));
     assert.deepEqual(audit, [
       { revision: first.revision, previous_revision: null },
       { revision: second.revision, previous_revision: first.revision },
