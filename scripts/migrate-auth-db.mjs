@@ -9,6 +9,7 @@ const migrations = [
   ['002_travel_trip_persistence', 'server/db/migrations/002_travel_trip_persistence.sql'],
   ['003_knowledge_retrieval_foundation', 'server/db/migrations/003_knowledge_retrieval_foundation.sql'],
   ['004_location_directory_foundation', 'server/db/migrations/004_location_directory_foundation.sql'],
+  ['005_location_directory_revision_activation', 'server/db/migrations/005_location_directory_revision_activation.sql'],
 ];
 const connectionString = process.env.DATABASE_URL;
 
