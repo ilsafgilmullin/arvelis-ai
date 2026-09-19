@@ -23,16 +23,19 @@ const revision = (name: string, countryCode = 'RU'): LocationDirectoryRevisionV1
   attributionUrl: 'https://www.geonames.org/',
 });
 
-const sourceLocation = (sourceRevision: string, displayName: string): LocationDirectorySourceLocationV1 => ({
+const sourceLocation = (
+  sourceRevision: string,
+  region = 'Москва',
+): LocationDirectorySourceLocationV1 => ({
   version: 1,
   source: 'geonames',
   sourceRevision,
   externalSourceId: '524901',
-  displayName,
-  searchNames: displayName === 'Москва' ? ['Москва'] : [displayName, 'Москва'],
+  displayName: 'Москва',
+  searchNames: ['Москва'],
   type: 'city',
   countryCode: 'RU',
-  region: 'Москва',
+  region,
   timezone: 'Europe/Moscow',
   latitude: 55.75222,
   longitude: 37.61556,
@@ -108,7 +111,7 @@ async function main() {
     () => 'arvelis:location:moscow',
   );
   await directoryRepository.upsertSourceLocation(
-    sourceLocation('ru-2026-09-18', 'Москва (актуальная)'),
+    sourceLocation('ru-2026-09-18', 'Москва — актуальная ревизия'),
     () => 'arvelis:location:unexpected-new-id',
   );
 
@@ -132,6 +135,7 @@ async function main() {
   if (resolvedFirst.status === 'resolved') {
     assert.equal(resolvedFirst.response.directoryRevision, 'ru-2026-09-17');
     assert.equal(resolvedFirst.response.candidates[0]?.displayName, 'Москва');
+    assert.equal(resolvedFirst.response.candidates[0]?.region, 'Москва');
   }
 
   await runtimeActivationService.activate({
@@ -142,7 +146,8 @@ async function main() {
   assert.equal(resolvedSecond.status, 'resolved');
   if (resolvedSecond.status === 'resolved') {
     assert.equal(resolvedSecond.response.directoryRevision, 'ru-2026-09-18');
-    assert.equal(resolvedSecond.response.candidates[0]?.displayName, 'Москва (актуальная)');
+    assert.equal(resolvedSecond.response.candidates[0]?.displayName, 'Москва');
+    assert.equal(resolvedSecond.response.candidates[0]?.region, 'Москва — актуальная ревизия');
   }
 
   await runtimeActivationService.activate({
@@ -153,6 +158,7 @@ async function main() {
   assert.equal(resolvedRollback.status, 'resolved');
   if (resolvedRollback.status === 'resolved') {
     assert.equal(resolvedRollback.response.directoryRevision, 'ru-2026-09-17');
+    assert.equal(resolvedRollback.response.candidates[0]?.region, 'Москва');
   }
 
   assert.deepEqual(await runtime.resolve({ ...query, countryCode: 'KZ' }, context()), {
