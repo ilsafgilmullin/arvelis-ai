@@ -37,7 +37,7 @@ function bindResolvedLocation(
 ):
   | { status: 'ready'; binding: TrustedProviderLocationBinding }
   | Exclude<RoutesLocationBoundaryOutcome, { status: 'ready' }> {
-  if (outcome.status === 'not_executed' || outcome.status === 'failed') {
+  if (!('response' in outcome)) {
     return { status: 'blocked', field, code: 'location_resolution_failed' };
   }
   if (outcome.status === 'ambiguous') {
