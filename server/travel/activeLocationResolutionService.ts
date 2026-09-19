@@ -1,4 +1,4 @@
-import type { LocationResolutionQueryV1 } from '../../src/travel/locationResolution';
+import { validateLocationResolutionQueryV1 } from '../../src/travel/locationResolution';
 import type { LocationDirectoryActivationRepository } from './locationDirectoryActivation';
 import {
   RepositoryTravelLocationDirectory,
@@ -51,8 +51,9 @@ export class ActiveLocationResolutionService {
   ): Promise<LocationResolutionOutcome> {
     if (context.signal.aborted) return { status: 'not_executed', code: 'aborted' };
 
-    const query = input as Partial<LocationResolutionQueryV1> | null;
-    if (query && typeof query === 'object' && query.countryCode !== undefined && query.countryCode !== this.#options.countryCode) {
+    const validation = validateLocationResolutionQueryV1(input);
+    if (!validation.ok) return { status: 'not_executed', code: 'invalid_location_query' };
+    if (validation.query.countryCode !== undefined && validation.query.countryCode !== this.#options.countryCode) {
       return { status: 'not_executed', code: 'resolver_not_configured' };
     }
 
@@ -84,6 +85,6 @@ export class ActiveLocationResolutionService {
       revision: active.revision,
     });
     const service = new LocationResolutionService(directory, { timeoutMs: this.#options.timeoutMs });
-    return service.resolve(input, context);
+    return service.resolve(validation.query, context);
   }
 }
