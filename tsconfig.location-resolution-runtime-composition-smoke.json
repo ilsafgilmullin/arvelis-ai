@@ -11,18 +11,21 @@
     "skipLibCheck": true,
     "types": ["node"],
     "lib": ["ES2022", "DOM"],
-    "outDir": "tests/.dist-location-directory-postgres",
+    "outDir": "tests/.dist-location-resolution-runtime-composition",
     "rootDir": "."
   },
   "include": [
     "src/travel/locationResolution.ts",
-    "src/travel/transportSearchRequest.ts",
     "server/travel/locationResolutionService.ts",
     "server/travel/locationDirectoryFoundation.ts",
     "server/travel/locationDirectoryActivation.ts",
+    "server/travel/activeLocationResolutionService.ts",
+    "server/persistence/sqlite/database.ts",
+    "server/persistence/sqlite/locationDirectoryRepository.ts",
+    "server/persistence/sqlite/locationDirectoryActivationRepository.ts",
     "server/persistence/postgres/locationDirectoryRepository.ts",
     "server/persistence/postgres/locationDirectoryActivationRepository.ts",
-    "tests/location-directory-postgres-persistence-smoke.ts",
-    "tests/location-directory-postgres-activation-persistence-smoke.ts"
+    "server/runtime/locationResolutionComposition.ts",
+    "tests/location-resolution-runtime-composition-smoke.ts"
   ]
 }

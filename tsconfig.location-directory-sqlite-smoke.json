@@ -19,8 +19,12 @@
     "src/travel/transportSearchRequest.ts",
     "server/travel/locationResolutionService.ts",
     "server/travel/locationDirectoryFoundation.ts",
+    "server/travel/locationDirectoryActivation.ts",
     "server/persistence/sqlite/database.ts",
     "server/persistence/sqlite/locationDirectoryRepository.ts",
-    "tests/location-directory-sqlite-persistence-smoke.ts"
+    "server/persistence/sqlite/locationDirectoryActivationSchema.ts",
+    "server/persistence/sqlite/locationDirectoryActivationRepository.ts",
+    "tests/location-directory-sqlite-persistence-smoke.ts",
+    "tests/location-directory-sqlite-activation-persistence-smoke.ts"
   ]
 }

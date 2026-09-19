@@ -11,18 +11,14 @@
     "skipLibCheck": true,
     "types": ["node"],
     "lib": ["ES2022", "DOM"],
-    "outDir": "tests/.dist-location-directory-postgres",
+    "outDir": "tests/.dist-location-directory-revision-activation",
     "rootDir": "."
   },
   "include": [
     "src/travel/locationResolution.ts",
-    "src/travel/transportSearchRequest.ts",
     "server/travel/locationResolutionService.ts",
     "server/travel/locationDirectoryFoundation.ts",
     "server/travel/locationDirectoryActivation.ts",
-    "server/persistence/postgres/locationDirectoryRepository.ts",
-    "server/persistence/postgres/locationDirectoryActivationRepository.ts",
-    "tests/location-directory-postgres-persistence-smoke.ts",
-    "tests/location-directory-postgres-activation-persistence-smoke.ts"
+    "tests/location-directory-revision-activation-smoke.ts"
   ]
 }
