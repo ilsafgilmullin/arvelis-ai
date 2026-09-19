@@ -84,7 +84,9 @@ export class ActiveLocationResolutionService {
       source: active.source,
       revision: active.revision,
     });
-    const service = new LocationResolutionService(directory, { timeoutMs: this.#options.timeoutMs });
+    const serviceOptions: LocationResolutionServiceOptions = {};
+    if (this.#options.timeoutMs !== undefined) serviceOptions.timeoutMs = this.#options.timeoutMs;
+    const service = new LocationResolutionService(directory, serviceOptions);
     return service.resolve(validation.query, context);
   }
 }
