@@ -1,3 +1,4 @@
+import type { TravelLocationCandidateV1 } from '../../src/travel/locationResolution';
 import type { LocationResolutionOutcome } from './locationResolutionService';
 import {
   bindTrustedLocationToYandexRasp,
@@ -21,7 +22,7 @@ export type RoutesLocationBoundaryOutcome =
       status: 'needs_disambiguation';
       field: 'origin' | 'destination';
       code: 'location_ambiguous';
-      candidates: LocationResolutionOutcome extends infer _T ? import('../../src/travel/locationResolution').TravelLocationCandidateV1[] : never;
+      candidates: TravelLocationCandidateV1[];
     }
   | {
       status: 'blocked';
