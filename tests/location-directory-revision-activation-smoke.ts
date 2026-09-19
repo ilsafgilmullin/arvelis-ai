@@ -5,10 +5,11 @@ import {
   LocationDirectoryActivationService,
   type LocationDirectoryActivationRepository,
 } from '../server/travel/locationDirectoryActivation';
-import {
-  InMemoryLocationDirectoryRepository,
-  type LocationDirectoryRevisionV1,
-  type LocationDirectorySourceLocationV1,
+import type {
+  LocationDirectoryRepository,
+  LocationDirectoryRevisionV1,
+  LocationDirectorySourceLocationV1,
+  StoredLocationDirectoryRecordV1,
 } from '../server/travel/locationDirectoryFoundation';
 
 const revision = (name: string, countryCode = 'RU'): LocationDirectoryRevisionV1 => ({
@@ -94,20 +95,38 @@ async function main() {
     expectedCurrentRevision: 'ru-2026-09-17', activatedAt: '2026-09-18T01:05:00.000Z',
   }), /country mismatch/);
 
-  // Runtime binding qualification is deliberately scoped to activation semantics:
-  // an imported revision remains unreadable until activation, and switching/rollback
-  // must be observed by the same runtime instance without process restart.
-  const directoryRepository = new InMemoryLocationDirectoryRepository();
+  // Keep this qualification focused on active-pointer runtime semantics. Repository
+  // persistence/ranking is covered by its own SQLite/PostgreSQL/in-memory gates.
+  const runtimeRevisions = new Map([
+    ['ru-2026-09-17', revision('ru-2026-09-17')],
+    ['ru-2026-09-18', revision('ru-2026-09-18')],
+  ]);
+  const runtimeRecord = (sourceRevision: string): StoredLocationDirectoryRecordV1 => ({
+    ...sourceLocation(sourceRevision),
+    locationId: 'arvelis:location:moscow',
+  });
+  const directoryRepository: LocationDirectoryRepository = {
+    putRevision: async () => undefined,
+    getRevision: async (source, sourceRevision) => {
+      if (source !== 'geonames') return null;
+      return runtimeRevisions.get(sourceRevision) ?? null;
+    },
+    upsertSourceLocation: async (location) => runtimeRecord(location.sourceRevision),
+    searchExact: async (lookup) => {
+      if (!runtimeRevisions.has(lookup.sourceRevision)
+        || lookup.countryCode !== 'RU'
+        || lookup.normalizedLabel !== 'москва') return [];
+      return [{
+        record: runtimeRecord(lookup.sourceRevision),
+        matchedName: 'Москва',
+        matchedPrimaryName: true,
+      }];
+    },
+  };
+
   const runtimeActivationRepository = new InMemoryLocationDirectoryActivationRepository();
   const runtimeActivationService = new LocationDirectoryActivationService(runtimeActivationRepository);
-  for (const item of [revision('ru-2026-09-17'), revision('ru-2026-09-18')]) {
-    await directoryRepository.putRevision(item);
-    runtimeActivationRepository.registerRevision(item);
-    await directoryRepository.upsertSourceLocation(
-      sourceLocation(item.revision),
-      () => 'arvelis:location:moscow',
-    );
-  }
+  for (const item of runtimeRevisions.values()) runtimeActivationRepository.registerRevision(item);
 
   const runtime = new ActiveLocationResolutionService(directoryRepository, runtimeActivationRepository, {
     directoryId: 'geonames-ru',
