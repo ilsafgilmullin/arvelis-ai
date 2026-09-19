@@ -19,6 +19,8 @@
     "src/travel/transportContracts.ts",
     "src/travel/providers.ts",
     "src/travel/locationResolution.ts",
+    "server/travel/locationResolutionService.ts",
+    "server/travel/routesLocationBoundary.ts",
     "server/travel/transportOrchestrator.ts",
     "server/travel/transportProviderPolicy.ts",
     "server/travel/providers/yandexRaspAdapter.ts",
@@ -34,6 +36,7 @@
     "tests/yandex-rasp-trusted-bindings-smoke.ts",
     "tests/yandex-rasp-runtime-provider-smoke.ts",
     "tests/yandex-rasp-development-live-smoke.ts",
-    "tests/trusted-location-provider-binding-smoke.ts"
+    "tests/trusted-location-provider-binding-smoke.ts",
+    "tests/routes-location-boundary-smoke.ts"
   ]
 }

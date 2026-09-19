@@ -1,3 +1,5 @@
+import './trusted-location-provider-binding-smoke';
+import './routes-location-boundary-smoke';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { TravelLocationCandidateV1 } from '../src/travel/locationResolution';
