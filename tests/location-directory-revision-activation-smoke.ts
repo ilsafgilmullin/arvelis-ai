@@ -29,7 +29,7 @@ const sourceLocation = (sourceRevision: string, displayName: string): LocationDi
   sourceRevision,
   externalSourceId: '524901',
   displayName,
-  searchNames: ['Москва'],
+  searchNames: displayName === 'Москва' ? ['Москва'] : [displayName, 'Москва'],
   type: 'city',
   countryCode: 'RU',
   region: 'Москва',
