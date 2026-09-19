@@ -65,6 +65,11 @@ jobs:
           npx tsc -p tsconfig.location-directory-revision-activation-smoke.json
           node tests/.dist-location-directory-revision-activation/tests/location-directory-revision-activation-smoke.js
 
+      - name: Location resolution runtime composition
+        run: |
+          npx tsc -p tsconfig.location-resolution-runtime-composition-smoke.json
+          node --experimental-sqlite tests/.dist-location-resolution-runtime-composition/tests/location-resolution-runtime-composition-smoke.js
+
       - name: GeoNames location source contract
         run: npm run test:geonames-location-source
 
