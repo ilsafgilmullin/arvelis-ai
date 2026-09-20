@@ -26,6 +26,7 @@
     "server/travel/routesResolutionRuntime.ts",
     "server/travel/routesResolutionAuthenticatedRuntime.ts",
     "server/travel/routesResolutionHttpRouteAdapter.ts",
+    "server/travel/routesResolutionRuntimeRoute.ts",
     "server/travel/transportOrchestrator.ts",
     "server/travel/transportProviderPolicy.ts",
     "server/travel/providers/yandexRaspAdapter.ts",
