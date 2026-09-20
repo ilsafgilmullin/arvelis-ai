@@ -13,10 +13,12 @@ export type RoutesResolutionHttpResult =
 export async function resolveRoutesForAuthenticatedRequest(input: {
   service: RoutesResolutionService;
   request: unknown;
+  accountScopeId: string;
   requestId: string;
   signal: AbortSignal;
 }): Promise<RoutesResolutionHttpResult> {
   const result = await input.service.resolve(input.request, {
+    accountScopeId: input.accountScopeId,
     requestId: input.requestId,
     signal: input.signal,
   });
