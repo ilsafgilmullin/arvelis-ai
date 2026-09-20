@@ -3,6 +3,7 @@ import './routes-location-boundary-smoke';
 import './routes-resolution-service-smoke';
 import './routes-resolution-http-boundary-smoke';
 import './routes-resolution-runtime-smoke';
+import './routes-resolution-authenticated-runtime-smoke';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { TravelLocationCandidateV1 } from '../src/travel/locationResolution';
