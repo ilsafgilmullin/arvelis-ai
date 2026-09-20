@@ -69,6 +69,11 @@ if (ready.status === 'ready') {
   });
   assert.equal(transportRequest.status, 'ready');
   if (transportRequest.status === 'ready') {
+    assert.equal(transportRequest.request.origin.resolution, 'resolved');
+    assert.equal(transportRequest.request.destination.resolution, 'resolved');
+    if (transportRequest.request.origin.resolution !== 'resolved' || transportRequest.request.destination.resolution !== 'resolved') {
+      throw new Error('Expected trusted Routes locations to stay resolved');
+    }
     assert.equal(transportRequest.request.origin.locationId, moscow.locationId);
     assert.equal(transportRequest.request.destination.locationId, kazan.locationId);
     assert.equal(transportRequest.request.timezone, 'Europe/Moscow');
