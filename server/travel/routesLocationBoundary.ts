@@ -17,6 +17,8 @@ export type RoutesLocationBoundaryOutcome =
       status: 'ready';
       origin: TrustedProviderLocationBinding;
       destination: TrustedProviderLocationBinding;
+      originLocation: TravelLocationCandidateV1;
+      destinationLocation: TravelLocationCandidateV1;
     }
   | {
       status: 'needs_disambiguation';
@@ -35,7 +37,7 @@ function bindResolvedLocation(
   outcome: LocationResolutionOutcome,
   bindings: YandexLocationBindings,
 ):
-  | { status: 'ready'; binding: TrustedProviderLocationBinding }
+  | { status: 'ready'; binding: TrustedProviderLocationBinding; location: TravelLocationCandidateV1 }
   | Exclude<RoutesLocationBoundaryOutcome, { status: 'ready' }> {
   if (!('response' in outcome)) {
     return { status: 'blocked', field, code: 'location_resolution_failed' };
@@ -50,7 +52,13 @@ function bindResolvedLocation(
   }
 
   const bound = bindTrustedLocationToYandexRasp(outcome.response.candidates, bindings);
-  if (bound.status === 'bound') return { status: 'ready', binding: bound.binding };
+  if (bound.status === 'bound') {
+    const location = outcome.response.candidates[0];
+    if (!location || location.locationId !== bound.binding.locationId) {
+      return { status: 'blocked', field, code: 'location_resolution_failed' };
+    }
+    return { status: 'ready', binding: bound.binding, location: structuredClone(location) };
+  }
   if (bound.status === 'ambiguous') {
     return {
       status: 'needs_disambiguation',
@@ -65,6 +73,8 @@ function bindResolvedLocation(
 /**
  * Joins trusted resolver outcomes to server-owned provider bindings for Routes.
  * It never chooses among multiple candidates and never accepts provider codes from clients.
+ * Provider-neutral candidate metadata is retained server-side for the subsequent
+ * TransportSearchRequest construction; the HTTP boundary still exposes only ARVELIS IDs.
  */
 export function prepareRoutesLocationsForYandexRasp(
   origin: LocationResolutionOutcome,
@@ -85,5 +95,7 @@ export function prepareRoutesLocationsForYandexRasp(
     status: 'ready',
     origin: originBinding.binding,
     destination: destinationBinding.binding,
+    originLocation: originBinding.location,
+    destinationLocation: destinationBinding.location,
   };
 }
