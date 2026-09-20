@@ -29,6 +29,7 @@
     "server/travel/routesResolutionRuntimeRoute.ts",
     "server/travel/routesTransportSearchRequest.ts",
     "server/travel/routesSearchOrchestrator.ts",
+    "server/travel/routesSearchHttpRouteAdapter.ts",
     "server/travel/transportSearchHttpBoundary.ts",
     "server/travel/transportSearchService.ts",
     "server/travel/transportOrchestrator.ts",
