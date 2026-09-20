@@ -2,24 +2,28 @@ import assert from 'node:assert/strict';
 import type { TravelLocationCandidateV1 } from '../src/travel/locationResolution';
 import type { LocationResolutionOutcome } from '../server/travel/locationResolutionService';
 import { prepareRoutesLocationsForYandexRasp } from '../server/travel/routesLocationBoundary';
+import { buildRoutesTransportSearchRequest } from '../server/travel/routesTransportSearchRequest';
 
 const moscow: TravelLocationCandidateV1 = {
   locationId: 'arvelis:station:moscow-kazanskaya',
   displayName: 'Москва (Казанский вокзал)',
   type: 'station',
   countryCode: 'RU',
+  timezone: 'Europe/Moscow',
 };
 const kazan: TravelLocationCandidateV1 = {
   locationId: 'arvelis:station:kazan-pass',
   displayName: 'Казань-Пасс.',
   type: 'station',
   countryCode: 'RU',
+  timezone: 'Europe/Moscow',
 };
 const other: TravelLocationCandidateV1 = {
   locationId: 'arvelis:station:other',
   displayName: 'Другая станция',
   type: 'station',
   countryCode: 'RU',
+  timezone: 'Europe/Moscow',
 };
 
 const resolved = (rawLabel: string, candidate: TravelLocationCandidateV1): LocationResolutionOutcome => ({
@@ -54,6 +58,32 @@ assert.equal(ready.status, 'ready');
 if (ready.status === 'ready') {
   assert.equal(ready.origin.searchCode, 's2000003');
   assert.equal(ready.destination.searchCode, 's9602494');
+  assert.equal(ready.originLocation.displayName, moscow.displayName);
+  assert.equal(ready.destinationLocation.type, 'station');
+
+  const transportRequest = buildRoutesTransportSearchRequest({
+    resolutionRequest: { origin: 'Москва', destination: 'Казань' },
+    locations: ready,
+    search: { departureDate: '2026-09-21', adults: 1 },
+    now: new Date('2026-09-20T10:00:00.000Z'),
+  });
+  assert.equal(transportRequest.status, 'ready');
+  if (transportRequest.status === 'ready') {
+    assert.equal(transportRequest.request.origin.locationId, moscow.locationId);
+    assert.equal(transportRequest.request.destination.locationId, kazan.locationId);
+    assert.equal(transportRequest.request.timezone, 'Europe/Moscow');
+    assert.equal(transportRequest.request.preferredCurrency, 'RUB');
+    assert.equal('searchCode' in transportRequest.request.origin, false);
+    assert.equal('searchCode' in transportRequest.request.destination, false);
+  }
+
+  const missingTimezone = buildRoutesTransportSearchRequest({
+    resolutionRequest: { origin: 'Москва', destination: 'Казань' },
+    locations: { ...ready, originLocation: { ...ready.originLocation, timezone: undefined } },
+    search: { departureDate: '2026-09-21', adults: 1 },
+    now: new Date('2026-09-20T10:00:00.000Z'),
+  });
+  assert.deepEqual(missingTimezone, { status: 'blocked', code: 'location_metadata_incomplete' });
 }
 
 const disambiguation = prepareRoutesLocationsForYandexRasp(resolved('Москва', moscow), ambiguous, bindings);
