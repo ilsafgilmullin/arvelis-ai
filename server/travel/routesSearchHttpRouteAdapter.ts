@@ -107,6 +107,12 @@ export async function handleAuthorizedRoutesSearchHttp(input: {
     }
 
     switch (result.code) {
+      case 'trip_not_ready':
+        sendJson(input.response, 409, {
+          status: result.status,
+          error: { code: result.code, message: 'Trip is not ready for routes search' },
+        });
+        return;
       case 'location_resolution_failed':
       case 'location_metadata_incomplete':
       case 'invalid_search_request':
