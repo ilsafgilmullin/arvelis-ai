@@ -46,16 +46,39 @@ async function main(): Promise<void> {
   assert.ok(readyResolver.queries.every((query) => query.countryCode === 'RU' && query.locale === 'ru-RU' && query.limit === 10));
   assert.ok(readyResolver.queries.every((query) => !Object.hasOwn(query as object, 'searchCode')));
 
-  const ambiguousResolver = new StubResolver(new Map([
+  const ambiguousResponses = new Map<string, LocationResolutionOutcome>([
     ['Москва', outcome('Москва', [moscow])],
     ['Казань', outcome('Казань', [kazan, kazanOther])],
-  ]));
+  ]);
+  const ambiguousResolver = new StubResolver(ambiguousResponses);
   const ambiguous = await new RoutesResolutionService(ambiguousResolver, bindings).resolve(request, context);
   assert.equal(ambiguous.status, 'needs_disambiguation');
   if (ambiguous.status === 'needs_disambiguation') {
     assert.equal(ambiguous.field, 'destination');
     assert.deepEqual(ambiguous.candidates.map((candidate) => candidate.locationId), [kazan.locationId, kazanOther.locationId]);
   }
+
+  const explicitlySelected = await new RoutesResolutionService(new StubResolver(ambiguousResponses), bindings).resolve(
+    { ...request, destinationLocationId: kazan.locationId },
+    context,
+  );
+  assert.equal(explicitlySelected.status, 'ready');
+  if (explicitlySelected.status === 'ready') {
+    assert.equal(explicitlySelected.destination.locationId, kazan.locationId);
+    assert.equal(explicitlySelected.destination.searchCode, 's9623141');
+  }
+
+  const staleSelection = await new RoutesResolutionService(new StubResolver(ambiguousResponses), bindings).resolve(
+    { ...request, destinationLocationId: 'arvelis:test:station:not-in-current-candidates' },
+    context,
+  );
+  assert.equal(staleSelection.status, 'needs_disambiguation', 'stale/invented ARVELIS IDs must never be trusted');
+
+  const providerCodeSelection = await new RoutesResolutionService(new StubResolver(ambiguousResponses), bindings).resolve(
+    { ...request, destinationLocationId: 's9623141' },
+    context,
+  );
+  assert.deepEqual(providerCodeSelection, { status: 'blocked', field: 'origin', code: 'location_resolution_failed' });
 
   const unresolvedResolver = new StubResolver(new Map([['Москва', outcome('Москва', [])]]));
   const unresolved = await new RoutesResolutionService(unresolvedResolver, bindings).resolve(request, context);
