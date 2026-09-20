@@ -77,9 +77,16 @@ if (ready.status === 'ready') {
     assert.equal('searchCode' in transportRequest.request.destination, false);
   }
 
+  const incompleteOrigin: TravelLocationCandidateV1 = {
+    locationId: ready.originLocation.locationId,
+    displayName: ready.originLocation.displayName,
+    type: ready.originLocation.type,
+    ...(ready.originLocation.countryCode ? { countryCode: ready.originLocation.countryCode } : {}),
+    ...(ready.originLocation.region ? { region: ready.originLocation.region } : {}),
+  };
   const missingTimezone = buildRoutesTransportSearchRequest({
     resolutionRequest: { origin: 'Москва', destination: 'Казань' },
-    locations: { ...ready, originLocation: { ...ready.originLocation, timezone: undefined } },
+    locations: { ...ready, originLocation: incompleteOrigin },
     search: { departureDate: '2026-09-21', adults: 1 },
     now: new Date('2026-09-20T10:00:00.000Z'),
   });
