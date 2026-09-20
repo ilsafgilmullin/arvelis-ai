@@ -106,18 +106,20 @@ export async function handleAuthorizedRoutesSearchHttp(input: {
       return;
     }
 
-    if (result.code === 'location_resolution_failed'
-      || result.code === 'location_metadata_incomplete'
-      || result.code === 'invalid_search_request') {
-      sendJson(input.response, 422, {
-        status: result.status,
-        error: { code: result.code, message: 'Routes search request cannot be executed' },
-      });
-      return;
+    switch (result.code) {
+      case 'location_resolution_failed':
+      case 'location_metadata_incomplete':
+      case 'invalid_search_request':
+        sendJson(input.response, 422, {
+          status: result.status,
+          error: { code: result.code, message: 'Routes search request cannot be executed' },
+        });
+        return;
+      default: {
+        const failure = transportHttpFailure(result);
+        sendJson(input.response, failure.statusCode, failure.body);
+      }
     }
-
-    const failure = transportHttpFailure(result);
-    sendJson(input.response, failure.statusCode, failure.body);
   } finally {
     input.request.off('aborted', abort);
   }
