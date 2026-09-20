@@ -1,3 +1,4 @@
+import './routes-resolution-authenticated-runtime-smoke';
 import assert from 'node:assert/strict';
 import { openSqliteAuthDatabase } from '../server/persistence/sqlite/database';
 import { loadRoutesResolutionRuntime } from '../server/travel/routesResolutionRuntime';
