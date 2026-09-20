@@ -26,6 +26,7 @@ import { openSqliteAuthDatabase } from '../persistence/sqlite/database';
 import { SqliteTripStore } from '../persistence/sqlite/tripStore';
 import { TripApplicationError, type ServerTripStore } from '../travel/contracts';
 import { loadYandexRaspRuntimeProvider } from '../travel/providers/yandexRaspRuntimeProvider';
+import { createAuthenticatedRoutesResolutionRuntimeRoute } from '../travel/routesResolutionRuntimeRoute';
 import { TripApplicationService } from '../travel/service';
 import { searchTransportForAuthorizedTrip, transportHttpFailure } from '../travel/transportSearchHttpBoundary';
 import { TransportSearchService } from '../travel/transportSearchService';
@@ -201,6 +202,11 @@ async function main(): Promise<void> {
   const trips = new TripApplicationService(tripStore);
   const yandexTransport = await loadYandexRaspRuntimeProvider();
   const transportSearch = new TransportSearchService(yandexTransport.provider);
+  const routesResolution = await createAuthenticatedRoutesResolutionRuntimeRoute({
+    database: config.database.provider === 'postgres'
+      ? { provider: 'postgres', pool: pool! }
+      : { provider: 'sqlite', database: sqlite! },
+  });
 
   const buildPublicSession = async (sessionId: string, createdAt: number, expiresAt: number, accountId: string) => {
     const account = await accounts.getAccount(accountId);
@@ -321,6 +327,17 @@ async function main(): Promise<void> {
       } catch {
         sendJson(response, 503, { error: authFailure('service_unavailable', 'Trip service unavailable') });
       }
+      return;
+    }
+
+    if (method === 'POST' && url.pathname === '/api/routes/resolve') {
+      const current = await requireTripAccount(request, response);
+      if (!current) return;
+      await routesResolution.handle({
+        request,
+        response,
+        accountScopeId: current.authenticated.account.id,
+      });
       return;
     }
 
