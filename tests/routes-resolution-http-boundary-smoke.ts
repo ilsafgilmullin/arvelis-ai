@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import type { LocationResolutionQueryV1, TravelLocationCandidateV1 } from '../src/travel/locationResolution';
-import type { LocationResolutionOutcome } from '../server/travel/locationResolutionService';
+import type { LocationDirectoryContext, LocationResolutionOutcome } from '../server/travel/locationResolutionService';
 import { resolveRoutesForAuthenticatedRequest } from '../server/travel/routesResolutionHttpBoundary';
 import { RoutesResolutionService, type RoutesLocationResolver } from '../server/travel/routesResolutionService';
 
 const moscow: TravelLocationCandidateV1 = { locationId: 'arvelis:dev:station:moscow-kazansky', displayName: 'Москва (Казанский вокзал)', type: 'station', countryCode: 'RU' };
 const kazan: TravelLocationCandidateV1 = { locationId: 'arvelis:dev:station:kazan-pass', displayName: 'Казань-Пасс.', type: 'station', countryCode: 'RU' };
 const kazanOther: TravelLocationCandidateV1 = { locationId: 'arvelis:test:station:kazan-other', displayName: 'Казань, другая станция', type: 'station', countryCode: 'RU' };
+const accountScopeId = 'account:http-boundary';
 
 function outcome(rawLabel: string, candidates: TravelLocationCandidateV1[]): LocationResolutionOutcome {
   const status = candidates.length === 0 ? 'unresolved' : candidates.length === 1 ? 'resolved' : 'ambiguous';
@@ -14,8 +15,12 @@ function outcome(rawLabel: string, candidates: TravelLocationCandidateV1[]): Loc
 }
 
 class StubResolver implements RoutesLocationResolver {
+  readonly seenContexts: LocationDirectoryContext[] = [];
+
   constructor(readonly responses: ReadonlyMap<string, LocationResolutionOutcome>) {}
-  async resolve(input: unknown): Promise<LocationResolutionOutcome> {
+
+  async resolve(input: unknown, context: LocationDirectoryContext): Promise<LocationResolutionOutcome> {
+    this.seenContexts.push(context);
     const query = input as LocationResolutionQueryV1;
     return this.responses.get(query.rawLabel) ?? outcome(query.rawLabel, []);
   }
@@ -29,16 +34,18 @@ async function request(resolver: RoutesLocationResolver) {
   return resolveRoutesForAuthenticatedRequest({
     service,
     request: { version: 1, origin: 'Москва', destination: 'Казань', locale: 'ru-RU', countryCode: 'RU' },
+    accountScopeId,
     requestId: 'request:http-boundary',
     signal: new AbortController().signal,
   });
 }
 
 async function main(): Promise<void> {
-  const ready = await request(new StubResolver(new Map([
+  const readyResolver = new StubResolver(new Map([
     ['Москва', outcome('Москва', [moscow])],
     ['Казань', outcome('Казань', [kazan])],
-  ])));
+  ]));
+  const ready = await request(readyResolver);
   assert.deepEqual(ready, {
     statusCode: 200,
     body: {
@@ -49,6 +56,8 @@ async function main(): Promise<void> {
   });
   assert.equal(JSON.stringify(ready).includes('s2000003'), false, 'provider codes must not cross the HTTP boundary');
   assert.equal(JSON.stringify(ready).includes('s9623141'), false, 'provider codes must not cross the HTTP boundary');
+  assert.equal(readyResolver.seenContexts.length, 2);
+  assert.equal(readyResolver.seenContexts.every((context) => context.accountScopeId === accountScopeId), true, 'authenticated account scope must reach every location resolution');
 
   const ambiguous = await request(new StubResolver(new Map([
     ['Москва', outcome('Москва', [moscow])],
