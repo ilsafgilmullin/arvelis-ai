@@ -2,6 +2,7 @@ import type { TravelLocationCandidateV1, TravelLocationType } from './locationRe
 import { validateTransportSearchResponse, type TransportSearchResponse } from './transportContracts';
 
 const ROUTES_SEARCH_RESPONSE_LIMIT_BYTES = 1024 * 1024;
+const ROUTES_SEARCH_TIMEOUT_MS = 20_000;
 const ROUTES_SEARCH_REQUEST_ID_HEADER = 'X-Arvelis-Request-Id';
 const ROUTES_SEARCH_PROVIDER_ID = 'yandex-rasp-v3';
 const LOCATION_ID_PATTERN = /^arvelis:[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$/;
@@ -77,6 +78,16 @@ export async function searchRoutesForTrip(input: {
   }
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return { status: 'offline' };
 
+  const controller = new AbortController();
+  let timedOut = false;
+  const onExternalAbort = () => controller.abort();
+  if (input.signal?.aborted) return { status: 'cancelled' };
+  input.signal?.addEventListener('abort', onExternalAbort, { once: true });
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, ROUTES_SEARCH_TIMEOUT_MS);
+
   let response: Response;
   try {
     response = await fetch(`/api/trips/${encodeURIComponent(input.tripId)}/routes/search`, {
@@ -84,13 +95,17 @@ export async function searchRoutesForTrip(input: {
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input.selection === undefined ? {} : { selection: input.selection }),
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      signal: controller.signal,
     });
   } catch (error) {
+    if (timedOut) return { status: 'failed', code: 'timeout' };
     if (input.signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) return { status: 'cancelled' };
     return typeof navigator !== 'undefined' && navigator.onLine === false
       ? { status: 'offline' }
       : { status: 'failed', code: 'network_error' };
+  } finally {
+    clearTimeout(timeout);
+    input.signal?.removeEventListener('abort', onExternalAbort);
   }
 
   let payload: unknown;
