@@ -8,6 +8,7 @@ import { transportHttpFailure } from './transportSearchHttpBoundary';
 import type { TransportSearchService } from './transportSearchService';
 
 const ROUTES_SEARCH_JSON_LIMIT = 12 * 1024;
+export const ROUTES_SEARCH_REQUEST_ID_HEADER = 'X-Arvelis-Request-Id';
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return value !== null
@@ -75,6 +76,9 @@ export async function handleAuthorizedRoutesSearchHttp(input: {
     return;
   }
 
+  const requestId = randomUUID();
+  input.response.setHeader(ROUTES_SEARCH_REQUEST_ID_HEADER, requestId);
+
   const controller = new AbortController();
   const abort = () => controller.abort();
   input.request.once('aborted', abort);
@@ -87,7 +91,7 @@ export async function handleAuthorizedRoutesSearchHttp(input: {
       accountScopeId: input.accountScopeId,
       trip: input.trip,
       selection,
-      requestId: randomUUID(),
+      requestId,
       signal: controller.signal,
     });
 
