@@ -58,7 +58,8 @@ assert.ok(resultListPosition >= 0 && yandexAttributionPosition > resultListPosit
 
 // Routes is now wired through the validated HTTP client. The app must not regress to the old truthful placeholder.
 assert.ok(routes.includes("import { searchRoutesForTrip"));
-assert.ok(routes.includes('<TransportResultsScreen response={state.response} />'));
+assert.ok(routes.includes("state.status === 'ready'"));
+assert.ok(routes.includes('response={state.response}'));
 assert.ok(routes.includes("state.status === 'needs_disambiguation'"));
 assert.ok(routes.includes("state.status === 'offline'"));
 assert.ok(routes.includes("state.status === 'failed'"));
