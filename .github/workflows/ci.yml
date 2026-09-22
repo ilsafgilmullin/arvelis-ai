@@ -43,6 +43,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Server auth and release runtime configuration
+        run: npm run test:server-auth
+
       - name: Plan orchestration business and provenance
         run: npm run test:plan-policy
 
