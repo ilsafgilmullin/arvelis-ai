@@ -25,6 +25,13 @@
     "server/travel/routesResolutionHttpBoundary.ts",
     "server/travel/routesResolutionRuntime.ts",
     "server/travel/routesResolutionAuthenticatedRuntime.ts",
+    "server/travel/routesResolutionHttpRouteAdapter.ts",
+    "server/travel/routesResolutionRuntimeRoute.ts",
+    "server/travel/routesTransportSearchRequest.ts",
+    "server/travel/routesSearchOrchestrator.ts",
+    "server/travel/routesSearchHttpRouteAdapter.ts",
+    "server/travel/transportSearchHttpBoundary.ts",
+    "server/travel/transportSearchService.ts",
     "server/travel/transportOrchestrator.ts",
     "server/travel/transportProviderPolicy.ts",
     "server/travel/providers/yandexRaspAdapter.ts",
@@ -45,6 +52,7 @@
     "tests/routes-resolution-service-smoke.ts",
     "tests/routes-resolution-http-boundary-smoke.ts",
     "tests/routes-resolution-runtime-smoke.ts",
-    "tests/routes-resolution-authenticated-runtime-smoke.ts"
+    "tests/routes-resolution-authenticated-runtime-smoke.ts",
+    "tests/routes-resolution-http-route-adapter-smoke.ts"
   ]
 }

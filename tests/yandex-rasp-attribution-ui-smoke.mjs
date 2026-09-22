@@ -5,6 +5,7 @@ const component = await readFile(new URL('../src/travel/TransportProviderAttribu
 const css = await readFile(new URL('../src/travel/travel-provider-attribution.css', import.meta.url), 'utf8');
 const results = await readFile(new URL('../src/travel/TransportResultsScreen.tsx', import.meta.url), 'utf8');
 const resultsCss = await readFile(new URL('../src/travel/travel-transport-results.css', import.meta.url), 'utf8');
+const routes = await readFile(new URL('../src/travel/RoutesScreen.tsx', import.meta.url), 'utf8');
 const app = await readFile(new URL('../src/travel/TravelApp.tsx', import.meta.url), 'utf8');
 const main = await readFile(new URL('../src/main.tsx', import.meta.url), 'utf8');
 
@@ -37,7 +38,7 @@ assert.ok(css.includes('max-width: 100%'));
 assert.ok(css.includes('height: 130px'));
 assert.ok(css.includes('overflow: hidden'));
 
-// The Routes UI consumes only a normalized response. It does not call Yandex or read secrets.
+// The results UI consumes only a normalized response. It does not call Yandex or read secrets.
 assert.ok(results.includes('response: TransportSearchResponse | null'));
 assert.ok(results.includes("response.providerId === 'yandex-rasp-v3'"));
 assert.ok(results.includes('<YandexRaspProviderAttribution attribution={attribution} />'));
@@ -55,9 +56,19 @@ const resultListPosition = results.indexOf('travel-transport-results__list');
 const yandexAttributionPosition = results.indexOf('<YandexRaspProviderAttribution');
 assert.ok(resultListPosition >= 0 && yandexAttributionPosition > resultListPosition, 'Provider attribution must remain directly after provider-backed result data.');
 
-// Until a real backend transport response is wired, the active screen remains a truthful empty state.
-assert.ok(app.includes('<TransportResultsScreen response={null}'));
-assert.ok(app.includes('Здесь ARVELIS будет сравнивать самолёты, поезда, автобусы и смешанные варианты.'));
+// Routes is now wired through the validated HTTP client. The app must not regress to the old truthful placeholder.
+assert.ok(routes.includes("import { searchRoutesForTrip"));
+assert.ok(routes.includes("state.status === 'ready'"));
+assert.ok(routes.includes('response={state.response}'));
+assert.ok(routes.includes("state.status === 'needs_disambiguation'"));
+assert.ok(routes.includes("state.status === 'offline'"));
+assert.ok(routes.includes("state.status === 'failed'"));
+assert.equal(routes.includes('YANDEX_RASP_API_KEY'), false);
+assert.ok(app.includes("import { RoutesScreen } from './RoutesScreen'"));
+assert.ok(app.includes('<RoutesScreen'));
+assert.ok(app.includes('trip={selectedTrip}'));
+assert.ok(app.includes('online={online}'));
+assert.equal(app.includes('<TransportResultsScreen response={null}'), false);
 assert.ok(main.includes("./travel/travel-transport-results.css"));
 assert.ok(resultsCss.includes('@media (max-width: 700px)'));
 assert.ok(resultsCss.includes('@media (max-width: 390px)'));

@@ -5,11 +5,14 @@ function assert(value: unknown, message: string): asserts value {
 }
 
 const managedKeys = [
+  'ARVELIS_RUNTIME_PROFILE',
   'AUTH_DB_PROVIDER',
   'AUTH_SQLITE_PATH',
   'DATABASE_URL',
   'AUTH_OTP_PEPPER_HEX',
   'AUTH_SESSION_PEPPER_HEX',
+  'AUTH_COOKIE_SECURE',
+  'AUTH_TRUST_PROXY',
   'SMTP_HOST',
   'SMTP_PORT',
   'SMTP_SECURE',
@@ -34,6 +37,7 @@ function resetBaseEnvironment(): void {
 try {
   resetBaseEnvironment();
   const defaults = loadAuthRuntimeConfig();
+  assert(defaults.profile === 'closed_test', 'Runtime must default to the closed-test profile');
   assert(defaults.database.provider === 'sqlite', 'Closed-test auth DB must default to SQLite');
   if (defaults.database.provider === 'sqlite') {
     assert(defaults.database.path === '.data/arvelis-auth.sqlite', 'SQLite must use the safe local default path');
@@ -88,6 +92,40 @@ try {
     rejectedMissingPassword = true;
   }
   assert(rejectedMissingPassword, 'Missing SMTP password must be rejected');
+
+  resetBaseEnvironment();
+  process.env.ARVELIS_RUNTIME_PROFILE = 'release';
+  let rejectedReleaseDefaults = false;
+  try {
+    loadAuthRuntimeConfig();
+  } catch {
+    rejectedReleaseDefaults = true;
+  }
+  assert(rejectedReleaseDefaults, 'Release profile must reject closed-test persistence/cookie defaults');
+
+  resetBaseEnvironment();
+  process.env.ARVELIS_RUNTIME_PROFILE = 'release';
+  process.env.AUTH_DB_PROVIDER = 'postgres';
+  process.env.DATABASE_URL = 'postgresql://test:test@127.0.0.1:5432/arvelis_release';
+  process.env.AUTH_COOKIE_SECURE = 'always';
+  const release = loadAuthRuntimeConfig();
+  assert(release.profile === 'release', 'Explicit release profile must be preserved');
+  assert(release.database.provider === 'postgres', 'Release profile must require PostgreSQL');
+  assert(release.cookieSecureMode === 'always', 'Release profile must require secure cookies');
+
+  resetBaseEnvironment();
+  process.env.ARVELIS_RUNTIME_PROFILE = 'release';
+  process.env.AUTH_DB_PROVIDER = 'postgres';
+  process.env.DATABASE_URL = 'postgresql://test:test@127.0.0.1:5432/arvelis_release';
+  process.env.AUTH_COOKIE_SECURE = 'always';
+  delete process.env.SMTP_HOST;
+  let rejectedReleaseSmtpDefault = false;
+  try {
+    loadAuthRuntimeConfig();
+  } catch {
+    rejectedReleaseSmtpDefault = true;
+  }
+  assert(rejectedReleaseSmtpDefault, 'Release profile must require explicit SMTP identity configuration');
 } finally {
   for (const key of managedKeys) {
     const value = saved.get(key);
