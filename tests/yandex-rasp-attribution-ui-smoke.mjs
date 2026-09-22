@@ -59,9 +59,9 @@ assert.ok(resultListPosition >= 0 && yandexAttributionPosition > resultListPosit
 // Routes is now wired through the validated HTTP client. The app must not regress to the old truthful placeholder.
 assert.ok(routes.includes("import { searchRoutesForTrip"));
 assert.ok(routes.includes('<TransportResultsScreen response={state.response} />'));
-assert.ok(routes.includes("state.kind === 'disambiguation'"));
-assert.ok(routes.includes("state.kind === 'offline'"));
-assert.ok(routes.includes("state.kind === 'error'"));
+assert.ok(routes.includes("state.status === 'needs_disambiguation'"));
+assert.ok(routes.includes("state.status === 'offline'"));
+assert.ok(routes.includes("state.status === 'failed'"));
 assert.equal(routes.includes('YANDEX_RASP_API_KEY'), false);
 assert.ok(app.includes("import { RoutesScreen } from './RoutesScreen'"));
 assert.ok(app.includes('<RoutesScreen'));
