@@ -6,13 +6,14 @@ import { canUseTripPersistence, createTravelTripRepository, type TripPersistence
 import { AssistantScreen } from './AssistantScreen';
 import { CreateTripScreen } from './CreateTripScreen';
 import { HomeScreen, TripsScreen } from './HomeTripsScreens';
+import { RoutesScreen } from './RoutesScreen';
 import { HelpScreen, ServiceFoundation, SettingsScreen } from './ServiceScreens';
-import { TransportResultsScreen } from './TransportResultsScreen';
 import { TripWorkspace, type WorkspaceTab } from './TripWorkspace';
 import { EMPTY_FORM, EmptyState } from './ui';
 
 type TravelScreen = 'home' | 'assistant' | 'trips' | 'create' | 'trip' | 'documents' | 'routes' | 'budgetService' | 'legalService' | 'mapService' | 'profile' | 'settings' | 'help' | 'states';
 type NavItem = { screen: TravelScreen; label: string };
+type TripSelectionTarget = 'routes' | null;
 
 const PRIMARY_NAV: NavItem[] = [
   { screen: 'home', label: 'Главная' },
@@ -81,6 +82,7 @@ export function TravelApp({ ownerScopeId, tripPersistenceMode, profileName, onli
   const [screen, setScreen] = useState<TravelScreen>('home');
   const [trips, setTrips] = useState<Trip[]>([]);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [tripSelectionTarget, setTripSelectionTarget] = useState<TripSelectionTarget>(null);
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('overview');
   const [form, setForm] = useState<CreateTripInput>(EMPTY_FORM);
   const [errors, setErrors] = useState<TripValidationError[]>([]);
@@ -196,7 +198,8 @@ export function TravelApp({ ownerScopeId, tripPersistenceMode, profileName, onli
     if (menuOpen) preserveDrawerScrollRef.current = false;
     setSelectedTripId(tripId);
     setWorkspaceTab('overview');
-    setScreen('trip');
+    setScreen(tripSelectionTarget ?? 'trip');
+    setTripSelectionTarget(null);
     setMenuOpen(false);
   };
 
@@ -254,7 +257,8 @@ export function TravelApp({ ownerScopeId, tripPersistenceMode, profileName, onli
       setForm(EMPTY_FORM);
       setErrors([]);
       setPersistenceError(null);
-      setScreen('trip');
+      setScreen(tripSelectionTarget ?? 'trip');
+      setTripSelectionTarget(null);
     }).catch(() => {
       setPersistenceError(tripPersistenceMode === 'server'
         ? 'Не удалось сохранить поездку на сервере. Данные формы сохранены на экране — попробуйте ещё раз.'
@@ -265,6 +269,11 @@ export function TravelApp({ ownerScopeId, tripPersistenceMode, profileName, onli
   };
 
   const chooseTripAction = () => {
+    if (trips.length > 0) navigate('trips');
+    else navigate('create');
+  };
+  const chooseRoutesTripAction = () => {
+    setTripSelectionTarget('routes');
     if (trips.length > 0) navigate('trips');
     else navigate('create');
   };
@@ -323,7 +332,7 @@ export function TravelApp({ ownerScopeId, tripPersistenceMode, profileName, onli
       {screen === 'create' ? <CreateTripScreen form={form} setForm={setForm} errors={errors} storageAvailable={storageAvailable} saving={savingTrip} onSubmit={createTrip} onCancel={() => navigate('trips')} /> : null}
       {screen === 'trip' ? tripScreen : null}
       {screen === 'documents' ? <ServiceFoundation kicker="ДОКУМЕНТЫ" icon="document" title="Документы поездки" text="Здесь будут храниться билеты, страховка, бронирования и другие документы." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
-      {screen === 'routes' ? <TransportResultsScreen response={null} emptyText="Здесь ARVELIS будет сравнивать самолёты, поезда, автобусы и смешанные варианты." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
+      {screen === 'routes' ? <RoutesScreen trip={selectedTrip} online={online} onChooseTrip={chooseRoutesTripAction} /> : null}
       {screen === 'budgetService' ? <ServiceFoundation kicker="БЮДЖЕТ" icon="budget" title="Бюджет поездки" text="Расходы и лимит бюджета ведутся внутри конкретной поездки." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
       {screen === 'legalService' ? <ServiceFoundation kicker="ПРАВИЛА И ДОКУМЕНТЫ" icon="shield" title="Проверка документов и правил" text="Выберите поездку, чтобы проверить правила въезда, транзита и документы для конкретного маршрута." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
       {screen === 'mapService' ? <ServiceFoundation kicker="КАРТА" icon="map" title="Карта маршрута" text="После подключения картографического сервиса здесь появится маршрут поездки." onPrimary={chooseTripAction} primaryLabel={chooseTripLabel} /> : null}
