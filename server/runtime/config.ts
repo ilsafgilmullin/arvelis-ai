@@ -1,11 +1,13 @@
 import type { SmtpEmailOtpDeliveryConfig } from '../auth/emailOtp/smtpDelivery';
 
 export type CookieSecureMode = 'auto' | 'always' | 'never';
+export type RuntimeProfile = 'closed_test' | 'release';
 export type AuthDatabaseConfig =
   | { provider: 'sqlite'; path: string }
   | { provider: 'postgres'; url: string };
 
 export type AuthRuntimeConfig = {
+  profile: RuntimeProfile;
   port: number;
   database: AuthDatabaseConfig;
   otpPepper: Uint8Array;
@@ -30,6 +32,12 @@ function optionalTrimmed(name: string, fallback: string): string {
   if (value === undefined || value === '') return fallback;
   if (value.trim() !== value) throw new Error(`Invalid ${name}`);
   return value;
+}
+
+function parseRuntimeProfile(value: string | undefined): RuntimeProfile {
+  if (value === undefined || value === '' || value === 'closed_test') return 'closed_test';
+  if (value === 'release') return 'release';
+  throw new Error('Invalid ARVELIS_RUNTIME_PROFILE');
 }
 
 function parsePort(value: string | undefined, fallback: number): number {
@@ -65,8 +73,12 @@ function parseHexSecret(name: string): Uint8Array {
   return bytes;
 }
 
-function loadDatabaseConfig(): AuthDatabaseConfig {
-  const provider = process.env.AUTH_DB_PROVIDER?.trim() || 'sqlite';
+function loadDatabaseConfig(profile: RuntimeProfile): AuthDatabaseConfig {
+  const rawProvider = process.env.AUTH_DB_PROVIDER;
+  if (profile === 'release' && rawProvider !== 'postgres') {
+    throw new Error('Release profile requires explicit AUTH_DB_PROVIDER=postgres');
+  }
+  const provider = rawProvider?.trim() || 'sqlite';
   if (provider === 'sqlite') {
     const path = process.env.AUTH_SQLITE_PATH?.trim() || '.data/arvelis-auth.sqlite';
     if (!path) throw new Error('Invalid AUTH_SQLITE_PATH');
@@ -76,26 +88,32 @@ function loadDatabaseConfig(): AuthDatabaseConfig {
   throw new Error('Invalid AUTH_DB_PROVIDER');
 }
 
-function loadSmtpConfig(): SmtpEmailOtpDeliveryConfig {
+function loadSmtpConfig(profile: RuntimeProfile): SmtpEmailOtpDeliveryConfig {
   const port = parsePort(process.env.SMTP_PORT, 465);
   return {
-    host: optionalTrimmed('SMTP_HOST', CLOSED_TEST_SMTP_HOST),
+    host: profile === 'release' ? required('SMTP_HOST') : optionalTrimmed('SMTP_HOST', CLOSED_TEST_SMTP_HOST),
     port,
     secure: parseBoolean(process.env.SMTP_SECURE, port === 465),
-    username: optionalTrimmed('SMTP_USERNAME', CLOSED_TEST_SMTP_LOGIN),
+    username: profile === 'release' ? required('SMTP_USERNAME') : optionalTrimmed('SMTP_USERNAME', CLOSED_TEST_SMTP_LOGIN),
     password: required('SMTP_PASSWORD'),
-    from: optionalTrimmed('SMTP_FROM', CLOSED_TEST_SMTP_FROM),
+    from: profile === 'release' ? required('SMTP_FROM') : optionalTrimmed('SMTP_FROM', CLOSED_TEST_SMTP_FROM),
   };
 }
 
 export function loadAuthRuntimeConfig(): AuthRuntimeConfig {
+  const profile = parseRuntimeProfile(process.env.ARVELIS_RUNTIME_PROFILE);
+  const cookieSecureMode = parseCookieSecureMode(process.env.AUTH_COOKIE_SECURE);
+  if (profile === 'release' && cookieSecureMode !== 'always') {
+    throw new Error('Release profile requires AUTH_COOKIE_SECURE=always');
+  }
   return {
+    profile,
     port: parsePort(process.env.AUTH_API_PORT, 3001),
-    database: loadDatabaseConfig(),
+    database: loadDatabaseConfig(profile),
     otpPepper: parseHexSecret('AUTH_OTP_PEPPER_HEX'),
     sessionPepper: parseHexSecret('AUTH_SESSION_PEPPER_HEX'),
-    smtp: loadSmtpConfig(),
+    smtp: loadSmtpConfig(profile),
     trustProxy: parseBoolean(process.env.AUTH_TRUST_PROXY, false),
-    cookieSecureMode: parseCookieSecureMode(process.env.AUTH_COOKIE_SECURE),
+    cookieSecureMode,
   };
 }
